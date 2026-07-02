@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "neonature-webapp",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "export PATH=$HOME/.local/node/bin:$PATH && cd webapp && npm run dev"],
+      "port": 3000
+    }
+  ]
+}

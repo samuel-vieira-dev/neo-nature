@@ -1,0 +1,17 @@
+{
+  "name": "Neo Nature",
+  "short_name": "Neo Nature",
+  "description": "Your daily wellness companion — track orders, build your streak, and get results.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070c0a",
+  "theme_color": "#070c0a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
