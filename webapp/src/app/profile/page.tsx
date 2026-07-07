@@ -14,15 +14,36 @@ import {
   Package,
   Sparkles,
   CalendarDays,
+  BookOpen,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useMe, useUpdatePrefs, useReminders, useReminderMutations, useLogout } from "@/lib/hooks";
 import { FadeUp, Toggle } from "@/components/ui";
-import { user } from "@/lib/data";
+import DemoControls from "@/components/DemoControls";
+
+const tierStyles: Record<string, string> = {
+  Bronze: "from-amber-600 to-amber-800",
+  Silver: "from-slate-300 to-slate-500",
+  Gold: "from-amber-300 to-yellow-500",
+};
 
 export default function ProfilePage() {
-  const { streak, totalDays, points, prefs, setPref, reminderTime, setReminderTime, toast, hydrated } = useApp();
+  const { toast } = useApp();
+  const { data: me } = useMe();
+  const updatePrefs = useUpdatePrefs();
+  const { data: remindersData } = useReminders();
+  const reminderMutations = useReminderMutations();
+  const logout = useLogout();
 
-  const tierProgress = Math.min(1, points / user.nextTierAt);
+  const hydrated = !!me;
+  const firstReminder = remindersData?.reminders[0];
+  const initials = me ? me.user.fullName.split(" ").map((s) => s[0]).join("").slice(0, 2) : "··";
+
+  // months → next tier progress
+  const tier = me?.tier;
+  const monthsActive = me?.subscription?.monthsActive ?? 0;
+  const tierTarget = tier?.tier === "Bronze" ? 3 : tier?.tier === "Silver" ? 6 : 6;
+  const tierProgress = Math.min(1, monthsActive / tierTarget);
 
   return (
     <div className="pt-8">
@@ -34,26 +55,37 @@ export default function ProfilePage() {
           transition={{ type: "spring", stiffness: 260, damping: 18 }}
           className="grad glow mx-auto flex h-24 w-24 items-center justify-center rounded-full font-display text-3xl font-bold text-emerald-950"
         >
-          MB
+          {initials}
         </motion.div>
-        <h1 className="mt-3 font-display text-2xl font-bold">{user.fullName}</h1>
+        <h1 className="mt-3 font-display text-2xl font-bold">{me?.user.fullName ?? "…"}</h1>
         <p className="text-xs text-muted">
-          {user.email} · Member since {user.memberSince}
+          {me?.user.email}
+          {me && (
+            <>
+              {" "}
+              · Member since {new Date(me.user.memberSince).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </>
+          )}
         </p>
       </FadeUp>
 
-      {/* tier card */}
+      {/* tier card — based on subscription months */}
       <FadeUp delay={0.07} className="mt-5 px-5">
         <div className="glass-strong relative overflow-hidden rounded-3xl p-5">
           <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-lime-400/15 blur-3xl" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-300 to-slate-500">
-                <Award className="h-5 w-5 text-slate-900" />
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${tierStyles[tier?.tier ?? "Bronze"]}`}>
+                <Award className="h-5 w-5 text-black/70" />
               </div>
               <div>
-                <p className="font-display text-base font-bold">{user.tier} member</p>
-                <p className="text-[11px] text-muted">{hydrated ? points : "—"} points</p>
+                <p className="font-display text-base font-bold">{tier?.tier ?? "…"} member</p>
+                <p className="text-[11px] text-muted">
+                  {hydrated ? `${me!.points} points` : "—"}
+                  {me && me.pointsExpiringSoon > 0 && (
+                    <span className="text-amber-300"> · {me.pointsExpiringSoon} expiring soon</span>
+                  )}
+                </p>
               </div>
             </div>
             <Sparkles className="h-5 w-5 text-lime-300" />
@@ -68,8 +100,14 @@ export default function ProfilePage() {
               />
             </div>
             <p className="mt-2 text-[11px] text-muted">
-              {user.nextTierAt - points} points to <span className="font-semibold text-amber-300">{user.nextTier}</span> — keep
-              checking in daily ✨
+              {tier?.nextTier ? (
+                <>
+                  {tier.monthsToNext} more {tier.monthsToNext === 1 ? "month" : "months"} of membership to{" "}
+                  <span className="font-semibold text-amber-300">{tier.nextTier}</span> ✨
+                </>
+              ) : (
+                <>You&apos;ve reached the top tier — enjoy the perks 🏆</>
+              )}
             </p>
           </div>
         </div>
@@ -78,9 +116,9 @@ export default function ProfilePage() {
       {/* stats */}
       <FadeUp delay={0.12} className="mt-4 grid grid-cols-3 gap-3 px-5">
         {[
-          { icon: Flame, value: streak, label: "Day streak", color: "text-orange-300", bg: "bg-orange-400/15" },
-          { icon: CalendarDays, value: totalDays, label: "Total days", color: "text-emerald-300", bg: "bg-emerald-400/15" },
-          { icon: Sparkles, value: points, label: "Points", color: "text-lime-300", bg: "bg-lime-400/15" },
+          { icon: Flame, value: me?.streak ?? 0, label: "Day streak", color: "text-orange-300", bg: "bg-orange-400/15" },
+          { icon: CalendarDays, value: me?.totalDays ?? 0, label: "Total days", color: "text-emerald-300", bg: "bg-emerald-400/15" },
+          { icon: Sparkles, value: me?.points ?? 0, label: "Points", color: "text-lime-300", bg: "bg-lime-400/15" },
         ].map((s) => (
           <div key={s.label} className="glass rounded-2xl p-3.5 text-center">
             <div className={`mx-auto flex h-9 w-9 items-center justify-center rounded-xl ${s.bg}`}>
@@ -102,22 +140,32 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="text-sm font-semibold">Daily dose reminder</p>
-                <p className="text-[11px] text-muted">We&apos;ll nudge you at this time</p>
+                <p className="text-[11px] text-muted">
+                  {firstReminder?.habitAnchor ? `Anchored: ${firstReminder.habitAnchor}` : "We'll nudge you at this time"}
+                </p>
               </div>
             </div>
-            <Toggle on={prefs.doseReminder} onChange={(v) => setPref("doseReminder", v)} />
+            <Toggle
+              on={me?.user.prefs.doseReminder ?? false}
+              onChange={(v) => updatePrefs.mutate({ doseReminder: v })}
+            />
           </div>
-          {prefs.doseReminder && (
+          {me?.user.prefs.doseReminder && firstReminder && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4">
               <input
                 type="time"
-                value={reminderTime}
+                value={firstReminder.time}
                 onChange={(e) => {
-                  setReminderTime(e.target.value);
+                  reminderMutations.update.mutate({ id: firstReminder.id, time: e.target.value });
                   toast(`Reminder set for ${e.target.value} ⏰`);
                 }}
                 className="glass w-full rounded-2xl px-4 py-3 text-center font-display text-2xl font-bold focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
               />
+              {(remindersData?.reminders.length ?? 0) > 1 && (
+                <p className="mt-2 text-center text-[11px] text-muted">
+                  +{remindersData!.reminders.length - 1} more reminder{remindersData!.reminders.length > 2 ? "s" : ""} configured
+                </p>
+              )}
             </motion.div>
           )}
         </div>
@@ -129,7 +177,7 @@ export default function ProfilePage() {
           <MapPin className="h-5 w-5 shrink-0 text-emerald-300" />
           <div className="flex-1">
             <p className="text-xs font-semibold">Shipping address</p>
-            <p className="text-[11px] text-muted">{user.address}</p>
+            <p className="text-[11px] text-muted">{me?.user.address}</p>
           </div>
           <button onClick={() => toast("Demo: address editing arrives with Phase 2 ✏️")} className="text-xs font-semibold text-emerald-300">
             Edit
@@ -143,6 +191,7 @@ export default function ProfilePage() {
           {[
             { href: "/orders", icon: Package, label: "My orders" },
             { href: "/notifications", icon: Bell, label: "Notifications" },
+            { href: "/learn", icon: BookOpen, label: "Learn" },
             { href: "/support", icon: LifeBuoy, label: "Help & support" },
           ].map((row) => (
             <Link key={row.href} href={row.href} className="flex items-center gap-3 px-5 py-4 active:bg-white/4">
@@ -152,7 +201,7 @@ export default function ProfilePage() {
             </Link>
           ))}
           <button
-            onClick={() => toast("Demo: sign-out will be wired to real auth in Phase 2 👋")}
+            onClick={() => logout.mutate()}
             className="flex w-full items-center gap-3 px-5 py-4 text-left active:bg-white/4"
           >
             <LogOut className="h-5 w-5 text-rose-300" />
@@ -161,10 +210,13 @@ export default function ProfilePage() {
         </div>
       </FadeUp>
 
-      <FadeUp delay={0.28} className="mt-6 text-center">
-        <p className="text-[10px] text-white/25">
-          Neo Nature · v0.1 demo build · made with 💚
-        </p>
+      {/* demo controls */}
+      <FadeUp delay={0.28} className="mt-4 px-5">
+        <DemoControls />
+      </FadeUp>
+
+      <FadeUp delay={0.32} className="mt-6 text-center">
+        <p className="text-[10px] text-white/25">Neo Nature · v0.2 demo build · made with 💚</p>
       </FadeUp>
     </div>
   );

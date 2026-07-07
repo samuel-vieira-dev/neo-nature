@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Home, ShoppingBag, Flame, BookOpen, User } from "lucide-react";
-import { useApp } from "@/lib/store";
+import { useMe } from "@/lib/hooks";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
@@ -14,9 +14,15 @@ const tabs = [
   { href: "/profile", label: "Profile", icon: User },
 ];
 
+const HIDDEN_ON = ["/login", "/onboarding"];
+
 export default function BottomNav() {
   const pathname = usePathname();
-  const { streak, hydrated } = useApp();
+  const { data: me } = useMe();
+  const streak = me?.streak ?? 0;
+  const hydrated = !!me;
+
+  if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
     <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4 pb-4">

@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { BookOpen, Play, Headphones, Check, Sparkles } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useContentProgress, useCompleteContent } from "@/lib/hooks";
 import { FadeUp, PageHeader, CTA } from "@/components/ui";
 import { contentBySlug, contentTracks } from "@/lib/data";
 
@@ -12,7 +13,9 @@ const kindIcon = { article: BookOpen, video: Play, audio: Headphones };
 export default function ContentPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const { completedContent, completeContent, toast } = useApp();
+  const { toast } = useApp();
+  const { data: progress } = useContentProgress();
+  const completeContent = useCompleteContent();
   const c = contentBySlug(slug);
 
   if (!c) {
@@ -25,14 +28,16 @@ export default function ContentPage() {
 
   const Icon = kindIcon[c.kind];
   const track = contentTracks.find((t) => t.id === c.track);
-  const done = completedContent.includes(c.slug);
+  const done = (progress?.completed ?? []).includes(c.slug);
 
   const markDone = () => {
-    if (!done) {
-      completeContent(c.slug);
-      toast("Nice! +5 points ✨");
-    }
-    router.push("/learn");
+    if (done) return router.push("/learn");
+    completeContent.mutate(c.slug, {
+      onSuccess: () => {
+        toast("Nice! +5 points ✨");
+        router.push("/learn");
+      },
+    });
   };
 
   return (
@@ -47,7 +52,6 @@ export default function ContentPage() {
           </div>
           <h1 className="mt-2 font-display text-2xl font-bold leading-tight">{c.title}</h1>
 
-          {/* fake media player for video/audio */}
           {c.kind !== "article" && (
             <motion.button
               whileTap={{ scale: 0.97 }}
@@ -85,7 +89,8 @@ export default function ContentPage() {
           </div>
         ) : (
           <CTA onClick={markDone}>
-            <Sparkles className="h-5 w-5" /> Mark as done · +5 points
+            <Sparkles className="h-5 w-5" />
+            {completeContent.isPending ? "Saving…" : "Mark as done · +5 points"}
           </CTA>
         )}
       </FadeUp>

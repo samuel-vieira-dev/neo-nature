@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot } from "lucide-react";
-import { useApp } from "@/lib/store";
+import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
 import { faqs } from "@/lib/data";
 
@@ -15,7 +15,8 @@ const ticketStatus = {
 };
 
 export default function SupportPage() {
-  const { tickets } = useApp();
+  const { data } = useTickets();
+  const tickets = data?.tickets ?? [];
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (

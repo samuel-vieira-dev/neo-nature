@@ -6,9 +6,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { ArrowRight, Camera, CheckCircle2, PartyPopper } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { PageHeader, Chip, CTA } from "@/components/ui";
+import { useOrders, useCreateTicket } from "@/lib/hooks";
+import { PageHeader, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
-import { orders, productById, issueTypes } from "@/lib/data";
+import { productById, issueTypes } from "@/lib/data";
 
 const stepVariants = {
   enter: { opacity: 0, x: 40 },
@@ -17,7 +18,11 @@ const stepVariants = {
 };
 
 export default function NewTicketPage() {
-  const { addTicket, toast } = useApp();
+  const { toast } = useApp();
+  const { data: ordersData } = useOrders();
+  const createTicket = useCreateTicket();
+  const orders = ordersData?.orders ?? [];
+
   const [step, setStep] = useState(0);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
@@ -26,10 +31,21 @@ export default function NewTicketPage() {
 
   const submit = () => {
     const issueLabel = issueTypes.find((i) => i.id === issue)?.label ?? "Support request";
-    const id = addTicket({ subject: issueLabel, orderNumber: orderNumber ?? "—" });
-    setTicketId(id);
-    setStep(3);
-    confetti({ particleCount: 60, spread: 60, origin: { y: 0.4 }, colors: ["#10b981", "#a3e635"] });
+    createTicket.mutate(
+      {
+        subject: issueLabel,
+        orderNumber: orderNumber ?? "—",
+        kind: issue === "refund" ? "refund" : "support",
+        description,
+      },
+      {
+        onSuccess: (res) => {
+          setTicketId(res.ticket.id);
+          setStep(3);
+          confetti({ particleCount: 60, spread: 60, origin: { y: 0.4 }, colors: ["#10b981", "#a3e635"] });
+        },
+      }
+    );
   };
 
   return (
@@ -67,7 +83,8 @@ export default function NewTicketPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex gap-1">
                         {o.items.slice(0, 2).map((it) => {
-                          const p = productById(it.productId)!;
+                          const p = productById(it.productId);
+                          if (!p) return null;
                           return <Bottle key={it.productId} accent={p.accent} label={p.short} className="h-12" />;
                         })}
                       </div>
@@ -151,7 +168,7 @@ export default function NewTicketPage() {
                 <Camera className="h-4 w-4" /> Add a photo (optional)
               </button>
               <div className="mt-5">
-                <CTA onClick={submit}>Submit ticket</CTA>
+                <CTA onClick={submit}>{createTicket.isPending ? "Submitting…" : "Submit ticket"}</CTA>
               </div>
             </motion.div>
           )}

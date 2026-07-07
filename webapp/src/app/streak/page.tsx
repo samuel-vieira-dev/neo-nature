@@ -2,39 +2,68 @@
 
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { Flame, Shield, Trophy, CalendarDays, Check, Lock } from "lucide-react";
+import { Flame, Shield, Trophy, CalendarDays, Check, Lock, Undo2 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useMe, useCheckIn } from "@/lib/hooks";
 import { FadeUp, PageHeader, CTA } from "@/components/ui";
 import { milestones } from "@/lib/data";
 
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-
 export default function StreakPage() {
-  const { streak, bestStreak, totalDays, freezes, checkedInToday, checkIn, checkinDays, toast, hydrated, points } = useApp();
+  const { toast } = useApp();
+  const { data: me } = useMe();
+  const checkInMutation = useCheckIn();
+
+  const hydrated = !!me;
+  const streak = me?.streak ?? 0;
+  const checkedInToday = me?.checkedInToday ?? false;
+  const checkinDays = me?.checkinDays ?? [];
+  const freezes = me?.user.freezes ?? 0;
+  const today = me?.today ?? new Date().toISOString().slice(0, 10);
 
   const handleCheckIn = () => {
-    if (checkedInToday) return;
-    checkIn();
-    confetti({
-      particleCount: 140,
-      spread: 90,
-      origin: { y: 0.4 },
-      colors: ["#10b981", "#a3e635", "#fb923c", "#fbbf24"],
+    if (checkedInToday || checkInMutation.isPending) return;
+    checkInMutation.mutate(undefined, {
+      onSuccess: (res) => {
+        confetti({
+          particleCount: 140,
+          spread: 90,
+          origin: { y: 0.4 },
+          colors: ["#10b981", "#a3e635", "#fb923c", "#fbbf24"],
+        });
+        toast(`Day ${res.streak} logged! +10 points 🔥`);
+      },
     });
-    toast(`Day ${streak + 1} logged! +10 points 🔥`);
   };
 
-  // current month calendar
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  // "recover yesterday" is available when yesterday is missing but the day
+  // before is logged — no-punishment streaks (spends one freeze)
+  const yesterday = new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10);
+  const dayBefore = new Date(Date.parse(today) - 2 * 86400000).toISOString().slice(0, 10);
+  const canRecover =
+    hydrated && freezes > 0 && !checkinDays.includes(yesterday) && checkinDays.includes(dayBefore);
+
+  const handleRecover = () => {
+    checkInMutation.mutate(
+      { recover: true },
+      {
+        onSuccess: () => toast("Yesterday recovered — streak saved! 🛡️ (1 freeze used)"),
+        onError: () => toast("No freezes left this month"),
+      }
+    );
+  };
+
+  // calendar for the user's current month (respects demo time travel)
+  const anchor = new Date(Date.parse(today) + 12 * 3600000);
+  const year = anchor.getUTCFullYear();
+  const month = anchor.getUTCMonth();
+  const firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const monthName = anchor.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
   const done = new Set(checkinDays);
-  const todayIso = isoDay(now);
 
   const nextMilestone = milestones.find((m) => m > streak) ?? 90;
+  const bestStreak = me?.bestStreak ?? 0;
+  const totalDays = me?.totalDays ?? 0;
 
   return (
     <div>
@@ -73,9 +102,20 @@ export default function StreakPage() {
           {!checkedInToday && (
             <div className="mt-5">
               <CTA onClick={handleCheckIn}>
-                <Flame className="h-5 w-5" fill="currentColor" /> I took it today
+                <Flame className="h-5 w-5" fill="currentColor" />
+                {checkInMutation.isPending ? "Logging…" : "I took it today"}
               </CTA>
             </div>
+          )}
+
+          {canRecover && (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={handleRecover}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-sky-400/25 bg-sky-400/10 py-3 text-sm font-semibold text-sky-300"
+            >
+              <Undo2 className="h-4 w-4" /> Missed yesterday? Recover it (uses 1 freeze)
+            </motion.button>
           )}
         </div>
       </FadeUp>
@@ -102,8 +142,8 @@ export default function StreakPage() {
         <div className="glass flex items-start gap-3 rounded-2xl p-4">
           <Shield className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
           <p className="text-xs leading-relaxed text-muted">
-            <span className="font-semibold text-sky-300">Streak Freeze:</span> life happens. If you miss a day, a freeze
-            is used automatically and your flame survives. You get 2 per month.
+            <span className="font-semibold text-sky-300">Streak Freeze:</span> life happens. Miss a day and you can
+            recover it the next morning — your flame survives. You get 2 freezes per month.
           </p>
         </div>
       </FadeUp>
@@ -122,21 +162,21 @@ export default function StreakPage() {
               <span key={`sp-${i}`} />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const iso = isoDay(new Date(year, month, day, 12));
+              const dayNum = i + 1;
+              const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
               const isDone = done.has(iso);
-              const isToday = iso === todayIso;
-              const isFuture = iso > todayIso;
+              const isToday = iso === today;
+              const isFuture = iso > today;
               return (
                 <motion.div
-                  key={day}
+                  key={dayNum}
                   initial={{ opacity: 0, scale: 0.5 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.2 + i * 0.012 }}
                   className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold
                     ${isDone ? "grad text-emerald-950" : isToday ? "border border-dashed border-emerald-400/60 text-emerald-300" : isFuture ? "text-white/25" : "text-muted"}`}
                 >
-                  {isDone ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : day}
+                  {isDone ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : dayNum}
                 </motion.div>
               );
             })}
@@ -175,7 +215,9 @@ export default function StreakPage() {
       </FadeUp>
 
       <FadeUp delay={0.26} className="mt-2 px-5 text-center">
-        <p className="text-[11px] text-muted">Every check-in earns +10 points · You have {hydrated ? points : "—"} points</p>
+        <p className="text-[11px] text-muted">
+          Every check-in earns +10 points · You have {hydrated ? me!.points : "—"} points
+        </p>
       </FadeUp>
     </div>
   );

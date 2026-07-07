@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Bell, BellRing, Flame, Package, BookOpen, Tag, FlaskConical } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useMe, useNotifications, useMarkAllRead, useTestNotification, useUpdatePrefs } from "@/lib/hooks";
 import { FadeUp, PageHeader, Toggle } from "@/components/ui";
 
 const icons = { flame: Flame, package: Package, book: BookOpen, tag: Tag };
@@ -15,36 +16,45 @@ const iconTones = {
 };
 
 export default function NotificationsPage() {
-  const { notifications, markAllRead, prefs, setPref, pushNotification, toast, streak } = useApp();
+  const { toast } = useApp();
+  const { data: me } = useMe();
+  const { data } = useNotifications();
+  const markAllRead = useMarkAllRead();
+  const testNotification = useTestNotification();
+  const updatePrefs = useUpdatePrefs();
+  const marked = useRef(false);
 
   useEffect(() => {
-    const t = setTimeout(markAllRead, 800);
-    return () => clearTimeout(t);
-  }, [markAllRead]);
-
-  const testPush = async () => {
-    const body = `💊 Time for your dose — keep that ${streak}-day streak alive!`;
-
-    if (!("Notification" in window)) {
-      pushNotification({ title: "Test notification", body, icon: "flame" });
-      toast("This browser doesn't support push — added to the list below instead.");
-      return;
+    if (!marked.current && (me?.unread ?? 0) > 0) {
+      marked.current = true;
+      const t = setTimeout(() => markAllRead.mutate(), 800);
+      return () => clearTimeout(t);
     }
-    let perm = Notification.permission;
-    if (perm === "default") perm = await Notification.requestPermission();
+  }, [me?.unread, markAllRead]);
 
-    if (perm === "granted") {
-      new Notification("Neo Nature 🌿", { body, icon: "/icon.svg" });
-      pushNotification({ title: "Test notification sent 🔔", body, icon: "flame" });
-      toast("Push sent! Check your system notifications.");
-    } else {
-      pushNotification({ title: "Test notification (in-app)", body, icon: "flame" });
-      toast("Push permission denied — showing in-app instead.");
-    }
+  const testPush = () => {
+    testNotification.mutate(undefined, {
+      onSuccess: async (payload) => {
+        if (!("Notification" in window)) {
+          toast("This browser doesn't support push — added to the list below instead.");
+          return;
+        }
+        let perm = Notification.permission;
+        if (perm === "default") perm = await Notification.requestPermission();
+        if (perm === "granted") {
+          new Notification(payload.title, { body: payload.body, icon: "/icon.svg" });
+          toast("Push sent! Check your system notifications.");
+        } else {
+          toast("Push permission denied — showing in-app instead.");
+        }
+      },
+    });
   };
 
+  const notifications = data?.notifications ?? [];
   const today = notifications.filter((n) => n.group === "today");
   const earlier = notifications.filter((n) => n.group === "earlier");
+  const prefs = me?.user.prefs;
 
   return (
     <div>
@@ -69,7 +79,8 @@ export default function NotificationsPage() {
             onClick={testPush}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3 font-display text-sm font-bold text-amber-950"
           >
-            <BellRing className="h-4 w-4" /> Send test notification
+            <BellRing className="h-4 w-4" />
+            {testNotification.isPending ? "Sending…" : "Send test notification"}
           </motion.button>
         </div>
       </FadeUp>
@@ -91,7 +102,10 @@ export default function NotificationsPage() {
                 <p className="text-sm font-semibold">{row.label}</p>
                 <p className="text-[11px] text-muted">{row.sub}</p>
               </div>
-              <Toggle on={prefs[row.key]} onChange={(v) => setPref(row.key, v)} />
+              <Toggle
+                on={prefs?.[row.key] ?? false}
+                onChange={(v) => updatePrefs.mutate({ [row.key]: v })}
+              />
             </div>
           ))}
         </div>
@@ -117,8 +131,8 @@ export default function NotificationsPage() {
                       transition={{ delay: 0.16 + i * 0.05 }}
                       className="glass flex gap-3 rounded-2xl p-4"
                     >
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTones[n.icon]}`}>
-                        <Icon className="h-4.5 w-4.5" />
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTones[n.icon] ?? iconTones.flame}`}>
+                        <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">

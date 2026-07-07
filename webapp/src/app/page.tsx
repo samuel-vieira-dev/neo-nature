@@ -16,35 +16,48 @@ import {
   BookOpen,
   Headphones,
   Sparkles,
+  Pill,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
 import { FadeUp, ProgressRing, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
-import { orders, products, contentItems, user, milestones } from "@/lib/data";
+import { products, contentItems, milestones, productById } from "@/lib/data";
 
 const kindIcon = { article: BookOpen, video: Play, audio: Headphones };
 
 export default function Home() {
-  const { name, streak, checkedInToday, checkIn, points, unread, toast, hydrated } = useApp();
+  const { toast } = useApp();
+  const { data: me } = useMe();
+  const { data: ordersData } = useOrders();
+  const checkInMutation = useCheckIn();
+
+  const hydrated = !!me;
+  const streak = me?.streak ?? 0;
+  const checkedInToday = me?.checkedInToday ?? false;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const activeOrder = orders.find((o) => o.status === "in_transit");
+  const activeOrder = ordersData?.orders.find((o) => o.status === "in_transit");
   const nextMilestone = milestones.find((m) => m > streak) ?? 90;
   const learnPreview = contentItems.filter((c) => !c.locked).slice(1, 5);
-  const featured = products.filter((p) => p.featured);
+  const featured = products.filter((p) => p.featured).slice(0, 5);
+  const bottleProduct = me?.bottle ? productById(me.bottle.productId) : null;
 
   const handleCheckIn = () => {
-    if (checkedInToday) return;
-    checkIn();
-    confetti({
-      particleCount: 90,
-      spread: 75,
-      origin: { y: 0.55 },
-      colors: ["#10b981", "#a3e635", "#34d399", "#fbbf24"],
+    if (checkedInToday || checkInMutation.isPending) return;
+    checkInMutation.mutate(undefined, {
+      onSuccess: (res) => {
+        confetti({
+          particleCount: 90,
+          spread: 75,
+          origin: { y: 0.55 },
+          colors: ["#10b981", "#a3e635", "#34d399", "#fbbf24"],
+        });
+        toast(`Day ${res.streak} logged! +10 points 🔥`);
+      },
     });
-    toast(`Day ${streak + 1} logged! +10 points 🔥`);
   };
 
   return (
@@ -54,18 +67,18 @@ export default function Home() {
         <div>
           <p className="text-sm text-muted">{greeting},</p>
           <h1 className="font-display text-2xl font-bold">
-            {name} <span className="inline-block">👋</span>
+            {me?.user.name ?? "…"} <span className="inline-block">👋</span>
           </h1>
         </div>
         <div className="flex items-center gap-2.5">
           <Link href="/notifications" className="glass relative flex h-11 w-11 items-center justify-center rounded-full active:scale-90 transition-transform">
             <Bell className="h-5 w-5" />
-            {hydrated && unread > 0 && (
+            {hydrated && (me?.unread ?? 0) > 0 && (
               <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-[#0d1512]" />
             )}
           </Link>
           <Link href="/profile" className="grad flex h-11 w-11 items-center justify-center rounded-full font-display text-sm font-bold text-emerald-950 active:scale-90 transition-transform">
-            MB
+            {me ? me.user.fullName.split(" ").map((s) => s[0]).join("").slice(0, 2) : "··"}
           </Link>
         </div>
       </FadeUp>
@@ -104,12 +117,37 @@ export default function Home() {
               </Link>
             ) : (
               <CTA onClick={handleCheckIn}>
-                <Flame className="h-5 w-5" fill="currentColor" /> I took it today
+                <Flame className="h-5 w-5" fill="currentColor" />
+                {checkInMutation.isPending ? "Logging…" : "I took it today"}
               </CTA>
             )}
           </div>
         </div>
       </FadeUp>
+
+      {/* bottle forecast */}
+      {me?.bottle && bottleProduct && (
+        <FadeUp delay={0.09} className="mt-4">
+          <div className="glass flex items-center gap-3 rounded-2xl px-4 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: `${bottleProduct.accent}22` }}>
+              <Pill className="h-4 w-4" style={{ color: bottleProduct.accent }} />
+            </div>
+            <p className="flex-1 text-xs text-muted">
+              <span className="font-semibold text-white/90">{bottleProduct.name}:</span>{" "}
+              {me.bottle.daysLeft > 0 ? (
+                <>~{me.bottle.daysLeft} days of doses left</>
+              ) : (
+                <span className="text-orange-300">bottle is empty — time to restock</span>
+              )}
+            </p>
+            {me.bottle.daysLeft <= 7 && (
+              <Link href="/shop" className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300">
+                Reorder
+              </Link>
+            )}
+          </div>
+        </FadeUp>
+      )}
 
       {/* order in transit */}
       {activeOrder && (
@@ -131,7 +169,6 @@ export default function Home() {
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted" />
               </div>
-              {/* mini progress */}
               <div className="mt-4 flex items-center gap-1.5">
                 {activeOrder.tracking.map((s, i) => (
                   <div key={i} className={`h-1.5 flex-1 rounded-full ${s.done ? "grad" : "bg-white/10"}`} />
@@ -222,9 +259,13 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-lime-300" />
               <div>
-                <p className="text-sm font-semibold">{hydrated ? points : "—"} points</p>
+                <p className="text-sm font-semibold">{hydrated ? me!.points : "—"} points</p>
                 <p className="text-[11px] text-muted">
-                  {user.tier} member · {user.nextTierAt - points} to {user.nextTier}
+                  {me
+                    ? me.tier.nextTier
+                      ? `${me.tier.tier} member · ${me.tier.monthsToNext} more ${me.tier.monthsToNext === 1 ? "month" : "months"} to ${me.tier.nextTier}`
+                      : `${me.tier.tier} member`
+                    : ""}
                 </p>
               </div>
             </div>

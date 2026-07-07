@@ -5,14 +5,24 @@ import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Copy, LifeBuoy, MapPin, RotateCcw, Truck, Check } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useOrder } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 import Bottle from "@/components/Bottle";
-import { orderById, productById } from "@/lib/data";
+import { productById } from "@/lib/data";
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useApp();
-  const order = orderById(id);
+  const { data, isLoading } = useOrder(id);
+  const order = data?.order;
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader title="Loading…" backHref="/orders" />
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -88,13 +98,9 @@ export default function OrderDetailPage() {
                   transition={{ delay: 0.12 + i * 0.08 }}
                   className="relative flex gap-4 pb-6 last:pb-0"
                 >
-                  {/* rail */}
                   {!isLast && (
-                    <span
-                      className={`absolute left-[11px] top-6 h-full w-0.5 ${step.done ? "grad" : "bg-white/10"}`}
-                    />
+                    <span className={`absolute left-[11px] top-6 h-full w-0.5 ${step.done ? "grad" : "bg-white/10"}`} />
                   )}
-                  {/* dot */}
                   <span
                     className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full
                       ${step.done ? "grad" : "border-2 border-white/15 bg-[#0d1512]"}
@@ -124,7 +130,8 @@ export default function OrderDetailPage() {
           <h3 className="mb-3 font-display text-base font-bold">Items</h3>
           <div className="space-y-3">
             {order.items.map((it) => {
-              const p = productById(it.productId)!;
+              const p = productById(it.productId);
+              if (!p) return null;
               return (
                 <Link key={it.productId} href={`/shop/${p.id}`} className="flex items-center gap-3">
                   <div className="rounded-xl bg-white/4 p-1.5">

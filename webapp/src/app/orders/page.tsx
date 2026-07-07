@@ -5,8 +5,9 @@ import { motion } from "framer-motion";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 import Bottle from "@/components/Bottle";
-import { orders, productById } from "@/lib/data";
+import { productById } from "@/lib/data";
 import { useApp } from "@/lib/store";
+import { useOrders } from "@/lib/hooks";
 
 const statusChip = {
   processing: { tone: "amber" as const, label: "Processing" },
@@ -16,10 +17,12 @@ const statusChip = {
 
 export default function OrdersPage() {
   const { toast } = useApp();
+  const { data } = useOrders();
+  const orders = data?.orders ?? [];
 
   return (
     <div>
-      <PageHeader title="My orders" subtitle={`${orders.length} orders since April 2026`} backHref="/" />
+      <PageHeader title="My orders" subtitle={orders.length ? `${orders.length} orders` : "Loading…"} backHref="/" />
 
       <div className="space-y-3 px-5">
         {orders.map((o, i) => {
@@ -38,7 +41,8 @@ export default function OrdersPage() {
 
                   <div className="mt-4 flex items-center gap-2">
                     {o.items.map((it) => {
-                      const p = productById(it.productId)!;
+                      const p = productById(it.productId);
+                      if (!p) return null;
                       return (
                         <div key={it.productId} className="relative rounded-xl bg-white/4 p-1.5">
                           <Bottle accent={p.accent} label={p.short} className="h-14" />

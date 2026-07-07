@@ -4,14 +4,18 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Play, Headphones, Lock, Check, Flame } from "lucide-react";
-import { useApp } from "@/lib/store";
+import { useMe, useContentProgress } from "@/lib/hooks";
 import { FadeUp } from "@/components/ui";
 import { contentTracks, contentItems } from "@/lib/data";
 
 const kindIcon = { article: BookOpen, video: Play, audio: Headphones };
 
 export default function LearnPage() {
-  const { completedContent, streak, hydrated } = useApp();
+  const { data: me } = useMe();
+  const { data: progress } = useContentProgress();
+  const completedContent = progress?.completed ?? [];
+  const streak = me?.streak ?? 0;
+  const hydrated = !!me;
   const [track, setTrack] = useState("first30");
 
   const items = contentItems.filter((c) => c.track === track);

@@ -102,6 +102,22 @@ export const products: Product[] = [
     featured: true,
     benefits: ["Laser focus", "Faster recall", "Calm mental energy", "No jitters, no crash"],
   },
+  {
+    id: "glucoease",
+    name: "GlucoEase",
+    short: "GLUCO EASE",
+    tagline: "Blood Sugar Support",
+    category: "Metabolic Health",
+    accent: "#2dd4bf",
+    price: 55,
+    compareAt: 75,
+    capsules: 60,
+    dosePerDay: 2,
+    rating: 4.7,
+    reviews: 918,
+    featured: true,
+    benefits: ["Support healthy glucose levels", "Steadier morning readings", "Berberine + chromium blend", "Fewer energy crashes"],
+  },
   // -------- extended line (the "esteira") --------
   { id: "flexease", name: "FlexEase", short: "FLEX EASE", tagline: "Joint Comfort & Mobility", category: "Joint Health", accent: "#f43f5e", price: 49, capsules: 60, dosePerDay: 2, rating: 4.5, reviews: 623, featured: false, benefits: ["Ease stiff joints", "Support cartilage", "Move freely again"] },
   { id: "gutbios", name: "GutBios", short: "GUT BIOS", tagline: "40B CFU Probiotic Complex", category: "Gut Health", accent: "#eab308", price: 44, capsules: 30, dosePerDay: 1, rating: 4.6, reviews: 511, featured: false, benefits: ["Balance gut flora", "Reduce bloating", "Immunity from within"] },
@@ -116,96 +132,6 @@ export const products: Product[] = [
 ];
 
 export const productById = (id: string) => products.find((p) => p.id === id);
-
-// ---------------------------------------------------------------------------
-
-export type TrackingStep = {
-  label: string;
-  detail: string;
-  date: string;
-  done: boolean;
-  current?: boolean;
-};
-
-export type Order = {
-  id: string;
-  number: string;
-  date: string;
-  status: "processing" | "in_transit" | "delivered";
-  items: { productId: string; qty: number; price: number }[];
-  total: number;
-  eta?: string;
-  carrier?: string;
-  trackingNumber?: string;
-  address: string;
-  tracking: TrackingStep[];
-};
-
-export const orders: Order[] = [
-  {
-    id: "o1",
-    number: "NN-10482",
-    date: "Jun 26, 2026",
-    status: "in_transit",
-    items: [
-      { productId: "heroup", qty: 2, price: 138 },
-      { productId: "igniteburn", qty: 1, price: 49 },
-    ],
-    total: 187,
-    eta: "Thursday, Jul 3",
-    carrier: "USPS",
-    trackingNumber: "9400 1102 3387 4512 9981 02",
-    address: "2847 Maplewood Ave, Austin, TX 78704",
-    tracking: [
-      { label: "Order confirmed", detail: "We received your order", date: "Jun 26, 9:14 AM", done: true },
-      { label: "Preparing your package", detail: "Fulfillment center — Dallas, TX", date: "Jun 27, 2:30 PM", done: true },
-      { label: "Shipped", detail: "Handed to USPS", date: "Jun 28, 11:05 AM", done: true },
-      { label: "In transit", detail: "Last scan: Waco, TX distribution center", date: "Jun 30, 8:47 PM", done: true, current: true },
-      { label: "Out for delivery", detail: "", date: "", done: false },
-      { label: "Delivered", detail: "", date: "", done: false },
-    ],
-  },
-  {
-    id: "o2",
-    number: "NN-09917",
-    date: "May 18, 2026",
-    status: "delivered",
-    items: [{ productId: "verdagreens", qty: 1, price: 59 }],
-    total: 59,
-    carrier: "UPS",
-    trackingNumber: "1Z 999 AA1 01 2345 6784",
-    address: "2847 Maplewood Ave, Austin, TX 78704",
-    tracking: [
-      { label: "Order confirmed", detail: "We received your order", date: "May 18, 10:02 AM", done: true },
-      { label: "Preparing your package", detail: "Fulfillment center — Dallas, TX", date: "May 18, 4:12 PM", done: true },
-      { label: "Shipped", detail: "Handed to UPS", date: "May 19, 9:40 AM", done: true },
-      { label: "In transit", detail: "Arrived at Austin, TX facility", date: "May 21, 6:15 AM", done: true },
-      { label: "Out for delivery", detail: "On the truck", date: "May 22, 7:58 AM", done: true },
-      { label: "Delivered", detail: "Left at front door", date: "May 22, 1:26 PM", done: true },
-    ],
-  },
-  {
-    id: "o3",
-    number: "NN-09312",
-    date: "Apr 09, 2026",
-    status: "delivered",
-    items: [{ productId: "heroup", qty: 1, price: 69 }],
-    total: 69,
-    carrier: "USPS",
-    trackingNumber: "9400 1102 3387 1120 4471 88",
-    address: "2847 Maplewood Ave, Austin, TX 78704",
-    tracking: [
-      { label: "Order confirmed", detail: "We received your order", date: "Apr 09, 8:21 AM", done: true },
-      { label: "Preparing your package", detail: "Fulfillment center — Dallas, TX", date: "Apr 09, 3:44 PM", done: true },
-      { label: "Shipped", detail: "Handed to USPS", date: "Apr 10, 10:12 AM", done: true },
-      { label: "In transit", detail: "", date: "Apr 12", done: true },
-      { label: "Out for delivery", detail: "", date: "Apr 14, 8:03 AM", done: true },
-      { label: "Delivered", detail: "In/at mailbox", date: "Apr 14, 12:51 PM", done: true },
-    ],
-  },
-];
-
-export const orderById = (id: string) => orders.find((o) => o.id === id);
 
 // ---------------------------------------------------------------------------
 
@@ -244,26 +170,6 @@ export const contentBySlug = (slug: string) => contentItems.find((c) => c.slug =
 
 // ---------------------------------------------------------------------------
 
-export type Ticket = {
-  id: string;
-  subject: string;
-  orderNumber: string;
-  status: "open" | "in_review" | "resolved";
-  date: string;
-  lastMessage: string;
-};
-
-export const seedTickets: Ticket[] = [
-  {
-    id: "T-2201",
-    subject: "Package arrived with a dented bottle",
-    orderNumber: "NN-09917",
-    status: "resolved",
-    date: "May 24, 2026",
-    lastMessage: "We shipped a free replacement — so sorry about that! It arrived May 29.",
-  },
-];
-
 export const faqs = [
   { q: "Where is my order?", a: "Every order ships within 24h (Mon–Fri) and typically arrives in 3–5 business days. Track it in real time on the Orders tab — no need to open a ticket." },
   { q: "What is your refund policy?", a: "Every purchase is covered by a 60-day, no-questions-asked money-back guarantee. Open a ticket and we'll process it within 48 hours — you don't even need to return the bottle." },
@@ -280,36 +186,5 @@ export const issueTypes = [
 ];
 
 // ---------------------------------------------------------------------------
-
-export type AppNotification = {
-  id: string;
-  title: string;
-  body: string;
-  time: string;
-  group: "today" | "earlier";
-  icon: "flame" | "package" | "book" | "tag";
-};
-
-export const seedNotifications: AppNotification[] = [
-  { id: "n1", title: "Don't lose your streak! 🔥", body: "You're on a 12-day streak. Take your HeroUp and check in.", time: "8:00 AM", group: "today", icon: "flame" },
-  { id: "n2", title: "Your package is moving 📦", body: "Order NN-10482 left the Waco, TX facility. ETA Thursday, Jul 3.", time: "6:47 AM", group: "today", icon: "package" },
-  { id: "n3", title: "New for you: Sleep, the silent multiplier", body: "A 5-minute listen that could change your results.", time: "Yesterday", group: "earlier", icon: "book" },
-  { id: "n4", title: "You unlocked a new article 🎉", body: "7-day streak reached — 'Weeks 3–4: The turning point' is now closer.", time: "Jun 28", group: "earlier", icon: "flame" },
-  { id: "n5", title: "Order confirmed", body: "We received order NN-10482 — 2× HeroUp + 1× IgniteBurn.", time: "Jun 26", group: "earlier", icon: "package" },
-];
-
-// ---------------------------------------------------------------------------
-
-export const user = {
-  name: "Michael",
-  fullName: "Michael Brooks",
-  email: "michael.brooks@example.com",
-  memberSince: "April 2026",
-  address: "2847 Maplewood Ave, Austin, TX 78704",
-  tier: "Silver",
-  nextTier: "Gold",
-  points: 480,
-  nextTierAt: 1000,
-};
 
 export const milestones = [7, 14, 30, 60, 90];
