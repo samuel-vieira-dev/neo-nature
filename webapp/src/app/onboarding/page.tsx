@@ -8,6 +8,7 @@ import confetti from "canvas-confetti";
 import { ArrowRight, Bell, Camera, Check, Flame, Leaf, Play, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { uploadPhoto } from "@/lib/photo";
+import { ensurePushSubscription } from "@/lib/push";
 import { CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
 import { productById } from "@/lib/data";
@@ -64,8 +65,8 @@ export default function OnboardingPage() {
     if (!goal || !product) return;
     setBusy(true);
 
-    if (pushOptIn && "Notification" in window && Notification.permission === "default") {
-      await Notification.requestPermission().catch(() => {});
+    if (pushOptIn) {
+      await ensurePushSubscription().catch(() => "unsupported");
     }
 
     const res = await fetch("/api/onboarding", {

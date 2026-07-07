@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Bell, BellRing, Flame, Package, BookOpen, Tag, FlaskConical } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { ensurePushSubscription } from "@/lib/push";
 import { useMe, useNotifications, useMarkAllRead, useTestNotification, useUpdatePrefs } from "@/lib/hooks";
 import { FadeUp, PageHeader, Toggle } from "@/components/ui";
 
@@ -32,21 +33,14 @@ export default function NotificationsPage() {
     }
   }, [me?.unread, markAllRead]);
 
-  const testPush = () => {
+  const testPush = async () => {
+    // subscribe this browser first, then let the SERVER send a real web push
+    const status = await ensurePushSubscription().catch(() => "unsupported" as const);
     testNotification.mutate(undefined, {
-      onSuccess: async (payload) => {
-        if (!("Notification" in window)) {
-          toast("This browser doesn't support push — added to the list below instead.");
-          return;
-        }
-        let perm = Notification.permission;
-        if (perm === "default") perm = await Notification.requestPermission();
-        if (perm === "granted") {
-          new Notification(payload.title, { body: payload.body, icon: "/icon.svg" });
-          toast("Push sent! Check your system notifications.");
-        } else {
-          toast("Push permission denied — showing in-app instead.");
-        }
+      onSuccess: () => {
+        if (status === "subscribed") toast("Real push sent! Check your system notifications 🔔");
+        else if (status === "denied") toast("Push permission denied — delivered in-app instead.");
+        else toast("Push not supported here — delivered in-app instead.");
       },
     });
   };

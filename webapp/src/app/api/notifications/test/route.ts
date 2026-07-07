@@ -1,11 +1,12 @@
 import { db } from "@/db";
-import { notifications, doseLogs } from "@/db/schema";
+import { doseLogs } from "@/db/schema";
 import { withUser } from "@/server/session";
 import { userToday } from "@/server/time";
 import { computeStreak } from "@/server/domain";
+import { notifyUser } from "@/server/push";
 import { desc, eq } from "drizzle-orm";
 
-/** Demo helper: creates an in-app notification (real web push arrives in Etapa 3) */
+/** Demo helper: sends a REAL web push (plus the in-app notification row) */
 export const POST = withUser(async (user) => {
   const doses = await db.query.doseLogs.findMany({
     where: eq(doseLogs.userId, user.id),
@@ -15,10 +16,7 @@ export const POST = withUser(async (user) => {
   const streak = computeStreak(doses.map((d) => d.day), userToday(user));
   const body = `💊 Time for your dose — keep that ${streak}-day streak alive!`;
 
-  const [row] = await db
-    .insert(notifications)
-    .values({ userId: user.id, title: "Test notification 🔔", body, icon: "flame" })
-    .returning();
+  await notifyUser(user.id, { title: "Neo Nature 🌿", body, icon: "flame", url: "/streak" });
 
-  return Response.json({ ok: true, title: "Neo Nature 🌿", body, id: row.id });
+  return Response.json({ ok: true, title: "Neo Nature 🌿", body });
 });
