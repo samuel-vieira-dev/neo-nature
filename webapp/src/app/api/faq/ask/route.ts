@@ -23,7 +23,7 @@ export const POST = withUser(async (user, request: Request) => {
       const corpus = faqs.map((f, i) => `[${i + 1}] Q: ${f.q}\nA: ${f.a}`).join("\n\n");
 
       const msg = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
+        model: process.env.FAQ_AI_MODEL ?? "claude-haiku-4-5-20251001",
         max_tokens: 300,
         system: `You are Neo Nature's support assistant. Answer the customer's question in 2-3 friendly sentences using ONLY the FAQ knowledge below. If the FAQ doesn't cover it, say so and suggest opening a ticket. Never give medical advice beyond what the FAQ says.\n\nFAQ:\n${corpus}`,
         messages: [{ role: "user", content: question }],

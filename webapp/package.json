@@ -11,7 +11,9 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "env:gen": "tsx scripts/gen-env.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:push:prod": "DRIZZLE_ENV=production drizzle-kit push",
+    "db:seed:prod": "tsx --env-file=.env.production scripts/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
