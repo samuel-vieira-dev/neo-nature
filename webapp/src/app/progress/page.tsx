@@ -7,6 +7,7 @@ import {
   Camera,
   Check,
   Flame,
+  Gift,
   Lock,
   Megaphone,
   PartyPopper,
@@ -18,6 +19,7 @@ import {
   Trophy,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useApp } from "@/lib/store";
 import { useMe, useResults, useLogResult, useSubmitTestimonial, type ResultEntry } from "@/lib/hooks";
 import { uploadPhoto } from "@/lib/photo";
@@ -404,6 +406,23 @@ export default function ProgressPage() {
             </div>
           </FadeUp>
         ))}
+
+      {/* referral at the moment of a felt result (doc §5) */}
+      {improving && (
+        <FadeUp delay={0.18} className="mt-4 px-5">
+          <Link href="/referral">
+            <motion.div whileTap={{ scale: 0.97 }} className="glass flex w-full items-center gap-3 rounded-2xl border-emerald-400/20 p-4 text-left">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/15">
+                <Gift className="h-5 w-5 text-emerald-300" />
+              </div>
+              <span className="flex-1">
+                <span className="block text-sm font-bold">Know someone who needs this?</span>
+                <span className="block text-[11px] text-muted">Give 20% off · earn 500 points per friend</span>
+              </span>
+            </motion.div>
+          </Link>
+        </FadeUp>
+      )}
 
       {/* share-story banner (shown when improving, before day 30) */}
       {improving && !day30Ready && (

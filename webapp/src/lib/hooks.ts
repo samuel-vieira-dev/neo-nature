@@ -311,6 +311,41 @@ export function useRefill() {
   });
 }
 
+// -------- rewards & referral --------
+
+export function useRewards() {
+  return useQuery({
+    queryKey: ["rewards"],
+    queryFn: () =>
+      api<{
+        balance: { total: number; expiringSoon: number; nextExpiryAt: string | null };
+        ledger: { id: number; delta: number; reason: string; expiresAt: string | null; createdAt: string }[];
+      }>("/api/rewards"),
+  });
+}
+
+export function useRedeemReward() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rewardId: string) => api("/api/rewards", { method: "POST", body: JSON.stringify({ rewardId }) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useReferral() {
+  return useQuery({
+    queryKey: ["referral"],
+    queryFn: () =>
+      api<{
+        code: string;
+        invitedCount: number;
+        convertedCount: number;
+        pointsPerConversion: number;
+        leaderboard: { rank: number; name: string; converted: number; you: boolean }[];
+      }>("/api/referral"),
+  });
+}
+
 // -------- demo controls --------
 
 export function useDemoTime() {

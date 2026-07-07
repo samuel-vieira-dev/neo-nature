@@ -278,7 +278,7 @@ export default function Home() {
 
       {/* points footer */}
       <FadeUp delay={0.36} className="mt-6">
-        <Link href="/profile">
+        <Link href="/rewards">
           <div className="glass flex items-center justify-between rounded-2xl px-5 py-4">
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-lime-300" />

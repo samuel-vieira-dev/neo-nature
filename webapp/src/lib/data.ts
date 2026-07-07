@@ -181,6 +181,37 @@ export const kitById = (id: string) => kits.find((k) => k.id === id);
 export const kitCompareAt = (k: Kit) =>
   k.productIds.reduce((sum, id) => sum + (productById(id)?.price ?? 0), 0);
 
+// ---------------------------------------------------------------------------
+// Rewards store (doc §5) — points buy upgrades and product, never raw discounts
+// ---------------------------------------------------------------------------
+
+export type Reward = {
+  id: string;
+  name: string;
+  detail: string;
+  cost: number;
+  kind: "upgrade" | "product" | "freeze" | "access";
+  emoji: string;
+};
+
+export const rewards: Reward[] = [
+  { id: "freeze-pack", name: "Streak Freeze 3-pack", detail: "Insurance for busy weeks — your flame survives", cost: 250, kind: "freeze", emoji: "🛡️" },
+  { id: "early-access", name: "Early Access Pass", detail: "New formulas 2 weeks before everyone else", cost: 400, kind: "access", emoji: "🎟️" },
+  { id: "premium-unlock", name: "Premium Product Unlock", detail: "Any bottle free with your next order", cost: 900, kind: "product", emoji: "🎁" },
+  { id: "free-month", name: "Free Subscription Month", detail: "One renewal completely on us", cost: 1200, kind: "upgrade", emoji: "👑" },
+];
+
+export const rewardById = (id: string) => rewards.find((r) => r.id === id);
+
+/** Fake leaderboard seed — the signed-in user's row is merged in at runtime */
+export const referralLeaderboardSeed = [
+  { name: "Amanda T.", converted: 11 },
+  { name: "Marcus L.", converted: 8 },
+  { name: "Katie R.", converted: 6 },
+  { name: "Devon P.", converted: 4 },
+  { name: "Sofia M.", converted: 2 },
+];
+
 /** "Pairs perfectly" map used for refill upsell and post-result cross-sell */
 export const pairsWith: Record<string, string> = {
   heroup: "primetest",

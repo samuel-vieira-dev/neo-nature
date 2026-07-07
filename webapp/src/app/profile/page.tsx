@@ -9,6 +9,7 @@ import {
   Clock,
   Crown,
   Flame,
+  Gift,
   LifeBuoy,
   LogOut,
   MapPin,
@@ -191,6 +192,8 @@ export default function ProfilePage() {
         <div className="glass divide-y divide-white/6 rounded-3xl">
           {[
             { href: "/subscription", icon: Crown, label: "My subscription" },
+            { href: "/rewards", icon: Sparkles, label: "Rewards" },
+            { href: "/referral", icon: Gift, label: "Refer a friend" },
             { href: "/orders", icon: Package, label: "My orders" },
             { href: "/notifications", icon: Bell, label: "Notifications" },
             { href: "/learn", icon: BookOpen, label: "Learn" },
