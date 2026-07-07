@@ -18,10 +18,12 @@ import {
   Sparkles,
   Pill,
 } from "lucide-react";
+import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
 import { FadeUp, ProgressRing, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
+import RefillSheet from "@/components/RefillSheet";
 import { products, contentItems, milestones, productById } from "@/lib/data";
 
 const kindIcon = { article: BookOpen, video: Play, audio: Headphones };
@@ -31,6 +33,7 @@ export default function Home() {
   const { data: me } = useMe();
   const { data: ordersData } = useOrders();
   const checkInMutation = useCheckIn();
+  const [refillOpen, setRefillOpen] = useState(false);
 
   const hydrated = !!me;
   const streak = me?.streak ?? 0;
@@ -158,11 +161,15 @@ export default function Home() {
               )}
             </p>
             {me.bottle.daysLeft <= 7 && (
-              <Link href="/shop" className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300">
+              <button
+                onClick={() => setRefillOpen(true)}
+                className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 active:scale-95 transition-transform"
+              >
                 Reorder
-              </Link>
+              </button>
             )}
           </div>
+          <RefillSheet open={refillOpen} onClose={() => setRefillOpen(false)} productId={me.bottle.productId} />
         </FadeUp>
       )}
 

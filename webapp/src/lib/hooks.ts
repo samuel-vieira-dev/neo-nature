@@ -267,6 +267,50 @@ export function useUpdatePrefs() {
   });
 }
 
+// -------- subscription & refill --------
+
+export type SubscriptionDto = {
+  id: number;
+  refId: string;
+  status: "active" | "paused" | "canceled";
+  priceMonthly: number;
+  discountPct: number;
+  nextBillingAt: string | null;
+  monthsActive: number;
+  skipsUsed: number;
+  pausedUntil: string | null;
+  startedAt: string;
+  journey: { ordersToward: number; target: number; completed: boolean };
+};
+
+export function useSubscription() {
+  return useQuery({
+    queryKey: ["subscription"],
+    queryFn: () => api<{ subscription: SubscriptionDto | null }>("/api/subscription"),
+  });
+}
+
+export function useSubscriptionAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { action: "pause" | "resume" | "skip" | "swap" | "cancel" | "reactivate"; productId?: string }) =>
+      api("/api/subscription", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useRefill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { productId: string; upsellProductIds?: string[] }) =>
+      api<{ ok: true; orderId: string; number: string; total: number }>("/api/refill", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 // -------- demo controls --------
 
 export function useDemoTime() {

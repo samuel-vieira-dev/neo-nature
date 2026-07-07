@@ -7,6 +7,7 @@ import {
   Bell,
   ChevronRight,
   Clock,
+  Crown,
   Flame,
   LifeBuoy,
   LogOut,
@@ -189,6 +190,7 @@ export default function ProfilePage() {
       <FadeUp delay={0.24} className="mt-4 px-5">
         <div className="glass divide-y divide-white/6 rounded-3xl">
           {[
+            { href: "/subscription", icon: Crown, label: "My subscription" },
             { href: "/orders", icon: Package, label: "My orders" },
             { href: "/notifications", icon: Bell, label: "Notifications" },
             { href: "/learn", icon: BookOpen, label: "Learn" },
