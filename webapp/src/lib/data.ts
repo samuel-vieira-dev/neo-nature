@@ -134,6 +134,64 @@ export const products: Product[] = [
 export const productById = (id: string) => products.find((p) => p.id === id);
 
 // ---------------------------------------------------------------------------
+// Kits/stacks per niche (doc §4) — bundle pricing vs. buying items separately
+// ---------------------------------------------------------------------------
+
+export type Kit = {
+  id: string;
+  name: string;
+  tagline: string;
+  niche: "mens_health" | "weight_loss" | "diabetes";
+  productIds: string[];
+  price: number;
+  accent: string;
+};
+
+export const kits: Kit[] = [
+  {
+    id: "total-performance",
+    name: "Total Performance Stack",
+    tagline: "The complete men's vitality protocol",
+    niche: "mens_health",
+    productIds: ["heroup", "primetest", "omegapure"],
+    price: 139,
+    accent: "#3b82f6",
+  },
+  {
+    id: "lean-body",
+    name: "Lean Body Stack",
+    tagline: "Burn, sculpt and stay energized",
+    niche: "weight_loss",
+    productIds: ["igniteburn", "thermocut", "verdagreens"],
+    price: 139,
+    accent: "#f97316",
+  },
+  {
+    id: "sugar-balance",
+    name: "Sugar Balance Stack",
+    tagline: "Steady glucose from every angle",
+    niche: "diabetes",
+    productIds: ["glucoease", "gutbios", "vitald3k2"],
+    price: 99,
+    accent: "#2dd4bf",
+  },
+];
+
+export const kitById = (id: string) => kits.find((k) => k.id === id);
+export const kitCompareAt = (k: Kit) =>
+  k.productIds.reduce((sum, id) => sum + (productById(id)?.price ?? 0), 0);
+
+/** "Pairs perfectly" map used for refill upsell and post-result cross-sell */
+export const pairsWith: Record<string, string> = {
+  heroup: "primetest",
+  igniteburn: "thermocut",
+  glucoease: "gutbios",
+  verdagreens: "vitald3k2",
+  claritymind: "calmzen",
+  lunarest: "calmzen",
+};
+
+// ---------------------------------------------------------------------------
 
 export type ContentItem = {
   slug: string;

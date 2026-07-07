@@ -7,17 +7,7 @@ import confetti from "canvas-confetti";
 import { Check, Lock, PackageCheck, Plus, Zap } from "lucide-react";
 import { useRefill } from "@/lib/hooks";
 import Bottle from "@/components/Bottle";
-import { productById } from "@/lib/data";
-
-/** Doc §4: the upsell moment — refill confirmation is when intent is highest */
-const pairsWith: Record<string, string> = {
-  heroup: "primetest",
-  igniteburn: "thermocut",
-  glucoease: "gutbios",
-  verdagreens: "vitald3k2",
-  claritymind: "calmzen",
-  lunarest: "calmzen",
-};
+import { productById, pairsWith } from "@/lib/data";
 
 export default function RefillSheet({
   open,

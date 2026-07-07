@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { FlaskConical, FastForward, RotateCcw, Users, CalendarClock, Play } from "lucide-react";
+import { FlaskConical, FastForward, RotateCcw, Users, CalendarClock, Play, PackageCheck } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { useMe, useDemoTime, useDemoReset, useLogout } from "@/lib/hooks";
 
@@ -81,6 +81,17 @@ export default function DemoControls() {
           className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
         >
           <Play className="h-4 w-4" /> Run jobs
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={async () => {
+            const res = await fetch("/api/demo/deliver", { method: "POST" });
+            if (res.ok) toast("Order marked delivered — check the post-delivery offer 📦");
+            else toast("No undelivered order to deliver");
+          }}
+          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
+        >
+          <PackageCheck className="h-4 w-4" /> Deliver
         </motion.button>
         <motion.button
           whileTap={{ scale: 0.95 }}
