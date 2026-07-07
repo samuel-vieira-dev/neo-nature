@@ -75,6 +75,11 @@ export const habitAnchors = [
   "Before bed",
 ];
 
+/** Which Learn track matters most at each phase — powers the personalized carousel */
+export function trackForPhase(phaseN: number): string {
+  return phaseN === 1 ? "first30" : phaseN === 2 ? "maximize" : "science";
+}
+
 /** Protocol day (1-based) given the onboarding date */
 export function protocolDay(onboardedAt: Date, now: Date): number {
   return Math.max(1, Math.floor((now.getTime() - onboardedAt.getTime()) / 86400000) + 1);

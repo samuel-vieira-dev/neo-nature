@@ -264,6 +264,17 @@ export const faqs = [
   { q: "What is your refund policy?", a: "Every purchase is covered by a 60-day, no-questions-asked money-back guarantee. Open a ticket and we'll process it within 48 hours — you don't even need to return the bottle." },
   { q: "How should I take my supplement?", a: "Each product page lists the exact dose and best timing. As a rule: take it at the same time every day, with a meal, and log it in the app to keep your streak alive." },
   { q: "Can I change my shipping address?", a: "If your order hasn't shipped yet, open a ticket with the new address and we'll update it. Once shipped, we can ask the carrier to redirect." },
+  { q: "When will I start feeling results?", a: "Most of our key ingredients show measurable effects between weeks 3 and 6 of DAILY use. The first two weeks are about building levels in your body — it's completely normal to feel little at first. Consistency is the whole game." },
+  { q: "What does the charge look like on my card?", a: "All charges appear as NEONATURE* followed by the product name (e.g. NEONATURE*HEROUP 855-201-4437). Check the Billing screen for your full history. If anything looks off, tap 'Get help with this charge' — it's faster than calling your bank." },
+  { q: "How do I pause or skip my subscription?", a: "Go to Profile → My subscription. You can pause for a month, skip the next delivery, or swap products in two taps. We also notify you 3 days before every renewal — no surprises." },
+  { q: "How do I cancel my subscription?", a: "Profile → My subscription → Cancel. It takes two taps, works instantly, and there are no phone calls or retention scripts. You can reactivate any time and your points stay saved." },
+  { q: "Can I take more than the recommended dose?", a: "No — more isn't better. Our formulas are clinically dosed. Doubling the dose won't double results, but doubling your consistency practically will." },
+  { q: "Can I take multiple Neo Nature products together?", a: "Yes — our formulas are designed to stack. Check the Stacks section in the Shop for combinations we've designed to work together, or ask your doctor if you take prescription medication." },
+  { q: "Is it safe with my medication?", a: "Our products are made with natural ingredients in FDA-registered facilities, but always check with your doctor before combining any supplement with prescription medication — especially blood thinners, diabetes or blood-pressure meds." },
+  { q: "What happens if I miss a dose?", a: "Just take the next one at the usual time (don't double up). In the app, you get streak freezes — miss a day and recover it the next morning so your flame survives." },
+  { q: "How do points work?", a: "You earn points for daily check-ins (+10), logging progress (+5), sharing your story (+50) and referrals (+500). Points expire after ~90 days, and you redeem them for upgrades and free product in the Rewards screen — never plain discounts." },
+  { q: "Do you ship outside the US?", a: "Currently we ship to all 50 US states (free!). International shipping is on our roadmap — join the waitlist by opening a ticket." },
+  { q: "How should I store my supplements?", a: "Cool, dry, and out of direct sunlight — a kitchen cabinet works great. No refrigeration needed. Keep the bottle where you'll SEE it: visible bottles get taken." },
 ];
 
 export const issueTypes = [

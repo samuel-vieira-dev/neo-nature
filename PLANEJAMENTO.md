@@ -179,8 +179,19 @@ Seção com a esteira de produtos para o cliente conhecer o catálogo e comprar 
 ## 9. Status
 
 - [x] Planejamento aprovado, respostas recebidas
-- [x] Fase 1 v0.1 construída: protótipo `webapp/` (Next.js 16 + Tailwind 4 + framer-motion, dados mockados)
-  - Telas: Home, Streak, Shop (catálogo + detalhe), Orders (histórico + rastreio), Learn (hub + leitura), Support (FAQ + tickets + wizard), Notifications (com botão de teste), Profile
-  - Rodar: `cd webapp && npm run dev` (Node 22 instalado em `~/.local/node/bin` — adicionar ao PATH)
-- [ ] Validação visual com o cliente
-- [ ] Deploy em URL pública (Vercel) para o cliente testar no celular
+- [x] Fase 1 v0.1: protótipo front mockado (validado pelo Samuel)
+- [x] **v0.2 — backend leve real + doc de funcionalidades do cliente (07/2026)**
+  - Postgres + Drizzle, auth OTP sem senha, 3 personas-cenário (Michael/Jessica/Robert)
+  - Viagem no tempo por usuário (valida dia-30, cobrança T-3, churn e refill em segundos)
+  - Onboarding 5 passos c/ protocolo 3 fases, lembretes múltiplos ancorados em hábito
+  - Push real (VAPID/service worker) + motor de jobs (lembrete, churn, T-3, cobrança simulada, refill)
+  - Aba Progress: peso/cintura+fotos, log privado ED, glicose AM/PM, antes/depois dia 30, depoimento c/ consentimento
+  - Assinatura: clube, jornada 90d/3 pedidos, pausar/pular/trocar, cancel honesto ≤2 toques
+  - Shop "próximo passo": kits por nicho c/ preço comparativo, cross-sell só após resultado sentido, oferta pós-entrega
+  - /rewards (pontos c/ expiração, resgates sem desconto direto), /referral (código + ranking), tiers por meses de assinatura
+  - /billing c/ descriptor exato do cartão + refund simplificado c/ save-offer
+  - Rescue state na Home (churn) citando a motivação do onboarding
+  - FAQ 15 itens c/ busca IA (Claude Haiku, fallback local) + Learn personalizado por fase
+  - 8 rodadas de verificação no preview + 12 testes unitários passando
+- [ ] Deploy Railway v0.2 (ações manuais: plugin Postgres, envs, cron — ver `webapp/README.md`)
+- [ ] Respostas do cliente para a Fase 2 (ver `INTEGRACOES.md`)

@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/lib/store";
-import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
+import { useMe, useOrders, useCheckIn, useContentProgress } from "@/lib/hooks";
+import { trackForPhase } from "@/lib/protocol";
 import { FadeUp, ProgressRing, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
 import RefillSheet from "@/components/RefillSheet";
@@ -42,9 +43,23 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  const { data: progress } = useContentProgress();
+
   const activeOrder = ordersData?.orders.find((o) => o.status === "in_transit");
   const nextMilestone = milestones.find((m) => m > streak) ?? 90;
-  const learnPreview = contentItems.filter((c) => !c.locked).slice(1, 5);
+
+  // personalized carousel: uncompleted lessons from the track matching the
+  // user's protocol phase come first (doc §8)
+  const completed = new Set(progress?.completed ?? []);
+  const phaseTrack = trackForPhase(me?.protocol?.phase.n ?? 1);
+  const learnPreview = [...contentItems]
+    .filter((c) => !c.locked || streak >= (c.locked ?? 0))
+    .sort((a, b) => {
+      const score = (c: (typeof contentItems)[number]) =>
+        (completed.has(c.slug) ? 2 : 0) + (c.track === phaseTrack ? -1 : 0);
+      return score(a) - score(b);
+    })
+    .slice(0, 4);
   const featured = products.filter((p) => p.featured).slice(0, 5);
   const bottleProduct = me?.bottle ? productById(me.bottle.productId) : null;
 

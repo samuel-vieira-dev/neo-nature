@@ -3,10 +3,104 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot } from "lucide-react";
+import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send } from "lucide-react";
 import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
 import { faqs } from "@/lib/data";
+
+const suggestions = ["When will I feel results?", "What's this charge on my card?", "How do I pause my subscription?"];
+
+function AskAI() {
+  const [question, setQuestion] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ answer: string; source: string; related: string[] } | null>(null);
+
+  const ask = async (q: string) => {
+    if (q.trim().length < 3 || busy) return;
+    setQuestion(q);
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/faq/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q }),
+      });
+      if (res.ok) setResult(await res.json());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="glass-strong rounded-3xl p-4">
+      <div className="flex items-center gap-2">
+        <div className="glass flex flex-1 items-center gap-2 rounded-2xl px-3.5">
+          <Search className="h-4 w-4 shrink-0 text-muted" />
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && ask(question)}
+            placeholder="Ask anything — results, charges, shipping…"
+            className="w-full bg-transparent py-3 text-sm placeholder:text-white/25 focus:outline-none"
+          />
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => ask(question)}
+          className="grad flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+        >
+          <Send className="h-4 w-4 text-emerald-950" />
+        </motion.button>
+      </div>
+
+      {/* auto-suggestions */}
+      {!result && !busy && (
+        <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => ask(s)}
+              className="glass shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold text-muted"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {busy && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-3 flex items-center gap-2 px-1 text-xs text-muted">
+            <Sparkles className="h-3.5 w-3.5 animate-pulse text-emerald-300" /> Thinking…
+          </motion.div>
+        )}
+        {result && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-3 rounded-2xl bg-emerald-400/8 p-4"
+          >
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+              <Sparkles className="h-3 w-3" /> {result.source === "ai" ? "AI answer" : "From our FAQ"}
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-white/85">{result.answer}</p>
+            {result.related.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {result.related.map((r) => (
+                  <button key={r} onClick={() => ask(r)} className="rounded-full bg-white/6 px-2.5 py-1 text-[10px] text-muted">
+                    {r}
+                  </button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 const ticketStatus = {
   open: { tone: "amber" as const, label: "Open", icon: CircleDot },
@@ -23,7 +117,12 @@ export default function SupportPage() {
     <div>
       <PageHeader title="Support" subtitle="We reply within 24 hours — usually much faster" backHref="/" />
 
+      {/* AI FAQ search — deflection before tickets (doc §8) */}
       <FadeUp className="px-5">
+        <AskAI />
+      </FadeUp>
+
+      <FadeUp delay={0.05} className="mt-4 px-5">
         <CTA href="/support/new">
           <MessageCirclePlus className="h-5 w-5" /> Open a ticket
         </CTA>
