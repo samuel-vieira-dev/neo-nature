@@ -103,6 +103,38 @@ export default function Home() {
         </FadeUp>
       )}
 
+      {/* rescue state — doc §7: win back BEFORE the cancel, never lead with discounts */}
+      {me?.user.churnFlag && !checkedInToday && (
+        <FadeUp delay={0.05} className="mt-4">
+          <div className="glass-strong relative overflow-hidden rounded-3xl border-orange-400/20 p-5">
+            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-orange-500/15 blur-3xl" />
+            <h2 className="font-display text-lg font-bold">We missed you, {me.user.name} 💚</h2>
+            {me.user.motivation && (
+              <p className="mt-2 rounded-2xl bg-white/4 p-3 text-xs italic leading-relaxed text-white/75">
+                “{me.user.motivation}”
+                <span className="mt-1 block not-italic text-[10px] text-white/35">— you, on day 1</span>
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              That reason hasn&apos;t gone anywhere — and neither has your progress:{" "}
+              <span className="font-bold text-white/85">{me.totalDays} doses logged</span> and a best streak of{" "}
+              <span className="font-bold text-white/85">{me.bestStreak} days</span>. One tap picks it right back up.
+            </p>
+            <div className="mt-4">
+              <CTA onClick={handleCheckIn}>
+                <Flame className="h-5 w-5" fill="currentColor" />
+                {checkInMutation.isPending ? "Logging…" : "I'm back — log today's dose"}
+              </CTA>
+            </div>
+            {me.subscription?.status === "active" && (
+              <Link href="/subscription" className="mt-3 block text-center text-[11px] font-semibold text-muted">
+                Need a breather instead? Pause your subscription — no hard feelings
+              </Link>
+            )}
+          </div>
+        </FadeUp>
+      )}
+
       {/* check-in hero */}
       <FadeUp delay={0.06} className="mt-4">
         <div className="glass-strong relative overflow-hidden rounded-3xl p-5">

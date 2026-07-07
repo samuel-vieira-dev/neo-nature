@@ -7,6 +7,7 @@ import {
   Bell,
   ChevronRight,
   Clock,
+  CreditCard,
   Crown,
   Flame,
   Gift,
@@ -192,6 +193,7 @@ export default function ProfilePage() {
         <div className="glass divide-y divide-white/6 rounded-3xl">
           {[
             { href: "/subscription", icon: Crown, label: "My subscription" },
+            { href: "/billing", icon: CreditCard, label: "Billing & charges" },
             { href: "/rewards", icon: Sparkles, label: "Rewards" },
             { href: "/referral", icon: Gift, label: "Refer a friend" },
             { href: "/orders", icon: Package, label: "My orders" },

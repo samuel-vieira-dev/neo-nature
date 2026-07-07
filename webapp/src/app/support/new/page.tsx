@@ -4,9 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { ArrowRight, Camera, CheckCircle2, PartyPopper } from "lucide-react";
+import { ArrowRight, Camera, CheckCircle2, PartyPopper, PauseCircle, Package, HeartHandshake } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useOrders, useCreateTicket } from "@/lib/hooks";
+import { useOrders, useCreateTicket, useSubscriptionAction, useMe } from "@/lib/hooks";
 import { PageHeader, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
 import { productById, issueTypes } from "@/lib/data";
@@ -19,8 +19,10 @@ const stepVariants = {
 
 export default function NewTicketPage() {
   const { toast } = useApp();
+  const { data: me } = useMe();
   const { data: ordersData } = useOrders();
   const createTicket = useCreateTicket();
+  const subAction = useSubscriptionAction();
   const orders = ordersData?.orders ?? [];
 
   const [step, setStep] = useState(0);
@@ -142,11 +144,91 @@ export default function NewTicketPage() {
               )}
               {issue && (
                 <div className="mt-5">
-                  <CTA onClick={() => setStep(2)}>
+                  <CTA onClick={() => setStep(issue === "refund" ? 5 : 2)}>
                     Continue <ArrowRight className="h-4 w-4" />
                   </CTA>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* REFUND SAVE-OFFER (doc §6: simplified refund with a rescue moment) */}
+          {step === 5 && (
+            <motion.div key="s5" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
+              <h2 className="font-display text-lg font-bold">Before we process it —</h2>
+              <p className="mt-1 text-sm text-muted">
+                Totally your call. But if one of these solves it, it&apos;s yours in one tap:
+              </p>
+              <div className="mt-4 space-y-3">
+                {me?.subscription?.status === "active" && (
+                  <button
+                    onClick={() =>
+                      subAction.mutate(
+                        { action: "pause" },
+                        {
+                          onSuccess: () => {
+                            toast("Subscription paused for 30 days instead — no charges ⏸️");
+                            setStep(3);
+                            setTicketId(null);
+                          },
+                        }
+                      )
+                    }
+                    className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                  >
+                    <PauseCircle className="h-5 w-5 shrink-0 text-amber-300" />
+                    <span className="flex-1">
+                      <span className="block text-sm font-bold">Pause instead of refund</span>
+                      <span className="block text-[11px] text-muted">30 days, zero charges, keep your progress</span>
+                    </span>
+                  </button>
+                )}
+                <button
+                  onClick={() =>
+                    createTicket.mutate(
+                      { subject: "Free replacement bottle requested", orderNumber: orderNumber ?? "—", kind: "support" },
+                      {
+                        onSuccess: (res) => {
+                          setTicketId(res.ticket.id);
+                          setStep(3);
+                          toast("Replacement on the way — no charge 📦");
+                        },
+                      }
+                    )
+                  }
+                  className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                >
+                  <Package className="h-5 w-5 shrink-0 text-sky-300" />
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold">Free replacement bottle</span>
+                    <span className="block text-[11px] text-muted">Damaged or unsatisfying? We&apos;ll reship free</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() =>
+                    createTicket.mutate(
+                      { subject: "Specialist consultation requested", orderNumber: orderNumber ?? "—", kind: "support" },
+                      {
+                        onSuccess: (res) => {
+                          setTicketId(res.ticket.id);
+                          setStep(3);
+                          toast("A specialist will reach out within 24h 💚");
+                        },
+                      }
+                    )
+                  }
+                  className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                >
+                  <HeartHandshake className="h-5 w-5 shrink-0 text-emerald-300" />
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold">Talk to a specialist</span>
+                    <span className="block text-[11px] text-muted">Dosage, timing, expectations — often it&apos;s fixable</span>
+                  </span>
+                </button>
+              </div>
+              <button onClick={() => setStep(2)} className="mt-4 w-full text-center text-sm font-semibold text-rose-300">
+                No thanks — continue with my refund
+              </button>
             </motion.div>
           )}
 
@@ -185,9 +267,15 @@ export default function NewTicketPage() {
               <div className="grad glow mx-auto flex h-20 w-20 items-center justify-center rounded-full">
                 <PartyPopper className="h-9 w-9 text-emerald-950" />
               </div>
-              <h2 className="mt-5 font-display text-2xl font-bold">Ticket {ticketId} created!</h2>
+              <h2 className="mt-5 font-display text-2xl font-bold">
+                {ticketId ? `Ticket ${ticketId} created!` : "All set!"}
+              </h2>
               <p className="mx-auto mt-2 max-w-64 text-sm text-muted">
-                Our team will reply within 24 hours. You&apos;ll get a push notification the moment we answer.
+                {issue === "refund" && ticketId
+                  ? "Refund confirmed — processed within 48 hours, and you can keep the bottle."
+                  : ticketId
+                  ? "Our team will reply within 24 hours. You'll get a push notification the moment we answer."
+                  : "Done — no ticket needed. You'll see the change reflected right away."}
               </p>
               <div className="mt-6 space-y-3">
                 <CTA href="/support">View my tickets</CTA>
