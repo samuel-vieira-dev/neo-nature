@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, ShoppingBag, Flame, BookOpen, User } from "lucide-react";
+import { Home, ShoppingBag, Flame, TrendingUp, User } from "lucide-react";
 import { useMe } from "@/lib/hooks";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
   { href: "/shop", label: "Shop", icon: ShoppingBag },
   { href: "/streak", label: "Streak", icon: Flame, center: true },
-  { href: "/learn", label: "Learn", icon: BookOpen },
+  { href: "/progress", label: "Progress", icon: TrendingUp },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

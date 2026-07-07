@@ -220,6 +220,42 @@ export function useCompleteContent() {
   });
 }
 
+// -------- results --------
+
+export type ResultEntry = {
+  id: number;
+  type: "weight" | "waist" | "ed_score" | "glucose_am" | "glucose_pm" | "victory";
+  valueNum: number | null;
+  valueText: string | null;
+  photoId: number | null;
+  day: string;
+};
+
+export function useResults() {
+  return useQuery({ queryKey: ["results"], queryFn: () => api<{ entries: ResultEntry[] }>("/api/results") });
+}
+
+export function useLogResult() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { type: ResultEntry["type"]; valueNum?: number; valueText?: string; photoId?: number }) =>
+      api<{ ok: true; updated: boolean }>("/api/results", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["results"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+}
+
+export function useSubmitTestimonial() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { text: string; consent: boolean; photoId?: number }) =>
+      api("/api/testimonials", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
 // -------- prefs --------
 
 export function useUpdatePrefs() {
