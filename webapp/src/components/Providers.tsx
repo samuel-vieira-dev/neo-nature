@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProvider } from "@/lib/store";
+import OnboardingGate from "@/components/OnboardingGate";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -16,7 +17,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <AppProvider>{children}</AppProvider>
+      <AppProvider>
+        <OnboardingGate />
+        {children}
+      </AppProvider>
     </QueryClientProvider>
   );
 }

@@ -14,7 +14,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+    if (!window.location.pathname.startsWith("/login")) window.location.href = "/login";
     throw new Error("unauthorized");
   }
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? `HTTP ${res.status}`);
@@ -60,6 +60,7 @@ export type Me = {
     skipsUsed: number;
   } | null;
   bottle: { productId: string; dosesTaken: number; dosesLeft: number; daysLeft: number; runsOutAt: string } | null;
+  protocol: { day: number; phase: { n: number; name: string; focus: string }; message: string } | null;
   demo: { mode: boolean; dayOffset: number };
 };
 

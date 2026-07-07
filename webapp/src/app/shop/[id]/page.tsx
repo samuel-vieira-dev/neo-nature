@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Star, ShieldCheck, Pill, Lock } from "lucide-react";
+import { Check, Star, ShieldCheck, Pill, Lock, Play } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { FadeUp, PageHeader, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
@@ -97,6 +97,23 @@ export default function ProductPage() {
             </p>
           </div>
         </div>
+      </FadeUp>
+
+      {/* how to take it — posology video placeholder */}
+      <FadeUp delay={0.17} className="mt-4 px-5">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => toast("Demo: 30-second posology video plays here in Phase 2 ▶️")}
+          className="glass flex w-full items-center gap-3 rounded-2xl p-4"
+        >
+          <span className="grad flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+            <Play className="ml-0.5 h-4 w-4 text-emerald-950" fill="currentColor" />
+          </span>
+          <span className="text-left">
+            <span className="block text-sm font-bold">How to take {p.name} — 30 sec</span>
+            <span className="block text-[11px] text-muted">Dosage, timing and what to pair it with</span>
+          </span>
+        </motion.button>
       </FadeUp>
 
       {/* reviews */}

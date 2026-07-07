@@ -83,8 +83,25 @@ export default function Home() {
         </div>
       </FadeUp>
 
+      {/* protocol status + expectation message */}
+      {me?.protocol && (
+        <FadeUp delay={0.04} className="mt-5">
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center gap-2">
+              <span className="grad rounded-full px-2.5 py-1 font-display text-[11px] font-bold text-emerald-950">
+                Day {me.protocol.day}
+              </span>
+              <span className="text-xs font-bold text-emerald-300">
+                Phase {me.protocol.phase.n} · {me.protocol.phase.name}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted">{me.protocol.message}</p>
+          </div>
+        </FadeUp>
+      )}
+
       {/* check-in hero */}
-      <FadeUp delay={0.06} className="mt-6">
+      <FadeUp delay={0.06} className="mt-4">
         <div className="glass-strong relative overflow-hidden rounded-3xl p-5">
           <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/20 blur-3xl" />
           <div className="flex items-center gap-4">

@@ -4,6 +4,7 @@ import { doseLogs, pointsLedger, notifications, subscriptions, bottles } from "@
 import { withUser } from "@/server/session";
 import { appNow, userToday } from "@/server/time";
 import { computeStreak, pointsBalance, bottleForecast, tierFor } from "@/server/domain";
+import { protocolDay, phaseForDay, expectationForDay } from "@/lib/protocol";
 
 export const GET = withUser(async (user) => {
   const today = userToday(user);
@@ -30,6 +31,14 @@ export const GET = withUser(async (user) => {
 
   const bottle = bottleRows[0]
     ? { productId: bottleRows[0].productId, ...bottleForecast(bottleRows[0], now) }
+    : null;
+
+  const protocol = user.onboardedAt
+    ? (() => {
+        const day = protocolDay(user.onboardedAt, now);
+        const phase = phaseForDay(day);
+        return { day, phase: { n: phase.n, name: phase.name, focus: phase.focus }, message: expectationForDay(day) };
+      })()
     : null;
 
   return Response.json({
@@ -62,6 +71,7 @@ export const GET = withUser(async (user) => {
     tier,
     subscription: sub ?? null,
     bottle,
+    protocol,
     demo: { mode: process.env.DEMO_MODE === "true", dayOffset: user.demoDayOffset },
   });
 });
