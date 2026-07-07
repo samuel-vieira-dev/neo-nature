@@ -61,3 +61,5 @@ forecast, churn detection, tiers).
   **time travel** works everywhere — never call `new Date()` in domain logic
 - Retention jobs in `src/server/jobs.ts`, idempotent via `job_runs` dedupe keys
 - Catalog/protocols/kits/FAQ live in code (`src/lib/data.ts`), user data in Postgres
+
+Deploy failed.
