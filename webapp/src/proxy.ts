@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC_PATHS = ["/login", "/api/auth"];
+const PUBLIC_PATHS = ["/login", "/api/auth", "/webhook-buygoods-info"];
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get("nn_session")?.value;

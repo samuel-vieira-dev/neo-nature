@@ -184,6 +184,20 @@ export const jobRuns = pgTable("job_runs", {
   ranAt: timestamp("ran_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+// -------- inbound webhooks (raw capture, pre-integration) --------
+
+/** Raw capture of every hit to /webhook-buygoods-info — inspect these to design the real BuyGoods integration */
+export const webhookLogs = pgTable("webhook_logs", {
+  id: serial("id").primaryKey(),
+  source: text("source").notNull().default("buygoods"),
+  method: text("method").notNull(),
+  contentType: text("content_type"),
+  headers: jsonb("headers").$type<Record<string, string>>().notNull().default({}),
+  query: jsonb("query").$type<Record<string, string>>().notNull().default({}),
+  body: text("body").notNull().default(""),
+  receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type DoseLog = typeof doseLogs.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
@@ -193,3 +207,4 @@ export type Invoice = typeof invoices.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type AppNotification = typeof notifications.$inferSelect;
 export type Banner = typeof banners.$inferSelect;
+export type WebhookLog = typeof webhookLogs.$inferSelect;

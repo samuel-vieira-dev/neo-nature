@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import confetti from "canvas-confetti";
-import { Bell, Check, Flame, Package, Truck, LifeBuoy, History, ChevronRight, Pill } from "lucide-react";
+import { Bell, Check, Flame, Truck, LifeBuoy, History, ChevronRight, Pill } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
 import { FadeUp, CTA } from "@/components/ui";
@@ -159,23 +159,6 @@ export default function Home() {
           <ChevronRight className="h-5 w-5 text-muted" />
         </Link>
       </FadeUp>
-
-      {/* order in transit detail (kept for context, below the main actions) */}
-      {activeOrder && (
-        <FadeUp delay={0.22} className="mt-4">
-          <Link href={`/orders/${activeOrder.id}`}>
-            <div className="card flex items-center gap-3 rounded-2xl p-4">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50">
-                <Package className="h-5 w-5 text-sky-700" />
-                <span className="ping-soft absolute right-0 top-0 h-2 w-2 rounded-full bg-sky-600" />
-              </div>
-              <p className="text-sm text-muted">
-                Your package is on the way — arriving <span className="font-semibold text-[var(--text)]">{activeOrder.eta}</span>
-              </p>
-            </div>
-          </Link>
-        </FadeUp>
-      )}
     </div>
   );
 }
