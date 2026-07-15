@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStreak, pointsBalance, bottleForecast, daysWithoutDose, tierFor } from "./domain";
+import { computeStreak, bottleForecast, daysWithoutDose } from "./domain";
 
 const DAY = 86400000;
 
@@ -16,30 +16,6 @@ describe("computeStreak", () => {
   });
   it("handles empty history", () => {
     expect(computeStreak([], "2026-07-06")).toBe(0);
-  });
-});
-
-describe("pointsBalance", () => {
-  const now = new Date("2026-07-06T12:00:00Z");
-  it("sums non-expired entries", () => {
-    const r = pointsBalance(
-      [
-        { delta: 100, expiresAt: new Date(now.getTime() + 60 * DAY) },
-        { delta: 50, expiresAt: null },
-        { delta: 200, expiresAt: new Date(now.getTime() - DAY) }, // expired
-      ],
-      now
-    );
-    expect(r.total).toBe(150);
-  });
-  it("flags points expiring within 30 days", () => {
-    const soon = new Date(now.getTime() + 10 * DAY);
-    const r = pointsBalance([{ delta: 80, expiresAt: soon }, { delta: 100, expiresAt: new Date(now.getTime() + 90 * DAY) }], now);
-    expect(r.expiringSoon).toBe(80);
-    expect(r.nextExpiryAt).toEqual(soon);
-  });
-  it("never returns negative totals", () => {
-    expect(pointsBalance([{ delta: -100, expiresAt: null }], now).total).toBe(0);
   });
 });
 
@@ -64,15 +40,5 @@ describe("daysWithoutDose", () => {
   });
   it("returns Infinity when never dosed", () => {
     expect(daysWithoutDose(null, "2026-07-06")).toBe(Infinity);
-  });
-});
-
-describe("tierFor", () => {
-  it("maps subscription months to tiers", () => {
-    expect(tierFor(0).tier).toBe("Bronze");
-    expect(tierFor(2)).toEqual({ tier: "Bronze", nextTier: "Silver", monthsToNext: 1 });
-    expect(tierFor(3).tier).toBe("Silver");
-    expect(tierFor(6).tier).toBe("Gold");
-    expect(tierFor(6).nextTier).toBeNull();
   });
 });

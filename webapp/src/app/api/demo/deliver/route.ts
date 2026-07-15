@@ -4,12 +4,12 @@ import { orders, orderItems, bottles } from "@/db/schema";
 import { withUser, isDemoMode } from "@/server/session";
 import { appNow } from "@/server/time";
 import { notifyUser } from "@/server/push";
-import { productById, pairsWith } from "@/lib/data";
+import { productById } from "@/lib/data";
 
 /**
- * Demo event: marks the user's most recent undelivered order as delivered.
- * Triggers the doc §4 "offer when the order is marked delivered" moment and
- * refreshes the active bottle when the delivery contains the protocol product.
+ * Demo event: marks the user's most recent undelivered order as delivered
+ * and refreshes the active bottle when the delivery contains the protocol
+ * product.
  */
 export const POST = withUser(async (user) => {
   if (!isDemoMode()) return Response.json({ error: "not_available" }, { status: 403 });
@@ -50,17 +50,12 @@ export const POST = withUser(async (user) => {
     });
   }
 
-  // post-delivery offer (doc §4): highest-attention moment after unboxing
-  const mainItem = items[0] ? productById(items[0].productId) : null;
-  const offer = mainItem ? productById(pairsWith[mainItem.id] ?? "") : null;
   await notifyUser(user.id, {
-    title: "Delivered! 📦 Enjoy your Neo Nature",
-    body: offer
-      ? `Order ${order.number} just arrived. Unboxing bonus: 20% off ${offer.name} today only — it pairs perfectly.`
-      : `Order ${order.number} just arrived. Time to put it to work!`,
+    title: "Delivered! 📦",
+    body: `Order ${order.number} just arrived at your door.`,
     icon: "package",
-    url: offer ? `/shop/${offer.id}` : `/orders/${order.id}`,
+    url: `/orders/${order.id}`,
   });
 
-  return Response.json({ ok: true, orderId: order.id, offerProductId: offer?.id ?? null });
+  return Response.json({ ok: true, orderId: order.id });
 });

@@ -13,9 +13,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
-// Neo Nature v0.2 schema.
-// Catalog, protocols and kits live in code (src/lib/data.ts) — only user data
-// lives here. All "money" flows are simulated (BuyGoods integration is Phase 2).
+// Neo Nature v0.3 schema — "Clareza 45+" redesign.
+// Catalog and goals live in code (src/lib/data.ts) — only user data lives
+// here. All "money" flows are simulated (BuyGoods integration is Phase 2).
 // ---------------------------------------------------------------------------
 
 export const users = pgTable("users", {
@@ -108,49 +108,15 @@ export const orderItems = pgTable("order_items", {
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
 });
 
-export const subscriptions = pgTable("subscriptions", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  kind: text("kind").notNull().default("product"), // product | kit
-  refId: text("ref_id").notNull(), // productId or kitId
-  status: text("status").notNull().default("active"), // active | paused | canceled
-  priceMonthly: numeric("price_monthly", { precision: 10, scale: 2 }).notNull(),
-  discountPct: integer("discount_pct").notNull().default(15),
-  nextBillingAt: timestamp("next_billing_at", { withTimezone: true, mode: "date" }),
-  monthsActive: integer("months_active").notNull().default(0),
-  skipsUsed: integer("skips_used").notNull().default(0),
-  startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  pausedUntil: timestamp("paused_until", { withTimezone: true, mode: "date" }),
-  canceledAt: timestamp("canceled_at", { withTimezone: true, mode: "date" }),
-});
-
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  subscriptionId: integer("subscription_id"),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   cardDescriptor: text("card_descriptor").notNull(), // exact name on the card statement
   status: text("status").notNull(), // paid | upcoming | refunded
   chargedAt: timestamp("charged_at", { withTimezone: true, mode: "date" }).notNull(),
   orderNumber: text("order_number"),
 });
-
-// -------- results --------
-
-export const resultsEntries = pgTable(
-  "results_entries",
-  {
-    id: serial("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(), // weight | waist | ed_score | glucose_am | glucose_pm | victory
-    valueNum: numeric("value_num", { precision: 10, scale: 2 }),
-    valueText: text("value_text"),
-    photoId: integer("photo_id"),
-    day: date("day").notNull(),
-    loggedAt: timestamp("logged_at", { withTimezone: true, mode: "date" }).notNull(),
-  },
-  (t) => [index("results_user_type").on(t.userId, t.type)]
-);
 
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
@@ -161,39 +127,17 @@ export const photos = pgTable("photos", {
   takenAt: timestamp("taken_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
-export const testimonials = pgTable("testimonials", {
+// -------- messaging --------
+
+export const banners = pgTable("banners", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  text: text("text").notNull(),
-  consent: boolean("consent").notNull().default(false),
-  photoId: integer("photo_id"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  ctaLabel: text("cta_label"),
+  ctaUrl: text("cta_url"),
+  active: boolean("active").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
-
-// -------- loyalty --------
-
-export const pointsLedger = pgTable(
-  "points_ledger",
-  {
-    id: serial("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    delta: integer("delta").notNull(),
-    reason: text("reason").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [index("points_user").on(t.userId)]
-);
-
-export const referrals = pgTable("referrals", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  code: text("code").notNull().unique(),
-  invitedCount: integer("invited_count").notNull().default(0),
-  convertedCount: integer("converted_count").notNull().default(0),
-});
-
-// -------- messaging --------
 
 export const notifications = pgTable(
   "notifications",
@@ -231,19 +175,6 @@ export const tickets = pgTable("tickets", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
-// -------- content --------
-
-export const contentProgress = pgTable(
-  "content_progress",
-  {
-    id: serial("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    slug: text("slug").notNull(),
-    completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("content_user_slug").on(t.userId, t.slug)]
-);
-
 // -------- jobs bookkeeping (idempotency for /api/jobs/tick) --------
 
 export const jobRuns = pgTable("job_runs", {
@@ -258,8 +189,7 @@ export type DoseLog = typeof doseLogs.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
 export type Bottle = typeof bottles.$inferSelect;
 export type Order = typeof orders.$inferSelect;
-export type Subscription = typeof subscriptions.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
-export type ResultEntry = typeof resultsEntries.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type AppNotification = typeof notifications.$inferSelect;
+export type Banner = typeof banners.$inferSelect;

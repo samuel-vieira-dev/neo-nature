@@ -1,14 +1,14 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { doseLogs, bottles, pointsLedger, users } from "@/db/schema";
+import { doseLogs, bottles, users } from "@/db/schema";
 import { withUser } from "@/server/session";
 import { appNow, userToday, isoDay, addDays } from "@/server/time";
 import { computeStreak } from "@/server/domain";
 
 const bodySchema = z.object({ recover: z.boolean().optional() }).optional();
 
-/** Log today's dose (or recover yesterday's, spending a streak freeze) */
+/** Log today's dose (or recover yesterday's) */
 export const POST = withUser(async (user, request: Request) => {
   const parsed = bodySchema.safeParse(await (request as Request).json().catch(() => undefined));
   const recover = parsed.success ? parsed.data?.recover === true : false;
@@ -37,15 +37,6 @@ export const POST = withUser(async (user, request: Request) => {
     })
     .onConflictDoNothing()
     .returning();
-
-  if (inserted.length > 0) {
-    await db.insert(pointsLedger).values({
-      userId: user.id,
-      delta: 10,
-      reason: recover ? "Recovered dose" : "Daily check-in",
-      expiresAt: addDays(now, 90),
-    });
-  }
 
   // refresh best streak + clear churn flag on activity
   const doses = await db.query.doseLogs.findMany({

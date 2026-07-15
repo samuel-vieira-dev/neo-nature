@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { users, bottles, reminders, doseLogs, pointsLedger } from "@/db/schema";
+import { users, bottles, reminders, doseLogs } from "@/db/schema";
 import { withUser } from "@/server/session";
-import { appNow, userToday, addDays } from "@/server/time";
+import { appNow, userToday } from "@/server/time";
 import { productById } from "@/lib/data";
 
 const schema = z.object({
@@ -52,7 +52,7 @@ export const POST = withUser(async (user, request: Request) => {
   }
 
   if (firstDoseTaken) {
-    const inserted = await db
+    await db
       .insert(doseLogs)
       .values({
         userId: user.id,
@@ -62,29 +62,7 @@ export const POST = withUser(async (user, request: Request) => {
         source: "onboarding",
         photoId: photoId ?? null,
       })
-      .onConflictDoNothing()
-      .returning();
-    if (inserted.length > 0) {
-      await db.insert(pointsLedger).values({
-        userId: user.id,
-        delta: 10,
-        reason: "First dose logged",
-        expiresAt: addDays(now, 90),
-      });
-    }
-  }
-
-  // welcome bonus (idempotent: at most one per user)
-  const hasWelcome = await db.query.pointsLedger.findFirst({
-    where: and(eq(pointsLedger.userId, user.id), eq(pointsLedger.reason, "Welcome bonus")),
-  });
-  if (!hasWelcome) {
-    await db.insert(pointsLedger).values({
-      userId: user.id,
-      delta: 200,
-      reason: "Welcome bonus",
-      expiresAt: addDays(now, 120),
-    });
+      .onConflictDoNothing();
   }
 
   return Response.json({ ok: true });

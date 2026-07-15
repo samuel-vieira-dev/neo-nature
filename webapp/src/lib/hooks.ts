@@ -32,7 +32,6 @@ export type Me = {
     address: string;
     memberSince: string;
     prefs: { doseReminder: boolean; orderUpdates: boolean; newContent: boolean; offers: boolean };
-    freezes: number;
     onboarded: boolean;
     churnFlag: boolean;
   };
@@ -44,23 +43,8 @@ export type Me = {
   checkedInToday: boolean;
   checkinDays: string[];
   lastDoseDay: string | null;
-  points: number;
-  pointsExpiringSoon: number;
-  pointsNextExpiryAt: string | null;
   unread: number;
-  tier: { tier: "Bronze" | "Silver" | "Gold"; nextTier: string | null; monthsToNext: number };
-  subscription: {
-    id: number;
-    refId: string;
-    status: string;
-    priceMonthly: string;
-    discountPct: number;
-    nextBillingAt: string | null;
-    monthsActive: number;
-    skipsUsed: number;
-  } | null;
   bottle: { productId: string; dosesTaken: number; dosesLeft: number; daysLeft: number; runsOutAt: string } | null;
-  protocol: { day: number; phase: { n: number; name: string; focus: string }; message: string } | null;
   demo: { mode: boolean; dayOffset: number };
 };
 
@@ -77,6 +61,17 @@ export function useCheckIn() {
         body: JSON.stringify(opts ?? {}),
       }),
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+// -------- banner --------
+
+export type BannerDto = { id: number; title: string; body: string; ctaLabel: string | null; ctaUrl: string | null };
+
+export function useBanner() {
+  return useQuery({
+    queryKey: ["banner"],
+    queryFn: () => api<{ banner: BannerDto | null }>("/api/banner"),
   });
 }
 
@@ -203,59 +198,6 @@ export function useReminderMutations() {
   };
 }
 
-// -------- content --------
-
-export function useContentProgress() {
-  return useQuery({ queryKey: ["content"], queryFn: () => api<{ completed: string[] }>("/api/content") });
-}
-
-export function useCompleteContent() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (slug: string) => api("/api/content", { method: "POST", body: JSON.stringify({ slug }) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["content"] });
-      qc.invalidateQueries({ queryKey: ["me"] });
-    },
-  });
-}
-
-// -------- results --------
-
-export type ResultEntry = {
-  id: number;
-  type: "weight" | "waist" | "ed_score" | "glucose_am" | "glucose_pm" | "victory";
-  valueNum: number | null;
-  valueText: string | null;
-  photoId: number | null;
-  day: string;
-};
-
-export function useResults() {
-  return useQuery({ queryKey: ["results"], queryFn: () => api<{ entries: ResultEntry[] }>("/api/results") });
-}
-
-export function useLogResult() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { type: ResultEntry["type"]; valueNum?: number; valueText?: string; photoId?: number }) =>
-      api<{ ok: true; updated: boolean }>("/api/results", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["results"] });
-      qc.invalidateQueries({ queryKey: ["me"] });
-    },
-  });
-}
-
-export function useSubmitTestimonial() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { text: string; consent: boolean; photoId?: number }) =>
-      api("/api/testimonials", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
-  });
-}
-
 // -------- prefs --------
 
 export function useUpdatePrefs() {
@@ -264,85 +206,6 @@ export function useUpdatePrefs() {
     mutationFn: (prefs: Partial<Me["user"]["prefs"]>) =>
       api("/api/prefs", { method: "PATCH", body: JSON.stringify(prefs) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
-  });
-}
-
-// -------- subscription & refill --------
-
-export type SubscriptionDto = {
-  id: number;
-  refId: string;
-  status: "active" | "paused" | "canceled";
-  priceMonthly: number;
-  discountPct: number;
-  nextBillingAt: string | null;
-  monthsActive: number;
-  skipsUsed: number;
-  pausedUntil: string | null;
-  startedAt: string;
-  journey: { ordersToward: number; target: number; completed: boolean };
-};
-
-export function useSubscription() {
-  return useQuery({
-    queryKey: ["subscription"],
-    queryFn: () => api<{ subscription: SubscriptionDto | null }>("/api/subscription"),
-  });
-}
-
-export function useSubscriptionAction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { action: "pause" | "resume" | "skip" | "swap" | "cancel" | "reactivate"; productId?: string }) =>
-      api("/api/subscription", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
-export function useRefill() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { productId: string; upsellProductIds?: string[] }) =>
-      api<{ ok: true; orderId: string; number: string; total: number }>("/api/refill", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
-// -------- rewards & referral --------
-
-export function useRewards() {
-  return useQuery({
-    queryKey: ["rewards"],
-    queryFn: () =>
-      api<{
-        balance: { total: number; expiringSoon: number; nextExpiryAt: string | null };
-        ledger: { id: number; delta: number; reason: string; expiresAt: string | null; createdAt: string }[];
-      }>("/api/rewards"),
-  });
-}
-
-export function useRedeemReward() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (rewardId: string) => api("/api/rewards", { method: "POST", body: JSON.stringify({ rewardId }) }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
-export function useReferral() {
-  return useQuery({
-    queryKey: ["referral"],
-    queryFn: () =>
-      api<{
-        code: string;
-        invitedCount: number;
-        convertedCount: number;
-        pointsPerConversion: number;
-        leaderboard: { rank: number; name: string; converted: number; you: boolean }[];
-      }>("/api/referral"),
   });
 }
 
@@ -362,6 +225,14 @@ export function useDemoReset() {
   return useMutation({
     mutationFn: () => api("/api/demo/reset", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useDemoNextBanner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: true; banner: { id: number; title: string } }>("/api/demo/banner", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["banner"] }),
   });
 }
 

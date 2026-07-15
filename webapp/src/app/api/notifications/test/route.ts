@@ -16,7 +16,7 @@ export const POST = withUser(async (user) => {
   const streak = computeStreak(doses.map((d) => d.day), userToday(user));
   const body = `💊 Time for your dose — keep that ${streak}-day streak alive!`;
 
-  await notifyUser(user.id, { title: "Neo Nature 🌿", body, icon: "flame", url: "/streak" });
+  await notifyUser(user.id, { title: "Neo Nature 🌿", body, icon: "flame", url: "/" });
 
   return Response.json({ ok: true, title: "Neo Nature 🌿", body });
 });

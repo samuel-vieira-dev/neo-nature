@@ -1,16 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  users,
-  doseLogs,
-  reminders,
-  bottles,
-  subscriptions,
-  invoices,
-  jobRuns,
-  type User,
-} from "@/db/schema";
-import { appNow, userToday, isoDay, addDays, daysBetween } from "./time";
+import { users, doseLogs, reminders, bottles, jobRuns, type User } from "@/db/schema";
+import { appNow, userToday } from "./time";
 import { bottleForecast, daysWithoutDose } from "./domain";
 import { notifyUser } from "./push";
 import { productById } from "@/lib/data";
@@ -23,9 +14,7 @@ import { productById } from "@/lib/data";
  * Routines:
  *  1. dose reminders at each user's chosen times (habit-anchored copy)
  *  2. churn detection (2+ days without a dose → flag + win-back nudge)
- *  3. billing notice 3 days before a subscription renews (doc §6)
- *  4. simulated recurring charge (Phase 2: BuyGoods postback replaces this)
- *  5. refill nudge when the bottle is running low (doc §3)
+ *  3. refill nudge when the bottle is running low
  */
 export async function runJobs(): Promise<string[]> {
   const actions: string[] = [];
@@ -34,8 +23,6 @@ export async function runJobs(): Promise<string[]> {
   for (const user of allUsers) {
     await doseReminders(user, actions);
     await churnDetection(user, actions);
-    await billingNotice(user, actions);
-    await recurringCharge(user, actions);
     await refillNudge(user, actions);
   }
 
@@ -84,9 +71,9 @@ async function doseReminders(user: User, actions: string[]) {
     const anchor = r.habitAnchor ? ` ${r.habitAnchor.charAt(0).toLowerCase()}${r.habitAnchor.slice(1)}` : "";
     await notifyUser(user.id, {
       title: "Time for your dose 💊",
-      body: `Take it${anchor} and keep your streak alive — one tap to log it.`,
+      body: `Take it${anchor} and check it off — one tap.`,
       icon: "flame",
-      url: "/streak",
+      url: "/",
     });
     actions.push(`dose_reminder:${user.id}@${r.time}`);
   }
@@ -105,88 +92,11 @@ async function churnDetection(user: User, actions: string[]) {
   const motivation = user.motivation ? ` You told us why you started: “${user.motivation}”.` : "";
   await notifyUser(user.id, {
     title: `We miss you, ${user.name} 💚`,
-    body: `It's been ${gap} days.${motivation} Your progress is still here — pick it back up today.`,
+    body: `It's been ${gap} days.${motivation} Pick it back up today.`,
     icon: "flame",
     url: "/",
   });
   actions.push(`churn:${user.id}`);
-}
-
-async function billingNotice(user: User, actions: string[]) {
-  const now = appNow(user);
-  const subs = await db.query.subscriptions.findMany({
-    where: and(eq(subscriptions.userId, user.id), eq(subscriptions.status, "active")),
-  });
-
-  for (const sub of subs) {
-    if (!sub.nextBillingAt) continue;
-    const days = daysBetween(now, sub.nextBillingAt);
-    if (days < 0 || days > 3) continue;
-    if (!(await once(`t3:${sub.id}:${isoDay(sub.nextBillingAt)}`, "billing_notice"))) continue;
-
-    const product = productById(sub.refId);
-    await notifyUser(user.id, {
-      title: `Heads-up: renewal in ${days === 0 ? "less than a day" : `${days} day${days > 1 ? "s" : ""}`}`,
-      body: `Your ${product?.name ?? "subscription"} renews for $${sub.priceMonthly}. Pause or skip anytime — no hoops.`,
-      icon: "tag",
-      url: "/subscription",
-    });
-    actions.push(`billing_notice:${sub.id}`);
-  }
-}
-
-async function recurringCharge(user: User, actions: string[]) {
-  const now = appNow(user);
-  const subs = await db.query.subscriptions.findMany({
-    where: and(eq(subscriptions.userId, user.id), eq(subscriptions.status, "active")),
-  });
-
-  for (const sub of subs) {
-    if (!sub.nextBillingAt || sub.nextBillingAt > now) continue;
-    if (!(await once(`charge:${sub.id}:${isoDay(sub.nextBillingAt)}`, "charge"))) continue;
-
-    const product = productById(sub.refId);
-    const descriptor = `NEONATURE*${(product?.name ?? "SUB").toUpperCase()} 855-201-4437`;
-
-    // settle the pending "upcoming" invoice (if any), then schedule the next
-    const upcoming = await db.query.invoices.findFirst({
-      where: and(eq(invoices.subscriptionId, sub.id), eq(invoices.status, "upcoming")),
-    });
-    if (upcoming) {
-      await db.update(invoices).set({ status: "paid", chargedAt: now }).where(eq(invoices.id, upcoming.id));
-    } else {
-      await db.insert(invoices).values({
-        userId: user.id,
-        subscriptionId: sub.id,
-        amount: sub.priceMonthly,
-        cardDescriptor: descriptor,
-        status: "paid",
-        chargedAt: now,
-      });
-    }
-
-    const nextAt = addDays(sub.nextBillingAt, 30);
-    await db
-      .update(subscriptions)
-      .set({ monthsActive: sub.monthsActive + 1, nextBillingAt: nextAt })
-      .where(eq(subscriptions.id, sub.id));
-    await db.insert(invoices).values({
-      userId: user.id,
-      subscriptionId: sub.id,
-      amount: sub.priceMonthly,
-      cardDescriptor: descriptor,
-      status: "upcoming",
-      chargedAt: nextAt,
-    });
-
-    await notifyUser(user.id, {
-      title: "Payment processed ✅",
-      body: `$${sub.priceMonthly} for ${product?.name ?? "your subscription"} — shows as ${descriptor} on your card. A fresh bottle is on the way!`,
-      icon: "package",
-      url: "/billing",
-    });
-    actions.push(`charge:${sub.id}`);
-  }
 }
 
 async function refillNudge(user: User, actions: string[]) {
@@ -206,8 +116,8 @@ async function refillNudge(user: User, actions: string[]) {
       title: stage === "final" ? "Last chance — bottle almost empty ⏳" : "Your bottle is running low",
       body:
         stage === "final"
-          ? `About ${daysLeft} day${daysLeft === 1 ? "" : "s"} of ${product?.name ?? "doses"} left. Reorder now so you never break the chain.`
-          : `About ${daysLeft} days of ${product?.name ?? "doses"} left — reorder in one tap and keep your protocol on track.`,
+          ? `About ${daysLeft} day${daysLeft === 1 ? "" : "s"} of ${product?.name ?? "doses"} left. Reorder now.`
+          : `About ${daysLeft} days of ${product?.name ?? "doses"} left — reorder in one tap.`,
       icon: "package",
       url: "/shop",
     });

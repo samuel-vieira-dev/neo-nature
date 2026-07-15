@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, eq, gt, isNull, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { otpCodes, users, referrals } from "@/db/schema";
+import { otpCodes, users } from "@/db/schema";
 import { createSession } from "@/server/session";
 
 const bodySchema = z.object({ email: z.string().email(), code: z.string().min(4).max(8) });
@@ -34,10 +34,6 @@ export async function POST(request: Request) {
       .insert(users)
       .values({ id, email, name: name.charAt(0).toUpperCase() + name.slice(1), fullName: name })
       .returning();
-    await db.insert(referrals).values({
-      userId: id,
-      code: `${name.slice(0, 6).toUpperCase()}${Math.floor(10 + Math.random() * 90)}`,
-    });
   }
 
   await createSession(user.id);
