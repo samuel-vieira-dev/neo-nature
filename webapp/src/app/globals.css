@@ -1,23 +1,33 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+ * Neo Nature v0.3 — "Clareza 45+" design tokens.
+ * Single light theme: white background, high contrast, large type, minimal
+ * motion. Optimized for a 45+ audience — clarity over flair.
+ * ------------------------------------------------------------------------- */
+
 :root {
-  --bg: #070c0a;
-  --surface: #0d1512;
-  --card: rgba(255, 255, 255, 0.04);
-  --card-strong: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.09);
-  --text: #eef5f1;
-  --muted: #93a89f;
-  --emerald: #10b981;
-  --lime: #a3e635;
+  --bg: #ffffff;
+  --surface: #f6f8f7;
+  --card: #ffffff;
+  --card-strong: #ffffff;
+  --border: #e3e8e5;
+  --text: #17251d;
+  --muted: #52615a;
+  --accent: #047857; /* emerald-700 */
+  --accent-strong: #065f46;
+  --accent-soft: #ecfdf5;
+  --amber: #b45309;
+  --amber-soft: #fffbeb;
+  --amber-border: #fde68a;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-muted: var(--muted);
-  --color-emerald-brand: var(--emerald);
-  --color-lime-brand: var(--lime);
+  --color-emerald-brand: var(--accent);
+  --color-lime-brand: var(--accent);
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-display: var(--font-outfit), system-ui, sans-serif;
 }
@@ -30,80 +40,57 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
+  font-size: 17px;
+  line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---------- brand helpers ---------- */
+/* ---------- cards & buttons (light theme) ---------- */
 
-.glass {
+.card {
   background: var(--card);
   border: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+/* Kept as aliases during the migration — same light-card look as `.card` */
+.glass,
 .glass-strong {
-  background: var(--card-strong);
+  background: var(--card);
   border: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+/* Solid accent button — replaces the old gradient */
 .grad {
-  background: linear-gradient(135deg, #10b981 0%, #a3e635 100%);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .text-grad {
-  background: linear-gradient(120deg, #34d399 10%, #a3e635 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--accent);
 }
 
 .glow {
-  box-shadow: 0 0 40px -8px rgba(16, 185, 129, 0.45);
+  box-shadow: none;
 }
 
-/* ---------- ambient orbs ---------- */
+/* ---------- focus ring (accessibility, 45+) ---------- */
 
-.orb {
-  position: fixed;
-  border-radius: 9999px;
-  filter: blur(100px);
-  opacity: 0.22;
-  pointer-events: none;
-  z-index: 0;
-  animation: drift 16s ease-in-out infinite alternate;
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-@keyframes drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    transform: translate3d(30px, -40px, 0) scale(1.15);
-  }
-}
-
-/* ---------- flame flicker ---------- */
-
-@keyframes flicker {
-  0%, 100% { transform: scale(1) rotate(-1.5deg); }
-  30% { transform: scale(1.06) rotate(1.5deg); }
-  60% { transform: scale(0.97) rotate(-1deg); }
-  80% { transform: scale(1.04) rotate(0.5deg); }
-}
-
-.flame {
-  animation: flicker 1.6s ease-in-out infinite;
-  transform-origin: 50% 90%;
-}
-
-/* ---------- pulse dot (shipping "live" indicator) ---------- */
+/* ---------- "in transit" live indicator (kept — signals real-time state) ---------- */
 
 @keyframes ping-soft {
   0% { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
 }
 
 .ping-soft::after {
@@ -112,7 +99,7 @@ body {
   inset: 0;
   border-radius: 9999px;
   background: inherit;
-  animation: ping-soft 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation: ping-soft 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* ---------- misc ---------- */
@@ -125,5 +112,5 @@ body {
 }
 
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
+  filter: none;
 }

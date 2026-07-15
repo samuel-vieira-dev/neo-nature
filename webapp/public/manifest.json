@@ -4,8 +4,8 @@
   "description": "Your daily wellness companion — track orders, build your streak, and get results.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#070c0a",
-  "theme_color": "#070c0a",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/icon.svg",

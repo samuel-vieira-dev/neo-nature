@@ -28,18 +28,18 @@ export default function Bottle({
           <stop offset="100%" stopColor={accent} stopOpacity="0.55" />
         </linearGradient>
         <linearGradient id={shineId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0.14" />
-          <stop offset="45%" stopColor="#fff" stopOpacity="0.02" />
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.35" />
+          <stop offset="45%" stopColor="#fff" stopOpacity="0.05" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
       </defs>
 
       {/* cap */}
-      <rect x="34" y="6" width="52" height="26" rx="7" fill="#161b19" stroke="rgba(255,255,255,0.08)" />
-      <rect x="42" y="32" width="36" height="10" fill="#111614" />
+      <rect x="34" y="6" width="52" height="26" rx="7" fill="#e3e8e5" stroke="rgba(0,0,0,0.08)" />
+      <rect x="42" y="32" width="36" height="10" fill="#d7dedb" />
 
       {/* body */}
-      <rect x="20" y="40" width="80" height="144" rx="18" fill="#121815" stroke="rgba(255,255,255,0.09)" />
+      <rect x="20" y="40" width="80" height="144" rx="18" fill="#f6f8f7" stroke="rgba(0,0,0,0.08)" />
 
       {/* label band */}
       <rect x="20" y="74" width="80" height="70" fill={`url(#${gradId})`} />
