@@ -1,15 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { FlaskConical, FastForward, RotateCcw, Users, CalendarClock, Play, PackageCheck } from "lucide-react";
+import { FlaskConical, FastForward, RotateCcw, Users, CalendarClock, Play, PackageCheck, Megaphone } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useMe, useDemoTime, useDemoReset, useLogout } from "@/lib/hooks";
+import { useMe, useDemoTime, useDemoReset, useDemoNextBanner, useLogout } from "@/lib/hooks";
 
 /**
  * Demo Controls — the client-validation cockpit. Time travel + persona switch
- * + full reset let every time-dependent flow (day-30, billing T-3, churn,
- * refill) be demonstrated in seconds instead of days.
+ * + full reset let every time-dependent flow (churn, refill) be demonstrated
+ * in seconds instead of days.
  */
 export default function DemoControls() {
   const { toast } = useApp();
@@ -17,6 +16,7 @@ export default function DemoControls() {
   const { data: me } = useMe();
   const demoTime = useDemoTime();
   const demoReset = useDemoReset();
+  const nextBanner = useDemoNextBanner();
   const logout = useLogout();
 
   if (!me?.demo.mode) return null;
@@ -26,7 +26,7 @@ export default function DemoControls() {
   const shift = (delta: number) =>
     demoTime.mutate(
       { delta },
-      { onSuccess: (r) => toast(`Time traveled: app is now ${r.dayOffset > 0 ? `+${r.dayOffset}` : r.dayOffset} days ${r.dayOffset >= 0 ? "ahead" : "behind"} ⏩`) }
+      { onSuccess: (r) => toast(`Time traveled: app is now ${r.dayOffset > 0 ? `+${r.dayOffset}` : r.dayOffset} days ${r.dayOffset >= 0 ? "ahead" : "behind"}`) }
     );
 
   const runJobs = async () => {
@@ -35,73 +35,59 @@ export default function DemoControls() {
       const data = await res.json();
       toast(`Jobs ran: ${data.actions?.length ?? 0} action(s) ✅`);
     } else {
-      toast("Jobs endpoint arrives in Etapa 3 🚧");
+      toast("Jobs endpoint not available");
     }
   };
 
+  const btn = "flex flex-col items-center gap-1 rounded-xl bg-amber-100 py-2.5 text-xs font-bold text-amber-800";
+
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-amber-400/25 bg-amber-400/8 p-4">
+    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15">
-          <FlaskConical className="h-5 w-5 text-amber-300" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
+          <FlaskConical className="h-5 w-5 text-amber-700" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-bold text-amber-200">Demo controls</p>
-          <p className="text-[11px] leading-snug text-amber-200/60">
+          <p className="text-base font-bold text-amber-800">Demo controls</p>
+          <p className="text-sm leading-snug text-amber-700">
             {offset === 0 ? "App clock: today (real time)" : `App clock: ${offset > 0 ? "+" : ""}${offset} days`}
           </p>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => shift(1)}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
-        >
+        <button onClick={() => shift(1)} className={btn}>
           <FastForward className="h-4 w-4" /> +1 day
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => shift(7)}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
-        >
+        </button>
+        <button onClick={() => shift(7)} className={btn}>
           <FastForward className="h-4 w-4" /> +7 days
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => demoTime.mutate({ reset: true }, { onSuccess: () => toast("Back to real time ⏪") })}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
-        >
+        </button>
+        <button onClick={() => demoTime.mutate({ reset: true }, { onSuccess: () => toast("Back to real time") })} className={btn}>
           <CalendarClock className="h-4 w-4" /> Today
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={runJobs}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
-        >
+        </button>
+        <button onClick={runJobs} className={btn}>
           <Play className="h-4 w-4" /> Run jobs
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
+        </button>
+        <button
           onClick={async () => {
             const res = await fetch("/api/demo/deliver", { method: "POST" });
-            if (res.ok) toast("Order marked delivered — check the post-delivery offer 📦");
+            if (res.ok) toast("Order marked delivered 📦");
             else toast("No undelivered order to deliver");
           }}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
+          className={btn}
         >
           <PackageCheck className="h-4 w-4" /> Deliver
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => logout.mutate()}
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
+        </button>
+        <button
+          onClick={() => nextBanner.mutate(undefined, { onSuccess: () => toast("Banner updated") })}
+          className={btn}
         >
+          <Megaphone className="h-4 w-4" /> Next banner
+        </button>
+        <button onClick={() => logout.mutate()} className={btn}>
           <Users className="h-4 w-4" /> Persona
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
+        </button>
+        <button
           onClick={() =>
             demoReset.mutate(undefined, {
               onSuccess: () => {
@@ -110,10 +96,10 @@ export default function DemoControls() {
               },
             })
           }
-          className="flex flex-col items-center gap-1 rounded-xl bg-amber-400/15 py-2.5 text-[11px] font-bold text-amber-200"
+          className={btn}
         >
           <RotateCcw className="h-4 w-4" /> {demoReset.isPending ? "…" : "Reset"}
-        </motion.button>
+        </button>
       </div>
     </div>
   );

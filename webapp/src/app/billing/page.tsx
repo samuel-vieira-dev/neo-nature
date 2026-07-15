@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { CalendarClock, CreditCard, HelpCircle, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "@/lib/store";
@@ -56,93 +54,83 @@ export default function BillingPage() {
       {/* upcoming charge — the anti-surprise banner */}
       {data?.upcoming && (
         <FadeUp className="px-5">
-          <div className="glass-strong relative overflow-hidden rounded-3xl border-amber-400/20 p-5">
-            <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-amber-400/15 blur-3xl" />
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15">
-                <CalendarClock className="h-5 w-5 text-amber-300" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
+                <CalendarClock className="h-5 w-5 text-amber-700" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold">
+                <p className="text-base font-bold text-[var(--text)]">
                   Next charge{" "}
                   {data.upcoming.daysUntil === 0
                     ? "today"
                     : `in ${data.upcoming.daysUntil} day${data.upcoming.daysUntil > 1 ? "s" : ""}`}
                 </p>
-                <p className="text-xs text-muted">
+                <p className="text-sm text-muted">
                   ${data.upcoming.amount} · shows as{" "}
-                  <span className="font-mono text-[10px] text-white/70">{data.upcoming.cardDescriptor}</span>
+                  <span className="font-mono text-xs text-[var(--text)]">{data.upcoming.cardDescriptor}</span>
                 </p>
               </div>
-              <span className="font-display text-xl font-bold">${data.upcoming.amount}</span>
+              <span className="font-display text-xl font-bold text-[var(--text)]">${data.upcoming.amount}</span>
             </div>
-            <Link
-              href="/subscription"
-              className="mt-3 block w-full rounded-xl border border-amber-400/25 bg-amber-400/10 py-2.5 text-center text-xs font-bold text-amber-300"
-            >
-              Need to pause or skip? Manage subscription →
-            </Link>
           </div>
         </FadeUp>
       )}
 
       {/* descriptor explainer — kills "unknown charge" chargebacks */}
-      <FadeUp delay={0.06} className="mt-4 px-5">
-        <div className="glass flex items-start gap-3 rounded-2xl p-4">
-          <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
-          <p className="text-xs leading-relaxed text-muted">
+      <FadeUp delay={0.05} className="mt-4 px-5">
+        <div className="card flex items-start gap-3 rounded-2xl p-4">
+          <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
+          <p className="text-sm leading-relaxed text-muted">
             Charges from us always appear as{" "}
-            <span className="font-mono text-[10px] font-bold text-white/80">NEONATURE*</span> on your statement.
+            <span className="font-mono text-xs font-bold text-[var(--text)]">NEONATURE*</span> on your statement.
             Don&apos;t recognize something? Tap it below — it&apos;s faster than calling your bank.
           </p>
         </div>
       </FadeUp>
 
       {/* invoices */}
-      <FadeUp delay={0.1} className="mt-5 px-5">
-        <h3 className="mb-3 font-display text-lg font-bold">Charge history</h3>
+      <FadeUp delay={0.08} className="mt-5 px-5">
+        <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Charge history</h3>
         <div className="space-y-3">
-          {(data?.invoices ?? []).map((inv, i) => {
+          {(data?.invoices ?? []).map((inv) => {
             const chip = statusChip[inv.status];
             return (
-              <motion.div
-                key={inv.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.05 }}
-                className="glass rounded-2xl p-4"
-              >
+              <div key={inv.id} className="card rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[11px] font-bold text-white/85">{inv.cardDescriptor}</p>
-                    <p className="mt-0.5 text-[11px] text-muted">
+                    <p className="truncate font-mono text-sm font-bold text-[var(--text)]">{inv.cardDescriptor}</p>
+                    <p className="mt-0.5 text-sm text-muted">
                       {inv.date}
                       {inv.orderNumber && ` · Order ${inv.orderNumber}`}
                     </p>
                   </div>
                   <div className="ml-3 flex shrink-0 flex-col items-end gap-1.5">
-                    <span className="font-display text-base font-bold">${inv.amount}</span>
+                    <span className="font-display text-base font-bold text-[var(--text)]">${inv.amount}</span>
                     <Chip tone={chip.tone}>{chip.label}</Chip>
                   </div>
                 </div>
                 {inv.status !== "upcoming" && (
                   <button
                     onClick={() => helpWithCharge(inv.cardDescriptor, inv.amount, inv.date)}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-white/4 py-2 text-[11px] font-semibold text-muted active:bg-white/8"
+                    className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface)] py-2 text-sm font-semibold text-muted active:bg-[var(--border)]"
                   >
-                    <HelpCircle className="h-3.5 w-3.5" /> Get help with this charge
+                    <HelpCircle className="h-4 w-4" /> Get help with this charge
                   </button>
                 )}
-              </motion.div>
+              </div>
             );
           })}
+          {(data?.invoices ?? []).length === 0 && (
+            <p className="py-6 text-center text-base text-muted">No charges yet.</p>
+          )}
         </div>
       </FadeUp>
 
-      <FadeUp delay={0.16} className="mt-5 px-5">
-        <div className="glass flex items-start gap-3 rounded-2xl p-4">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
-          <p className="text-xs leading-relaxed text-muted">
+      <FadeUp delay={0.12} className="mt-5 px-5">
+        <div className="card flex items-start gap-3 rounded-2xl p-4">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
+          <p className="text-sm leading-relaxed text-muted">
             60-day money-back guarantee on everything. Refunds processed within 48h through the app — no phone calls,
             no return shipping.
           </p>

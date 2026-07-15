@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import { Bell, BellRing, Flame, Package, BookOpen, Tag, FlaskConical } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ensurePushSubscription } from "@/lib/push";
@@ -10,10 +9,10 @@ import { FadeUp, PageHeader, Toggle } from "@/components/ui";
 
 const icons = { flame: Flame, package: Package, book: BookOpen, tag: Tag };
 const iconTones = {
-  flame: "bg-orange-400/15 text-orange-300",
-  package: "bg-sky-400/15 text-sky-300",
-  book: "bg-emerald-400/15 text-emerald-300",
-  tag: "bg-violet-400/15 text-violet-300",
+  flame: "bg-amber-50 text-amber-700",
+  package: "bg-sky-50 text-sky-700",
+  book: "bg-[var(--accent-soft)] text-[var(--accent)]",
+  tag: "bg-violet-50 text-violet-700",
 };
 
 export default function NotificationsPage() {
@@ -34,7 +33,6 @@ export default function NotificationsPage() {
   }, [me?.unread, markAllRead]);
 
   const testPush = async () => {
-    // subscribe this browser first, then let the SERVER send a real web push
     const status = await ensurePushSubscription().catch(() => "unsupported" as const);
     testNotification.mutate(undefined, {
       onSuccess: () => {
@@ -56,45 +54,44 @@ export default function NotificationsPage() {
 
       {/* DEMO test button */}
       <FadeUp className="px-5">
-        <div className="relative overflow-hidden rounded-3xl border border-amber-400/25 bg-amber-400/8 p-4">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-400/15">
-              <FlaskConical className="h-5 w-5 text-amber-300" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
+              <FlaskConical className="h-5 w-5 text-amber-700" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-bold text-amber-200">Demo mode</p>
-              <p className="text-[11px] leading-snug text-amber-200/60">
+              <p className="text-base font-bold text-amber-800">Demo mode</p>
+              <p className="text-sm leading-snug text-amber-700">
                 Temporary button to preview how push notifications will feel.
               </p>
             </div>
           </div>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
+          <button
             onClick={testPush}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3 font-display text-sm font-bold text-amber-950"
+            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3 font-display text-base font-bold text-white"
           >
             <BellRing className="h-4 w-4" />
             {testNotification.isPending ? "Sending…" : "Send test notification"}
-          </motion.button>
+          </button>
         </div>
       </FadeUp>
 
       {/* preferences */}
-      <FadeUp delay={0.08} className="mt-5 px-5">
-        <h3 className="mb-3 font-display text-lg font-bold">Preferences</h3>
-        <div className="glass divide-y divide-white/6 rounded-3xl px-5">
+      <FadeUp delay={0.06} className="mt-5 px-5">
+        <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Preferences</h3>
+        <div className="card divide-y divide-[var(--border)] rounded-3xl px-5">
           {(
             [
               { key: "doseReminder", label: "Daily dose reminder", sub: "Your streak's best friend" },
               { key: "orderUpdates", label: "Order & delivery updates", sub: "Every step of the way" },
-              { key: "newContent", label: "New content", sub: "Articles, videos & audio" },
+              { key: "newContent", label: "New content", sub: "Tips, articles & updates" },
               { key: "offers", label: "Offers & early access", sub: "Member-only deals" },
             ] as const
           ).map((row) => (
             <div key={row.key} className="flex items-center justify-between py-4">
               <div>
-                <p className="text-sm font-semibold">{row.label}</p>
-                <p className="text-[11px] text-muted">{row.sub}</p>
+                <p className="text-base font-semibold text-[var(--text)]">{row.label}</p>
+                <p className="text-sm text-muted">{row.sub}</p>
               </div>
               <Toggle
                 on={prefs?.[row.key] ?? false}
@@ -110,32 +107,26 @@ export default function NotificationsPage() {
         { title: "Today", list: today },
         { title: "Earlier", list: earlier },
       ].map(
-        (group, gi) =>
+        (group) =>
           group.list.length > 0 && (
-            <FadeUp key={group.title} delay={0.14 + gi * 0.06} className="mt-5 px-5">
-              <h3 className="mb-3 font-display text-lg font-bold">{group.title}</h3>
+            <FadeUp key={group.title} delay={0.1} className="mt-5 px-5">
+              <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">{group.title}</h3>
               <div className="space-y-2.5">
-                {group.list.map((n, i) => {
+                {group.list.map((n) => {
                   const Icon = icons[n.icon] ?? Bell;
                   return (
-                    <motion.div
-                      key={n.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.16 + i * 0.05 }}
-                      className="glass flex gap-3 rounded-2xl p-4"
-                    >
+                    <div key={n.id} className="card flex gap-3 rounded-2xl p-4">
                       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconTones[n.icon] ?? iconTones.flame}`}>
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">
-                          <p className="truncate text-sm font-semibold">{n.title}</p>
-                          <span className="shrink-0 text-[10px] text-white/30">{n.time}</span>
+                          <p className="truncate text-base font-semibold text-[var(--text)]">{n.title}</p>
+                          <span className="shrink-0 text-xs text-muted">{n.time}</span>
                         </div>
-                        <p className="mt-0.5 text-xs leading-snug text-muted">{n.body}</p>
+                        <p className="mt-0.5 text-sm leading-snug text-muted">{n.body}</p>
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>

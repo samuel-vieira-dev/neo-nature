@@ -4,25 +4,23 @@ import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { ArrowRight, Camera, CheckCircle2, PartyPopper, PauseCircle, Package, HeartHandshake } from "lucide-react";
+import { ArrowRight, Camera, CheckCircle2, PartyPopper, Package, HeartHandshake } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useOrders, useCreateTicket, useSubscriptionAction, useMe } from "@/lib/hooks";
+import { useOrders, useCreateTicket } from "@/lib/hooks";
 import { PageHeader, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
 import { productById, issueTypes } from "@/lib/data";
 
 const stepVariants = {
-  enter: { opacity: 0, x: 40 },
-  center: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -40 },
+  enter: { opacity: 0 },
+  center: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 export default function NewTicketPage() {
   const { toast } = useApp();
-  const { data: me } = useMe();
   const { data: ordersData } = useOrders();
   const createTicket = useCreateTicket();
-  const subAction = useSubscriptionAction();
   const orders = ordersData?.orders ?? [];
 
   const [step, setStep] = useState(0);
@@ -44,7 +42,7 @@ export default function NewTicketPage() {
         onSuccess: (res) => {
           setTicketId(res.ticket.id);
           setStep(3);
-          confetti({ particleCount: 60, spread: 60, origin: { y: 0.4 }, colors: ["#10b981", "#a3e635"] });
+          confetti({ particleCount: 40, spread: 55, origin: { y: 0.4 }, colors: ["#047857", "#34d399"] });
         },
       }
     );
@@ -58,10 +56,10 @@ export default function NewTicketPage() {
       {step < 3 && (
         <div className="mb-5 flex justify-center gap-2">
           {[0, 1, 2].map((i) => (
-            <motion.span
+            <span
               key={i}
-              animate={{ width: step === i ? 24 : 8, backgroundColor: step >= i ? "#10b981" : "rgba(255,255,255,0.12)" }}
-              className="h-2 rounded-full"
+              className="h-2 rounded-full transition-all duration-200"
+              style={{ width: step === i ? 24 : 8, backgroundColor: step >= i ? "var(--accent)" : "var(--border)" }}
             />
           ))}
         </div>
@@ -71,15 +69,15 @@ export default function NewTicketPage() {
         <AnimatePresence mode="wait">
           {/* STEP 1 — which order */}
           {step === 0 && (
-            <motion.div key="s0" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
-              <h2 className="font-display text-lg font-bold">Which order is this about?</h2>
+            <motion.div key="s0" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+              <h2 className="font-display text-lg font-bold text-[var(--text)]">Which order is this about?</h2>
               <div className="mt-4 space-y-3">
                 {orders.map((o) => (
                   <button
                     key={o.id}
                     onClick={() => setOrderNumber(o.number)}
-                    className={`glass w-full rounded-2xl p-4 text-left transition-all ${
-                      orderNumber === o.number ? "border-emerald-400/50 ring-1 ring-emerald-400/40" : ""
+                    className={`card w-full rounded-2xl p-4 text-left transition-all ${
+                      orderNumber === o.number ? "ring-2 ring-[var(--accent)]" : ""
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -91,19 +89,19 @@ export default function NewTicketPage() {
                         })}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold">Order {o.number}</p>
-                        <p className="text-[11px] text-muted">
+                        <p className="text-base font-semibold text-[var(--text)]">Order {o.number}</p>
+                        <p className="text-sm text-muted">
                           {o.date} · ${o.total}
                         </p>
                       </div>
-                      {orderNumber === o.number && <CheckCircle2 className="h-5 w-5 text-emerald-300" />}
+                      {orderNumber === o.number && <CheckCircle2 className="h-5 w-5 text-[var(--accent)]" />}
                     </div>
                   </button>
                 ))}
                 <button
                   onClick={() => setOrderNumber("Not order-related")}
-                  className={`glass w-full rounded-2xl p-4 text-left text-sm text-muted ${
-                    orderNumber === "Not order-related" ? "border-emerald-400/50 ring-1 ring-emerald-400/40" : ""
+                  className={`card w-full rounded-2xl p-4 text-left text-base text-muted ${
+                    orderNumber === "Not order-related" ? "ring-2 ring-[var(--accent)]" : ""
                   }`}
                 >
                   It&apos;s not about a specific order
@@ -121,24 +119,24 @@ export default function NewTicketPage() {
 
           {/* STEP 2 — what happened */}
           {step === 1 && (
-            <motion.div key="s1" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
-              <h2 className="font-display text-lg font-bold">What happened?</h2>
+            <motion.div key="s1" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+              <h2 className="font-display text-lg font-bold text-[var(--text)]">What happened?</h2>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {issueTypes.map((it) => (
                   <button
                     key={it.id}
                     onClick={() => setIssue(it.id)}
-                    className={`glass rounded-2xl p-4 text-center transition-all ${
-                      issue === it.id ? "border-emerald-400/50 ring-1 ring-emerald-400/40" : ""
+                    className={`card rounded-2xl p-4 text-center transition-all ${
+                      issue === it.id ? "ring-2 ring-[var(--accent)]" : ""
                     }`}
                   >
                     <span className="text-2xl">{it.emoji}</span>
-                    <p className="mt-2 text-xs font-semibold leading-snug">{it.label}</p>
+                    <p className="mt-2 text-sm font-semibold leading-snug text-[var(--text)]">{it.label}</p>
                   </button>
                 ))}
               </div>
               {issue === "refund" && (
-                <p className="mt-4 rounded-2xl bg-emerald-400/10 p-3 text-center text-xs text-emerald-300">
+                <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-center text-sm text-[var(--accent-strong)]">
                   Covered by our 60-day guarantee — refunds are processed within 48h, no questions asked. 💚
                 </p>
               )}
@@ -152,37 +150,14 @@ export default function NewTicketPage() {
             </motion.div>
           )}
 
-          {/* REFUND SAVE-OFFER (doc §6: simplified refund with a rescue moment) */}
+          {/* REFUND SAVE-OFFER — simplified rescue moment (no subscription pause anymore) */}
           {step === 5 && (
-            <motion.div key="s5" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
-              <h2 className="font-display text-lg font-bold">Before we process it —</h2>
-              <p className="mt-1 text-sm text-muted">
+            <motion.div key="s5" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+              <h2 className="font-display text-lg font-bold text-[var(--text)]">Before we process it —</h2>
+              <p className="mt-1 text-base text-muted">
                 Totally your call. But if one of these solves it, it&apos;s yours in one tap:
               </p>
               <div className="mt-4 space-y-3">
-                {me?.subscription?.status === "active" && (
-                  <button
-                    onClick={() =>
-                      subAction.mutate(
-                        { action: "pause" },
-                        {
-                          onSuccess: () => {
-                            toast("Subscription paused for 30 days instead — no charges ⏸️");
-                            setStep(3);
-                            setTicketId(null);
-                          },
-                        }
-                      )
-                    }
-                    className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
-                  >
-                    <PauseCircle className="h-5 w-5 shrink-0 text-amber-300" />
-                    <span className="flex-1">
-                      <span className="block text-sm font-bold">Pause instead of refund</span>
-                      <span className="block text-[11px] text-muted">30 days, zero charges, keep your progress</span>
-                    </span>
-                  </button>
-                )}
                 <button
                   onClick={() =>
                     createTicket.mutate(
@@ -196,12 +171,12 @@ export default function NewTicketPage() {
                       }
                     )
                   }
-                  className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left"
                 >
-                  <Package className="h-5 w-5 shrink-0 text-sky-300" />
+                  <Package className="h-5 w-5 shrink-0 text-sky-700" />
                   <span className="flex-1">
-                    <span className="block text-sm font-bold">Free replacement bottle</span>
-                    <span className="block text-[11px] text-muted">Damaged or unsatisfying? We&apos;ll reship free</span>
+                    <span className="block text-base font-bold text-[var(--text)]">Free replacement bottle</span>
+                    <span className="block text-sm text-muted">Damaged or unsatisfying? We&apos;ll reship free</span>
                   </span>
                 </button>
                 <button
@@ -217,16 +192,16 @@ export default function NewTicketPage() {
                       }
                     )
                   }
-                  className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left"
                 >
-                  <HeartHandshake className="h-5 w-5 shrink-0 text-emerald-300" />
+                  <HeartHandshake className="h-5 w-5 shrink-0 text-[var(--accent)]" />
                   <span className="flex-1">
-                    <span className="block text-sm font-bold">Talk to a specialist</span>
-                    <span className="block text-[11px] text-muted">Dosage, timing, expectations — often it&apos;s fixable</span>
+                    <span className="block text-base font-bold text-[var(--text)]">Talk to a specialist</span>
+                    <span className="block text-sm text-muted">Dosage, timing, expectations — often it&apos;s fixable</span>
                   </span>
                 </button>
               </div>
-              <button onClick={() => setStep(2)} className="mt-4 w-full text-center text-sm font-semibold text-rose-300">
+              <button onClick={() => setStep(2)} className="mt-4 w-full text-center text-base font-semibold text-rose-700">
                 No thanks — continue with my refund
               </button>
             </motion.div>
@@ -234,18 +209,18 @@ export default function NewTicketPage() {
 
           {/* STEP 3 — details */}
           {step === 2 && (
-            <motion.div key="s2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
-              <h2 className="font-display text-lg font-bold">Tell us a bit more</h2>
+            <motion.div key="s2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+              <h2 className="font-display text-lg font-bold text-[var(--text)]">Tell us a bit more</h2>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
                 placeholder="Describe what happened — the more detail, the faster we can fix it."
-                className="glass mt-4 w-full resize-none rounded-2xl p-4 text-sm placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
+                className="card mt-4 w-full resize-none rounded-2xl p-4 text-base placeholder:text-muted"
               />
               <button
                 onClick={() => toast("Demo: photo upload will be enabled in Phase 2 📷")}
-                className="glass mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-dashed py-4 text-sm text-muted"
+                className="card mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-dashed py-4 text-base text-muted"
               >
                 <Camera className="h-4 w-4" /> Add a photo (optional)
               </button>
@@ -259,18 +234,18 @@ export default function NewTicketPage() {
           {step === 3 && (
             <motion.div
               key="s3"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 18 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
               className="pt-6 text-center"
             >
-              <div className="grad glow mx-auto flex h-20 w-20 items-center justify-center rounded-full">
-                <PartyPopper className="h-9 w-9 text-emerald-950" />
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--accent)]">
+                <PartyPopper className="h-9 w-9 text-white" />
               </div>
-              <h2 className="mt-5 font-display text-2xl font-bold">
+              <h2 className="mt-5 font-display text-2xl font-bold text-[var(--text)]">
                 {ticketId ? `Ticket ${ticketId} created!` : "All set!"}
               </h2>
-              <p className="mx-auto mt-2 max-w-64 text-sm text-muted">
+              <p className="mx-auto mt-2 max-w-64 text-base text-muted">
                 {issue === "refund" && ticketId
                   ? "Refund confirmed — processed within 48 hours, and you can keep the bottle."
                   : ticketId
@@ -279,7 +254,7 @@ export default function NewTicketPage() {
               </p>
               <div className="mt-6 space-y-3">
                 <CTA href="/support">View my tickets</CTA>
-                <Link href="/" className="block text-sm font-semibold text-muted">
+                <Link href="/" className="block text-base font-semibold text-muted">
                   Back to home
                 </Link>
               </div>

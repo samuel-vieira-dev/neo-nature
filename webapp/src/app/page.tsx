@@ -1,40 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import {
-  Bell,
-  Flame,
-  Package,
-  Truck,
-  LifeBuoy,
-  History,
-  ChevronRight,
-  Check,
-  Play,
-  BookOpen,
-  Headphones,
-  Sparkles,
-  Pill,
-} from "lucide-react";
-import { useState } from "react";
+import { Bell, Check, Flame, Package, Truck, LifeBuoy, History, ChevronRight, Pill } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { useMe, useOrders, useCheckIn, useContentProgress } from "@/lib/hooks";
-import { trackForPhase } from "@/lib/protocol";
-import { FadeUp, ProgressRing, CTA } from "@/components/ui";
-import Bottle from "@/components/Bottle";
-import RefillSheet from "@/components/RefillSheet";
-import { products, contentItems, milestones, productById } from "@/lib/data";
-
-const kindIcon = { article: BookOpen, video: Play, audio: Headphones };
+import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
+import { FadeUp, CTA } from "@/components/ui";
+import Banner from "@/components/Banner";
+import { productById } from "@/lib/data";
 
 export default function Home() {
   const { toast } = useApp();
   const { data: me } = useMe();
   const { data: ordersData } = useOrders();
   const checkInMutation = useCheckIn();
-  const [refillOpen, setRefillOpen] = useState(false);
 
   const hydrated = !!me;
   const streak = me?.streak ?? 0;
@@ -43,37 +22,23 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const { data: progress } = useContentProgress();
-
   const activeOrder = ordersData?.orders.find((o) => o.status === "in_transit");
-  const nextMilestone = milestones.find((m) => m > streak) ?? 90;
-
-  // personalized carousel: uncompleted lessons from the track matching the
-  // user's protocol phase come first (doc §8)
-  const completed = new Set(progress?.completed ?? []);
-  const phaseTrack = trackForPhase(me?.protocol?.phase.n ?? 1);
-  const learnPreview = [...contentItems]
-    .filter((c) => !c.locked || streak >= (c.locked ?? 0))
-    .sort((a, b) => {
-      const score = (c: (typeof contentItems)[number]) =>
-        (completed.has(c.slug) ? 2 : 0) + (c.track === phaseTrack ? -1 : 0);
-      return score(a) - score(b);
-    })
-    .slice(0, 4);
-  const featured = products.filter((p) => p.featured).slice(0, 5);
   const bottleProduct = me?.bottle ? productById(me.bottle.productId) : null;
+  const runsOutLabel = me?.bottle
+    ? new Date(me.bottle.runsOutAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : null;
 
   const handleCheckIn = () => {
     if (checkedInToday || checkInMutation.isPending) return;
     checkInMutation.mutate(undefined, {
       onSuccess: (res) => {
         confetti({
-          particleCount: 90,
-          spread: 75,
+          particleCount: 50,
+          spread: 60,
           origin: { y: 0.55 },
-          colors: ["#10b981", "#a3e635", "#34d399", "#fbbf24"],
+          colors: ["#047857", "#34d399"],
         });
-        toast(`Day ${res.streak} logged! +10 points 🔥`);
+        toast(`Day ${res.streak} logged!`);
       },
     });
   };
@@ -84,266 +49,133 @@ export default function Home() {
       <FadeUp className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted">{greeting},</p>
-          <h1 className="font-display text-2xl font-bold">
-            {me?.user.name ?? "…"} <span className="inline-block">👋</span>
-          </h1>
+          <h1 className="font-display text-2xl font-bold text-[var(--text)]">{me?.user.name ?? "…"}</h1>
         </div>
-        <div className="flex items-center gap-2.5">
-          <Link href="/notifications" className="glass relative flex h-11 w-11 items-center justify-center rounded-full active:scale-90 transition-transform">
-            <Bell className="h-5 w-5" />
-            {hydrated && (me?.unread ?? 0) > 0 && (
-              <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-[#0d1512]" />
-            )}
-          </Link>
-          <Link href="/profile" className="grad flex h-11 w-11 items-center justify-center rounded-full font-display text-sm font-bold text-emerald-950 active:scale-90 transition-transform">
-            {me ? me.user.fullName.split(" ").map((s) => s[0]).join("").slice(0, 2) : "··"}
-          </Link>
-        </div>
+        <Link
+          href="/notifications"
+          className="card relative flex h-11 w-11 items-center justify-center rounded-full active:scale-95 transition-transform"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {hydrated && (me?.unread ?? 0) > 0 && (
+            <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-600 ring-2 ring-white" />
+          )}
+        </Link>
       </FadeUp>
 
-      {/* protocol status + expectation message */}
-      {me?.protocol && (
-        <FadeUp delay={0.04} className="mt-5">
-          <div className="glass rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <span className="grad rounded-full px-2.5 py-1 font-display text-[11px] font-bold text-emerald-950">
-                Day {me.protocol.day}
-              </span>
-              <span className="text-xs font-bold text-emerald-300">
-                Phase {me.protocol.phase.n} · {me.protocol.phase.name}
-              </span>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{me.protocol.message}</p>
-          </div>
-        </FadeUp>
-      )}
+      {/* banner */}
+      <FadeUp delay={0.04} className="mt-5">
+        <Banner />
+      </FadeUp>
 
-      {/* rescue state — doc §7: win back BEFORE the cancel, never lead with discounts */}
+      {/* churn message */}
       {me?.user.churnFlag && !checkedInToday && (
-        <FadeUp delay={0.05} className="mt-4">
-          <div className="glass-strong relative overflow-hidden rounded-3xl border-orange-400/20 p-5">
-            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-orange-500/15 blur-3xl" />
-            <h2 className="font-display text-lg font-bold">We missed you, {me.user.name} 💚</h2>
-            {me.user.motivation && (
-              <p className="mt-2 rounded-2xl bg-white/4 p-3 text-xs italic leading-relaxed text-white/75">
-                “{me.user.motivation}”
-                <span className="mt-1 block not-italic text-[10px] text-white/35">— you, on day 1</span>
-              </p>
-            )}
-            <p className="mt-3 text-xs leading-relaxed text-muted">
-              That reason hasn&apos;t gone anywhere — and neither has your progress:{" "}
-              <span className="font-bold text-white/85">{me.totalDays} doses logged</span> and a best streak of{" "}
-              <span className="font-bold text-white/85">{me.bestStreak} days</span>. One tap picks it right back up.
-            </p>
-            <div className="mt-4">
-              <CTA onClick={handleCheckIn}>
-                <Flame className="h-5 w-5" fill="currentColor" />
-                {checkInMutation.isPending ? "Logging…" : "I'm back — log today's dose"}
-              </CTA>
-            </div>
-            {me.subscription?.status === "active" && (
-              <Link href="/subscription" className="mt-3 block text-center text-[11px] font-semibold text-muted">
-                Need a breather instead? Pause your subscription — no hard feelings
-              </Link>
-            )}
-          </div>
+        <FadeUp delay={0.06} className="mt-4">
+          <p className="text-center text-sm font-semibold text-[var(--accent)]">
+            We missed you, {me.user.name} — pick it back up today.
+          </p>
         </FadeUp>
       )}
 
-      {/* check-in hero */}
-      <FadeUp delay={0.06} className="mt-4">
-        <div className="glass-strong relative overflow-hidden rounded-3xl p-5">
-          <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/20 blur-3xl" />
-          <div className="flex items-center gap-4">
-            <Link href="/streak">
-              <ProgressRing progress={hydrated ? streak / nextMilestone : 0} size={84} stroke={6}>
-                <div className="flex flex-col items-center">
-                  <Flame className={`h-5 w-5 text-orange-400 ${hydrated && streak > 0 ? "flame" : ""}`} fill="currentColor" />
-                  <span className="font-display text-lg font-bold leading-none">{hydrated ? streak : "–"}</span>
-                </div>
-              </ProgressRing>
-            </Link>
-            <div className="flex-1">
-              <h2 className="font-display text-lg font-bold leading-tight">
-                {checkedInToday ? "You showed up today 💪" : "Did you take your supplement?"}
-              </h2>
-              <p className="mt-0.5 text-xs text-muted">
-                {checkedInToday
-                  ? `${nextMilestone - streak} days to your ${nextMilestone}-day badge`
-                  : `Keep your ${streak}-day streak alive`}
-              </p>
-            </div>
+      {/* big dose button */}
+      <FadeUp delay={0.08} className="mt-4">
+        {checkedInToday ? (
+          <div className="flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-soft)] px-6 py-4 font-display text-lg font-bold text-[var(--accent-strong)]">
+            <Check className="h-6 w-6" /> Done for today!
           </div>
+        ) : (
+          <CTA onClick={handleCheckIn} className="min-h-[64px] text-lg">
+            <Flame className="h-6 w-6" fill="currentColor" />
+            {checkInMutation.isPending ? "Logging…" : "I took my dose today"}
+          </CTA>
+        )}
+      </FadeUp>
 
-          <div className="mt-4">
-            {checkedInToday ? (
-              <Link href="/streak">
-                <motion.div whileTap={{ scale: 0.97 }} className="glass flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 font-display font-bold text-emerald-300">
-                  <Check className="h-5 w-5" /> Done for today — view streak
-                </motion.div>
-              </Link>
-            ) : (
-              <CTA onClick={handleCheckIn}>
-                <Flame className="h-5 w-5" fill="currentColor" />
-                {checkInMutation.isPending ? "Logging…" : "I took it today"}
-              </CTA>
-            )}
+      {/* streak count */}
+      <FadeUp delay={0.11} className="mt-4">
+        <div className="card flex items-center gap-4 rounded-2xl p-5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+            <Flame className="h-6 w-6 text-amber-600" fill="currentColor" />
+          </div>
+          <div>
+            <p className="font-display text-2xl font-bold text-[var(--text)]">{hydrated ? streak : "–"} days in a row</p>
+            <p className="text-sm text-muted">Keep showing up — it adds up.</p>
           </div>
         </div>
       </FadeUp>
 
-      {/* bottle forecast */}
+      {/* doses left */}
       {me?.bottle && bottleProduct && (
-        <FadeUp delay={0.09} className="mt-4">
-          <div className="glass flex items-center gap-3 rounded-2xl px-4 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: `${bottleProduct.accent}22` }}>
-              <Pill className="h-4 w-4" style={{ color: bottleProduct.accent }} />
-            </div>
-            <p className="flex-1 text-xs text-muted">
-              <span className="font-semibold text-white/90">{bottleProduct.name}:</span>{" "}
-              {me.bottle.daysLeft > 0 ? (
-                <>~{me.bottle.daysLeft} days of doses left</>
-              ) : (
-                <span className="text-orange-300">bottle is empty — time to restock</span>
-              )}
-            </p>
-            {me.bottle.daysLeft <= 7 && (
-              <button
-                onClick={() => setRefillOpen(true)}
-                className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 active:scale-95 transition-transform"
-              >
-                Reorder
-              </button>
-            )}
-          </div>
-          <RefillSheet open={refillOpen} onClose={() => setRefillOpen(false)} productId={me.bottle.productId} />
-        </FadeUp>
-      )}
-
-      {/* order in transit */}
-      {activeOrder && (
-        <FadeUp delay={0.12} className="mt-4">
-          <Link href={`/orders/${activeOrder.id}`}>
-            <motion.div whileTap={{ scale: 0.98 }} className="glass relative overflow-hidden rounded-3xl p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-400/15">
-                    <Truck className="h-5 w-5 text-sky-300" />
-                    <span className="ping-soft absolute right-0 top-0 h-2 w-2 rounded-full bg-sky-400" />
-                  </div>
-                  <div>
-                    <p className="font-display text-sm font-bold">Your package is on the way</p>
-                    <p className="text-xs text-muted">
-                      Arriving <span className="font-semibold text-sky-300">{activeOrder.eta}</span>
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted" />
+        <FadeUp delay={0.14} className="mt-4">
+          <div className="card rounded-2xl p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+                <Pill className="h-6 w-6 text-[var(--accent)]" />
               </div>
-              <div className="mt-4 flex items-center gap-1.5">
-                {activeOrder.tracking.map((s, i) => (
-                  <div key={i} className={`h-1.5 flex-1 rounded-full ${s.done ? "grad" : "bg-white/10"}`} />
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] text-muted">{activeOrder.tracking.find((s) => s.current)?.detail}</p>
-            </motion.div>
-          </Link>
-        </FadeUp>
-      )}
-
-      {/* quick actions */}
-      <FadeUp delay={0.18} className="mt-4 grid grid-cols-3 gap-3">
-        {[
-          { href: activeOrder ? `/orders/${activeOrder.id}` : "/orders", icon: Package, label: "Track order", color: "text-sky-300" },
-          { href: "/orders", icon: History, label: "My orders", color: "text-violet-300" },
-          { href: "/support", icon: LifeBuoy, label: "Support", color: "text-rose-300" },
-        ].map((a) => (
-          <Link key={a.label} href={a.href}>
-            <motion.div whileTap={{ scale: 0.94 }} className="glass flex flex-col items-center gap-2 rounded-2xl py-4">
-              <a.icon className={`h-5 w-5 ${a.color}`} />
-              <span className="text-[11px] font-medium text-muted">{a.label}</span>
-            </motion.div>
-          </Link>
-        ))}
-      </FadeUp>
-
-      {/* keep learning */}
-      <FadeUp delay={0.24} className="mt-7">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">Keep learning</h3>
-          <Link href="/learn" className="text-xs font-semibold text-emerald-300">
-            See all
-          </Link>
-        </div>
-        <div className="no-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
-          {learnPreview.map((c) => {
-            const Icon = kindIcon[c.kind];
-            return (
-              <Link key={c.slug} href={`/learn/${c.slug}`} className="shrink-0">
-                <motion.div whileTap={{ scale: 0.96 }} className="glass w-44 rounded-2xl p-4">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/15">
-                    <Icon className="h-4 w-4 text-emerald-300" />
-                  </div>
-                  <p className="mt-3 line-clamp-2 font-display text-sm font-bold leading-snug">{c.title}</p>
-                  <p className="mt-1 text-[11px] text-muted">
-                    {c.kind} · {c.minutes} min
-                  </p>
-                </motion.div>
-              </Link>
-            );
-          })}
-        </div>
-      </FadeUp>
-
-      {/* shop teaser */}
-      <FadeUp delay={0.3} className="mt-7">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">Explore the line</h3>
-          <Link href="/shop" className="text-xs font-semibold text-emerald-300">
-            Full catalog
-          </Link>
-        </div>
-        <div className="no-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
-          {featured.map((p) => (
-            <Link key={p.id} href={`/shop/${p.id}`} className="shrink-0">
-              <motion.div
-                whileTap={{ scale: 0.96 }}
-                className="glass relative w-36 overflow-hidden rounded-2xl p-3 pt-4 text-center"
-              >
-                <div
-                  className="absolute inset-x-0 top-0 h-20 opacity-25"
-                  style={{ background: `radial-gradient(circle at 50% 0%, ${p.accent}, transparent 70%)` }}
-                />
-                <Bottle accent={p.accent} label={p.short} className="mx-auto h-24" />
-                <p className="mt-2 font-display text-sm font-bold">{p.name}</p>
-                <p className="text-[11px] text-muted">${p.price}</p>
-              </motion.div>
-            </Link>
-          ))}
-        </div>
-      </FadeUp>
-
-      {/* points footer */}
-      <FadeUp delay={0.36} className="mt-6">
-        <Link href="/rewards">
-          <div className="glass flex items-center justify-between rounded-2xl px-5 py-4">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-lime-300" />
               <div>
-                <p className="text-sm font-semibold">{hydrated ? me!.points : "—"} points</p>
-                <p className="text-[11px] text-muted">
-                  {me
-                    ? me.tier.nextTier
-                      ? `${me.tier.tier} member · ${me.tier.monthsToNext} more ${me.tier.monthsToNext === 1 ? "month" : "months"} to ${me.tier.nextTier}`
-                      : `${me.tier.tier} member`
-                    : ""}
+                <p className="font-display text-lg font-bold text-[var(--text)]">
+                  {me.bottle.daysLeft > 0 ? (
+                    <>≈ {me.bottle.daysLeft} days of doses left</>
+                  ) : (
+                    "Bottle is empty"
+                  )}
+                </p>
+                <p className="text-sm text-muted">
+                  {bottleProduct.name}
+                  {me.bottle.daysLeft > 0 && runsOutLabel && <> · runs out {runsOutLabel}</>}
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-5 w-5 text-muted" />
+            {me.bottle.daysLeft <= 7 && (
+              <Link
+                href="/shop"
+                className="mt-4 flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 py-2.5 text-sm font-bold text-amber-800"
+              >
+                Running low — reorder soon
+              </Link>
+            )}
           </div>
+        </FadeUp>
+      )}
+
+      {/* 3 big nav buttons */}
+      <FadeUp delay={0.18} className="mt-6 space-y-3">
+        <Link
+          href={activeOrder ? `/orders/${activeOrder.id}` : "/orders"}
+          className="card flex min-h-[56px] items-center gap-3 rounded-2xl px-5 py-4"
+        >
+          <Truck className="h-5 w-5 text-[var(--accent)]" />
+          <span className="flex-1 font-display text-base font-bold text-[var(--text)]">Track my package</span>
+          <ChevronRight className="h-5 w-5 text-muted" />
+        </Link>
+        <Link href="/orders" className="card flex min-h-[56px] items-center gap-3 rounded-2xl px-5 py-4">
+          <History className="h-5 w-5 text-[var(--accent)]" />
+          <span className="flex-1 font-display text-base font-bold text-[var(--text)]">My orders</span>
+          <ChevronRight className="h-5 w-5 text-muted" />
+        </Link>
+        <Link href="/support" className="card flex min-h-[56px] items-center gap-3 rounded-2xl px-5 py-4">
+          <LifeBuoy className="h-5 w-5 text-[var(--accent)]" />
+          <span className="flex-1 font-display text-base font-bold text-[var(--text)]">Support</span>
+          <ChevronRight className="h-5 w-5 text-muted" />
         </Link>
       </FadeUp>
+
+      {/* order in transit detail (kept for context, below the main actions) */}
+      {activeOrder && (
+        <FadeUp delay={0.22} className="mt-4">
+          <Link href={`/orders/${activeOrder.id}`}>
+            <div className="card flex items-center gap-3 rounded-2xl p-4">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50">
+                <Package className="h-5 w-5 text-sky-700" />
+                <span className="ping-soft absolute right-0 top-0 h-2 w-2 rounded-full bg-sky-600" />
+              </div>
+              <p className="text-sm text-muted">
+                Your package is on the way — arriving <span className="font-semibold text-[var(--text)]">{activeOrder.eta}</span>
+              </p>
+            </div>
+          </Link>
+        </FadeUp>
+      )}
     </div>
   );
 }

@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Leaf, Mail, KeyRound, ArrowRight, Sparkles, FlaskConical } from "lucide-react";
+import { Leaf, Mail, KeyRound, ArrowRight, FlaskConical } from "lucide-react";
 import { CTA, FadeUp } from "@/components/ui";
 
 const personas = [
-  { id: "michael", name: "Michael", emoji: "💪", scenario: "Day 12 · renewal in 3 days · order in transit" },
-  { id: "jessica", name: "Jessica", emoji: "✨", scenario: "Day 28 · results logged · bottle almost empty" },
-  { id: "robert", name: "Robert", emoji: "🌿", scenario: "3 days inactive · rescue & win-back flows" },
+  { id: "michael", name: "Michael", emoji: "💪", scenario: "Order in transit" },
+  { id: "jessica", name: "Jessica", emoji: "✨", scenario: "Bottle running low" },
+  { id: "robert", name: "Robert", emoji: "🌿", scenario: "3 days inactive" },
 ] as const;
 
 export default function LoginPage() {
@@ -72,23 +72,23 @@ export default function LoginPage() {
     <div className="flex min-h-dvh flex-col justify-center px-6 pb-16">
       {/* brand */}
       <FadeUp className="text-center">
-        <div className="grad glow mx-auto flex h-16 w-16 items-center justify-center rounded-3xl">
-          <Leaf className="h-8 w-8 text-emerald-950" />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--accent)]">
+          <Leaf className="h-8 w-8 text-white" />
         </div>
-        <h1 className="mt-4 font-display text-3xl font-extrabold">
-          Neo <span className="text-grad">Nature</span>
+        <h1 className="mt-4 font-display text-3xl font-extrabold text-[var(--text)]">
+          Neo <span className="text-[var(--accent)]">Nature</span>
         </h1>
-        <p className="mt-1 text-sm text-muted">Your daily wellness companion</p>
+        <p className="mt-1 text-base text-muted">Your daily wellness companion</p>
       </FadeUp>
 
       {/* auth card */}
-      <FadeUp delay={0.08} className="mt-8">
-        <div className="glass-strong rounded-3xl p-5">
+      <FadeUp delay={0.06} className="mt-8">
+        <div className="card rounded-3xl p-5">
           <AnimatePresence mode="wait">
             {step === "email" ? (
-              <motion.div key="email" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted">
-                  <Mail className="h-3.5 w-3.5" /> Sign in with your email — no password needed
+              <motion.div key="email" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted">
+                  <Mail className="h-4 w-4" /> Sign in with your email — no password needed
                 </label>
                 <input
                   type="email"
@@ -96,7 +96,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && requestCode()}
                   placeholder="you@example.com"
-                  className="glass w-full rounded-2xl px-4 py-3.5 text-sm placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
+                  className="card w-full min-h-[52px] rounded-2xl px-4 text-base placeholder:text-muted"
                 />
                 <div className="mt-3">
                   <CTA onClick={requestCode}>
@@ -105,12 +105,12 @@ export default function LoginPage() {
                 </div>
               </motion.div>
             ) : (
-              <motion.div key="code" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted">
-                  <KeyRound className="h-3.5 w-3.5" /> Enter the 6-digit code we sent to {email}
+              <motion.div key="code" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted">
+                  <KeyRound className="h-4 w-4" /> Enter the 6-digit code we sent to {email}
                 </label>
                 {demoCode && (
-                  <p className="mb-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-center text-xs text-amber-200">
+                  <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-800">
                     Demo mode — your code is <span className="font-mono text-base font-bold">{demoCode}</span>
                   </p>
                 )}
@@ -120,46 +120,41 @@ export default function LoginPage() {
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   onKeyDown={(e) => e.key === "Enter" && verify()}
                   placeholder="••••••"
-                  className="glass w-full rounded-2xl px-4 py-3.5 text-center font-mono text-2xl tracking-[0.4em] placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
+                  className="card w-full min-h-[52px] rounded-2xl px-4 text-center font-mono text-2xl tracking-[0.4em] placeholder:text-muted"
                 />
                 <div className="mt-3">
                   <CTA onClick={verify}>{busy ? "Verifying…" : "Sign in"}</CTA>
                 </div>
-                <button onClick={() => setStep("email")} className="mt-3 w-full text-center text-xs text-muted">
+                <button onClick={() => setStep("email")} className="mt-3 w-full text-center text-sm text-muted">
                   Use a different email
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
-          {error && <p className="mt-3 text-center text-xs text-rose-300">{error}</p>}
+          {error && <p className="mt-3 text-center text-sm text-rose-700">{error}</p>}
         </div>
       </FadeUp>
 
       {/* demo personas */}
       {demo && (
-        <FadeUp delay={0.16} className="mt-6">
+        <FadeUp delay={0.12} className="mt-6">
           <div className="mb-3 flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-amber-300" />
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Demo scenarios</p>
+            <FlaskConical className="h-4 w-4 text-amber-600" />
+            <p className="text-sm font-bold uppercase tracking-wider text-amber-700">Demo scenarios</p>
           </div>
           <div className="space-y-2.5">
-            {personas.map((p, i) => (
-              <motion.button
+            {personas.map((p) => (
+              <button
                 key={p.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + i * 0.07 }}
-                whileTap={{ scale: 0.97 }}
                 onClick={() => loginAsPersona(p.id)}
-                className="glass flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                className="card flex min-h-[56px] w-full items-center gap-3 rounded-2xl p-4 text-left"
               >
                 <span className="text-2xl">{p.emoji}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold">{p.name}</span>
-                  <span className="block truncate text-[11px] text-muted">{p.scenario}</span>
+                  <span className="block text-base font-bold text-[var(--text)]">{p.name}</span>
+                  <span className="block truncate text-sm text-muted">{p.scenario}</span>
                 </span>
-                <Sparkles className="h-4 w-4 shrink-0 text-emerald-300" />
-              </motion.button>
+              </button>
             ))}
           </div>
         </FadeUp>

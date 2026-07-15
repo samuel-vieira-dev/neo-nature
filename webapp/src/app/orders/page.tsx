@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 import Bottle from "@/components/Bottle";
@@ -25,16 +24,16 @@ export default function OrdersPage() {
       <PageHeader title="My orders" subtitle={orders.length ? `${orders.length} orders` : "Loading…"} backHref="/" />
 
       <div className="space-y-3 px-5">
-        {orders.map((o, i) => {
+        {orders.map((o) => {
           const chip = statusChip[o.status];
           return (
-            <FadeUp key={o.id} delay={i * 0.07}>
+            <FadeUp key={o.id}>
               <Link href={`/orders/${o.id}`}>
-                <motion.div whileTap={{ scale: 0.98 }} className="glass rounded-3xl p-5">
+                <div className="card rounded-3xl p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-display text-sm font-bold">Order {o.number}</p>
-                      <p className="text-xs text-muted">{o.date}</p>
+                      <p className="font-display text-base font-bold text-[var(--text)]">Order {o.number}</p>
+                      <p className="text-sm text-muted">{o.date}</p>
                     </div>
                     <Chip tone={chip.tone}>{chip.label}</Chip>
                   </div>
@@ -44,10 +43,10 @@ export default function OrdersPage() {
                       const p = productById(it.productId);
                       if (!p) return null;
                       return (
-                        <div key={it.productId} className="relative rounded-xl bg-white/4 p-1.5">
+                        <div key={it.productId} className="relative rounded-xl bg-[var(--surface)] p-1.5">
                           <Bottle accent={p.accent} label={p.short} className="h-14" />
                           {it.qty > 1 && (
-                            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-emerald-950">
+                            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white">
                               ×{it.qty}
                             </span>
                           )}
@@ -55,26 +54,25 @@ export default function OrdersPage() {
                       );
                     })}
                     <div className="ml-auto text-right">
-                      <p className="font-display text-lg font-bold">${o.total}</p>
-                      <p className="flex items-center justify-end gap-1 text-[11px] text-emerald-300">
-                        View details <ChevronRight className="h-3 w-3" />
+                      <p className="font-display text-lg font-bold text-[var(--text)]">${o.total}</p>
+                      <p className="flex items-center justify-end gap-1 text-sm font-semibold text-[var(--accent)]">
+                        View details <ChevronRight className="h-3.5 w-3.5" />
                       </p>
                     </div>
                   </div>
 
                   {o.status === "delivered" && (
-                    <motion.button
-                      whileTap={{ scale: 0.96 }}
+                    <button
                       onClick={(e) => {
                         e.preventDefault();
                         toast("Demo: 1-click reorder → secure checkout (BuyGoods) 🔒");
                       }}
-                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 py-2.5 text-sm font-semibold text-emerald-300"
+                      className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] py-2.5 text-sm font-semibold text-[var(--accent-strong)]"
                     >
                       <RotateCcw className="h-4 w-4" /> Buy again
-                    </motion.button>
+                    </button>
                   )}
-                </motion.div>
+                </div>
               </Link>
             </FadeUp>
           );
