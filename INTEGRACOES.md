@@ -4,8 +4,19 @@
 
 ## 🔴 Crítico — BuyGoods (pedidos, assinatura, refund)
 
+> **⚠️ Descobertas do teste de webhook (16/07/2026) — leia antes de pedir qualquer coisa:**
+>
+> **a) O postback da BuyGoods manda dados por _query string_ (GET), não por corpo POST.** As macros precisam estar **na própria URL** cadastrada. Colar a URL "pelada" faz a BuyGoods chamar sem dado nenhum — foi exatamente o que aconteceu nos 2 testes do cliente (chegou request vazio, `content-length: 0`). URL correta a cadastrar:
+> ```
+> https://neo-nature-production.up.railway.app/webhook-buygoods-info?subid={SUBID}&subid2={SUBID2}&subid3={SUBID3}&subid4={SUBID4}&subid5={SUBID5}&orderid={ORDERID}&product={PRODUCT_CODENAME}&amount={COMMISSION_AMOUNT}
+> ```
+> **b) O postback NÃO carrega dados de logística.** As únicas macros que existem são `{SUBID}`–`{SUBID5}`, `{ORDERID}`, `{PRODUCT_CODENAME}`, `{COMMISSION_AMOUNT}`. **Não há tracking number, transportadora nem status de envio.** O "tracking" da doc da BuyGoods é rastreio de *conversão de afiliado*, não de *pacote* — colisão de terminologia. → **O rastreio real terá que vir de outra fonte (ver item 9: 3PL/AfterShip).**
+> c) Onde cadastrar: conta → **Settings → Postback pixels**. Só na página principal (AffOverview) — se cadastrar também na oferta específica, **dispara duas vezes**.
+> d) A doc é escrita para conta de **afiliado**. Nosso cliente é o **vendor/merchant** — confirmar com o gerente de conta se o lado merchant tem postback/API diferente (é onde pode existir dado de fulfillment).
+> e) Requisito técnico: o script precisa **responder algo** no corpo, senão a BuyGoods considera falha e reenvia por até 3 dias. (Nosso endpoint já responde `{"ok":true}` ✓)
+
 1. **Acesso ao painel BuyGoods** (usuário colaborador) e lista das ofertas ativas hoje.
-2. **Postback/IPN**: autorização para configurar a Postback URL apontando para o nosso backend + o secret de validação. Precisamos dos eventos: venda aprovada, rebill, refund, chargeback. (Pedir a documentação de postback que o gerente de conta deles fornece.)
+2. **Postback/IPN**: cadastrar a URL com macros do quadro acima. Perguntar ao gerente de conta: (i) existe postback/API do lado **merchant** (não afiliado)? (ii) existe evento/macro de **refund, rebill e chargeback**? (iii) existe **qualquer** endpoint que exponha tracking number/status de envio?
 3. **Recorrência**: confirmar que a conta suporta cobrança recorrente e **quais SKUs viram assinatura**, com preço/desconto oficial do clube (o app assume −15%).
 4. **Esteira completa (20 produtos)**: nome, SKU, preço, compare-at, upsells atuais, **foto do rótulo em alta**, dosagem/posologia oficial e claims permitidos de cada produto. (Hoje o app tem 16 produtos fictícios — vamos substituir 1:1.)
 5. **Descriptor real do cartão** de cada oferta (ex.: `NEONATURE*HEROUP 855-…`) — alimenta a central de faturas anti-chargeback.
@@ -15,7 +26,7 @@
 
 7. **Helpdesk**: qual usam (Gorgias, Zendesk, e-mail)? Se houver, API key/acesso para os tickets do app caírem lá. Se não houver, decidir: adotar um ou manter os tickets nativos do app (já funcionam).
 8. **Fluxo de refund atual (35 passos) documentado** + política oficial de garantia (60 dias? exceções?) — para decidirmos o que o fluxo simplificado do app automatiza.
-9. **Fulfillment/rastreio**: quem envia (3PL? qual?) e de onde vêm os tracking numbers hoje (ShipStation? planilha?). Com isso escolhemos AfterShip/EasyPost e conectamos o rastreio real.
+9. **Fulfillment/rastreio** — 🔺 **SUBIU DE PRIORIDADE**: como o postback da BuyGoods não carrega logística (ver quadro acima), **esta é agora a única fonte possível de rastreio**. Perguntar: quem faz o envio (qual 3PL?), de onde saem os tracking numbers hoje (ShipStation? painel do 3PL? planilha?), e se dá para receber webhook/API de lá. Com isso conectamos AfterShip/EasyPost e o rastreio real do app.
 10. **E-mail transacional**: domínio para envio (códigos de login, confirmações) — vamos configurar Resend/SES; precisamos de acesso DNS (SPF/DKIM).
 11. **CRM/e-mail marketing**: usam Klaviyo/Sendlane/etc.? API key para sincronizar eventos do app (churn, dia-30, refill devido) com flows de e-mail/SMS.
 
