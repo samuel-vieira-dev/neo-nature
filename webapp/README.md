@@ -43,6 +43,22 @@ forecast, churn detection, tiers).
 | `DEMO_MODE` + `NEXT_PUBLIC_DEMO_MODE` | `true` enables persona login, on-screen OTP, demo panel |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Real web push |
 | `ANTHROPIC_API_KEY` | Optional — AI FAQ answers (falls back to local search) |
+| `FRESHDESK_DOMAIN` + `FRESHDESK_API_KEY` | Optional — push support tickets to Freshdesk. Without them, tickets stay local (`sync_status: local_only`). `FRESHDESK_DOMAIN` is just the subdomain, e.g. `neonature` for `neonature.freshdesk.com` |
+
+## Support tickets → Freshdesk (push-only)
+
+The app creates every support/refund/billing ticket in Freshdesk via the REST v2
+API (`src/server/freshdesk.ts`); the customer follows the thread over email.
+Freshdesk is the system of record — the local `tickets` table is a mirror for the
+"Your tickets" screen, with `sync_status`:
+
+- `synced` — pushed to Freshdesk (`freshdesk_id` set)
+- `local_only` — Freshdesk not configured (no env vars)
+- `pending` — push failed (API/network); safe to reconcile later
+
+To enable: create a Freshdesk account, grab the API key (Profile → below the
+change-password box), and set `FRESHDESK_DOMAIN` + `FRESHDESK_API_KEY`. Start with
+a **free trial account** to validate, then swap in the client's real credentials.
 
 ## Railway deploy
 

@@ -172,6 +172,11 @@ export const tickets = pgTable("tickets", {
   kind: text("kind").notNull().default("support"), // support | refund | billing
   status: text("status").notNull().default("open"), // open | in_review | resolved
   lastMessage: text("last_message").notNull().default(""),
+  // Freshdesk mirror (push-only): local row is the app's view, Freshdesk is the
+  // system of record. syncStatus tracks whether the push to Freshdesk succeeded.
+  email: text("email").notNull().default(""), // requester email snapshot (Freshdesk keys on this)
+  freshdeskId: integer("freshdesk_id"), // Freshdesk ticket id once created
+  syncStatus: text("sync_status").notNull().default("pending"), // pending | synced | local_only
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 

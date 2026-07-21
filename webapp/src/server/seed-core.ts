@@ -158,8 +158,10 @@ export async function seedAll() {
   // ---------------------------------------------------------------- tickets
   await db.insert(s.tickets).values([
     {
-      id: "T-2201", userId: "michael", subject: "Package arrived with a dented bottle",
+      id: "T-2201", userId: "michael", email: "michael@demo.neonature.app",
+      subject: "Package arrived with a dented bottle",
       orderNumber: "NN-09917", status: "resolved", kind: "support", createdAt: d(-40),
+      syncStatus: "local_only",
       lastMessage: "We shipped a free replacement — so sorry about that! It arrived 5 days later.",
     },
   ]);
