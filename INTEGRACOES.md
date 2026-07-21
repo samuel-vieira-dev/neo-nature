@@ -24,7 +24,7 @@
 
 ## 🟠 Importante — Operação
 
-7. **Helpdesk**: qual usam (Gorgias, Zendesk, e-mail)? Se houver, API key/acesso para os tickets do app caírem lá. Se não houver, decidir: adotar um ou manter os tickets nativos do app (já funcionam).
+7. **Helpdesk → Freshdesk** ✅ *(decidido)*. Integração push-only já construída no app (código pronto, testado local; ver `webapp/README.md`). Falta só: **(a)** criar a conta Freshdesk (validamos num trial grátis primeiro), **(b)** o cliente fornecer o **subdomínio** (`XXXX.freshdesk.com`) e a **API key** (Profile → abaixo do "change password"). Setamos `FRESHDESK_DOMAIN` + `FRESHDESK_API_KEY` no Railway e os tickets do app passam a cair no Freshdesk; cliente acompanha por e-mail. *(Sync bidirecional — trazer a resposta do agente de volta pro app via webhook — fica para depois, se quiserem.)*
 8. **Fluxo de refund atual (35 passos) documentado** + política oficial de garantia (60 dias? exceções?) — para decidirmos o que o fluxo simplificado do app automatiza.
 9. **Fulfillment/rastreio** — 🔺 **SUBIU DE PRIORIDADE**: como o postback da BuyGoods não carrega logística (ver quadro acima), **esta é agora a única fonte possível de rastreio**. Perguntar: quem faz o envio (qual 3PL?), de onde saem os tracking numbers hoje (ShipStation? painel do 3PL? planilha?), e se dá para receber webhook/API de lá. Com isso conectamos AfterShip/EasyPost e o rastreio real do app.
 10. **E-mail transacional**: domínio para envio (códigos de login, confirmações) — vamos configurar Resend/SES; precisamos de acesso DNS (SPF/DKIM).
