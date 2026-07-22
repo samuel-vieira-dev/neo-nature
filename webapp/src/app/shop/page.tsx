@@ -5,7 +5,9 @@ import { useState } from "react";
 import { Star, ShieldCheck, Truck, BadgePercent } from "lucide-react";
 import { FadeUp } from "@/components/ui";
 import Bottle from "@/components/Bottle";
+import ComingSoon from "@/components/ComingSoon";
 import { products } from "@/lib/data";
+import { SHOP_ENABLED } from "@/lib/flags";
 
 function ProductRow({ p }: { p: (typeof products)[number] }) {
   return (
@@ -35,6 +37,8 @@ function ProductRow({ p }: { p: (typeof products)[number] }) {
 
 export default function ShopPage() {
   const [filter, setFilter] = useState("All");
+
+  if (!SHOP_ENABLED) return <ComingSoon />;
 
   const categories = ["All", ...Array.from(new Set(products.map((p) => p.category)))];
   const filtered = filter === "All" ? products : products.filter((p) => p.category === filter);

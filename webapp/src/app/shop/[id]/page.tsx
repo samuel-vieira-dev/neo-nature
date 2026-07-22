@@ -5,12 +5,16 @@ import { Check, Star, ShieldCheck, Pill, Lock, Play } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { FadeUp, PageHeader, CTA } from "@/components/ui";
 import Bottle from "@/components/Bottle";
+import ComingSoon from "@/components/ComingSoon";
 import { productById } from "@/lib/data";
+import { SHOP_ENABLED } from "@/lib/flags";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useApp();
   const p = productById(id);
+
+  if (!SHOP_ENABLED) return <ComingSoon />;
 
   if (!p) {
     return (
