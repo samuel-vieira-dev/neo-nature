@@ -3,25 +3,34 @@ import { db } from "@/db";
 import { orders, orderItems, type Order } from "@/db/schema";
 import { withUser } from "@/server/session";
 
-export function serializeOrder(o: Order, items: { productId: string; qty: number; price: string }[]) {
+type Item = typeof orderItems.$inferSelect;
+
+export function serializeOrder(o: Order, items: Item[]) {
   return {
     id: o.id,
     number: o.number,
     date: o.placedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    status: o.status,
+    status: o.status as "confirmed" | "shipped" | "canceled" | "refunded",
     total: Number(o.total),
-    eta: o.eta,
-    carrier: o.carrier,
-    trackingNumber: o.trackingNumber,
+    currency: o.currency,
+    shippingStatus: o.shippingStatus,
     address: o.address,
     tracking: o.trackingSteps,
-    items: items.map((i) => ({ productId: i.productId, qty: i.qty, price: Number(i.price) })),
+    items: items.map((i) => ({
+      productName: i.productName,
+      sku: i.sku,
+      thumbnailUrl: i.thumbnailUrl,
+      qty: i.qty,
+      price: Number(i.price),
+    })),
   };
 }
 
+// Orders are matched to the signed-in user by email (they may have been created
+// by a BuyGoods webhook before the account existed).
 export const GET = withUser(async (user) => {
   const rows = await db.query.orders.findMany({
-    where: eq(orders.userId, user.id),
+    where: eq(orders.email, user.email.toLowerCase()),
     orderBy: [desc(orders.placedAt)],
   });
   const items = rows.length

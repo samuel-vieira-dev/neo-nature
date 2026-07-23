@@ -7,7 +7,7 @@ import { serializeOrder } from "../route";
 export const GET = withUser(async (user, _req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const { id } = await ctx.params;
   const order = await db.query.orders.findFirst({
-    where: and(eq(orders.id, id), eq(orders.userId, user.id)),
+    where: and(eq(orders.id, id), eq(orders.email, user.email.toLowerCase())),
   });
   if (!order) return Response.json({ error: "not_found" }, { status: 404 });
 

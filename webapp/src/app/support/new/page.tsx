@@ -8,8 +8,7 @@ import { ArrowRight, Camera, CheckCircle2, PartyPopper, Package, HeartHandshake 
 import { useApp } from "@/lib/store";
 import { useOrders, useCreateTicket } from "@/lib/hooks";
 import { PageHeader, CTA } from "@/components/ui";
-import Bottle from "@/components/Bottle";
-import { productById, issueTypes } from "@/lib/data";
+import { issueTypes } from "@/lib/data";
 
 const stepVariants = {
   enter: { opacity: 0 },
@@ -81,12 +80,8 @@ export default function NewTicketPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex gap-1">
-                        {o.items.slice(0, 2).map((it) => {
-                          const p = productById(it.productId);
-                          if (!p) return null;
-                          return <Bottle key={it.productId} accent={p.accent} label={p.short} className="h-12" />;
-                        })}
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)]">
+                        <Package className="h-5 w-5 text-muted" />
                       </div>
                       <div className="flex-1">
                         <p className="text-base font-semibold text-[var(--text)]">Order {o.number}</p>
@@ -219,7 +214,7 @@ export default function NewTicketPage() {
                 className="card mt-4 w-full resize-none rounded-2xl p-4 text-base placeholder:text-muted"
               />
               <button
-                onClick={() => toast("Demo: photo upload will be enabled in Phase 2 📷")}
+                onClick={() => toast("Photo attachments are coming soon 📷")}
                 className="card mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-dashed py-4 text-base text-muted"
               >
                 <Camera className="h-4 w-4" /> Add a photo (optional)

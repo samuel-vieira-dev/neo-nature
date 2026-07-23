@@ -22,7 +22,7 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const activeOrder = ordersData?.orders.find((o) => o.status === "in_transit");
+  const activeOrder = ordersData?.orders.find((o) => o.status === "confirmed" || o.status === "shipped");
   const bottleProduct = me?.bottle ? productById(me.bottle.productId) : null;
   const runsOutLabel = me?.bottle
     ? new Date(me.bottle.runsOutAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })

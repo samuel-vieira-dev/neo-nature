@@ -81,29 +81,40 @@ export const bottles = pgTable("bottles", {
   active: boolean("active").notNull().default(true),
 });
 
-// -------- commerce (simulated; BuyGoods postback replaces this in Phase 2) --------
+// -------- commerce (fed by BuyGoods IPN — see src/server/buygoods.ts) --------
 
-export const orders = pgTable("orders", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  number: text("number").notNull(),
-  placedAt: timestamp("placed_at", { withTimezone: true, mode: "date" }).notNull(),
-  status: text("status").notNull(), // processing | in_transit | delivered
-  total: numeric("total", { precision: 10, scale: 2 }).notNull(),
-  eta: text("eta"),
-  carrier: text("carrier"),
-  trackingNumber: text("tracking_number"),
-  address: text("address").notNull().default(""),
-  trackingSteps: jsonb("tracking_steps")
-    .$type<{ label: string; detail: string; date: string; done: boolean; current?: boolean }[]>()
-    .notNull()
-    .default([]),
-});
+export const orders = pgTable(
+  "orders",
+  {
+    id: text("id").primaryKey(), // our id: "bg-<order_id_global>"
+    buygoodsOrderId: text("buygoods_order_id").unique(), // order_id_global (idempotency key)
+    // orders can arrive before the customer signs up — matched by email at read time
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    email: text("email").notNull().default(""),
+    number: text("number").notNull(), // human order id (order_id)
+    placedAt: timestamp("placed_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: text("status").notNull(), // confirmed | shipped | canceled | refunded
+    total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("USD"),
+    shippingStatus: text("shipping_status"), // BuyGoods human text, e.g. "Shipped on 27 Feb, 2023"
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true, mode: "date" }),
+    address: text("address").notNull().default(""),
+    trackingSteps: jsonb("tracking_steps")
+      .$type<{ label: string; detail: string; date: string; done: boolean; current?: boolean }[]>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("orders_email").on(t.email)]
+);
 
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  productId: text("product_id").notNull(),
+  productCodename: text("product_codename").notNull().default(""),
+  productName: text("product_name").notNull().default(""),
+  sku: text("sku"),
+  thumbnailUrl: text("thumbnail_url"),
   qty: integer("qty").notNull().default(1),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
 });

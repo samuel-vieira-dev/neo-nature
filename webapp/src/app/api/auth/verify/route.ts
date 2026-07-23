@@ -3,6 +3,7 @@ import { and, eq, gt, isNull, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { otpCodes, users } from "@/db/schema";
 import { createSession } from "@/server/session";
+import { linkOrdersToUser } from "@/server/buygoods";
 
 const bodySchema = z.object({ email: z.string().email(), code: z.string().min(4).max(8) });
 
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
       .values({ id, email, name: name.charAt(0).toUpperCase() + name.slice(1), fullName: name })
       .returning();
   }
+
+  // link any orders that arrived (via BuyGoods) before this account existed
+  await linkOrdersToUser(user.id, email);
 
   await createSession(user.id);
   return Response.json({ ok: true, onboarded: !!user.onboardedAt });

@@ -45,7 +45,6 @@ export type Me = {
   lastDoseDay: string | null;
   unread: number;
   bottle: { productId: string; dosesTaken: number; dosesLeft: number; daysLeft: number; runsOutAt: string } | null;
-  demo: { mode: boolean; dayOffset: number };
 };
 
 export function useMe() {
@@ -122,14 +121,13 @@ export type OrderDto = {
   id: string;
   number: string;
   date: string;
-  status: "processing" | "in_transit" | "delivered";
+  status: "confirmed" | "shipped" | "canceled" | "refunded";
   total: number;
-  eta: string | null;
-  carrier: string | null;
-  trackingNumber: string | null;
+  currency: string;
+  shippingStatus: string | null;
   address: string;
   tracking: { label: string; detail: string; date: string; done: boolean; current?: boolean }[];
-  items: { productId: string; qty: number; price: number }[];
+  items: { productName: string; sku: string | null; thumbnailUrl: string | null; qty: number; price: number }[];
 };
 
 export function useOrders() {
@@ -206,33 +204,6 @@ export function useUpdatePrefs() {
     mutationFn: (prefs: Partial<Me["user"]["prefs"]>) =>
       api("/api/prefs", { method: "PATCH", body: JSON.stringify(prefs) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
-  });
-}
-
-// -------- demo controls --------
-
-export function useDemoTime() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { delta?: number; reset?: boolean }) =>
-      api<{ ok: true; dayOffset: number }>("/api/demo/time", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
-export function useDemoReset() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api("/api/demo/reset", { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
-
-export function useDemoNextBanner() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api<{ ok: true; banner: { id: number; title: string } }>("/api/demo/banner", { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["banner"] }),
   });
 }
 

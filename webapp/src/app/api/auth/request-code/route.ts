@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db } from "@/db";
 import { otpCodes } from "@/db/schema";
-import { isDemoMode } from "@/server/session";
+import { isEmailConfigured, sendOtpEmail } from "@/server/email";
 
 const bodySchema = z.object({ email: z.string().email() });
 
@@ -18,8 +18,13 @@ export async function POST(request: Request) {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  // Phase 2: send via Resend/SES. In demo mode the code is returned so the
-  // client can show it on screen ("check your email" is simulated).
-  console.log(`[auth] OTP for ${email}: ${code}`);
-  return Response.json({ ok: true, ...(isDemoMode() ? { demoCode: code } : {}) });
+  if (isEmailConfigured()) {
+    await sendOtpEmail(email, code);
+    return Response.json({ ok: true });
+  }
+
+  // No email provider yet — return the code so testers can sign in. Set
+  // RESEND_API_KEY + EMAIL_FROM to switch to real email delivery.
+  console.log(`[auth] OTP for ${email}: ${code} (email not configured)`);
+  return Response.json({ ok: true, devCode: code });
 }
