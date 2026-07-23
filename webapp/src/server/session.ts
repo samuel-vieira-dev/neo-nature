@@ -44,10 +44,15 @@ export async function sessionUserId(): Promise<string | null> {
 /** Loads the authenticated user or throws a 401 Response */
 export async function requireUser(): Promise<User> {
   const uid = await sessionUserId();
-  if (!uid) throw unauthorized();
-  const user = await db.query.users.findFirst({ where: eq(users.id, uid) });
-  if (!user) throw unauthorized();
-  return user;
+  if (uid) {
+    const user = await db.query.users.findFirst({ where: eq(users.id, uid) });
+    if (user) return user;
+  }
+  // Stale/invalid session (valid JWT but the user no longer exists, e.g. after
+  // a data reset). Clear the cookie so the client isn't stuck in a login↔home
+  // redirect loop — the proxy trusts the JWT, but the DB is the source of truth.
+  await destroySession();
+  throw unauthorized();
 }
 
 function unauthorized(): Response {

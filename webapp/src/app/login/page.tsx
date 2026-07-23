@@ -19,6 +19,21 @@ export default function LoginPage() {
     if (!email.includes("@")) return setError("Enter a valid email address");
     setBusy(true);
     setError(null);
+
+    // test account: signs straight in as "Samuel"
+    if (email.toLowerCase().trim() === "demo@neonatura.com") {
+      const res = await fetch("/api/auth/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setBusy(false);
+      if (!res.ok) return setError("Couldn't sign in — try again");
+      router.push("/");
+      router.refresh();
+      return;
+    }
+
     const res = await fetch("/api/auth/request-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
