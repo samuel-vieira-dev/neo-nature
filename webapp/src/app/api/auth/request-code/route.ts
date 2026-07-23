@@ -19,7 +19,10 @@ export async function POST(request: Request) {
   });
 
   if (isEmailConfigured()) {
-    await sendOtpEmail(email, code);
+    const sent = await sendOtpEmail(email, code);
+    // Don't leak the code in production — surface a failure so DNS/domain
+    // issues are caught instead of silently swallowed.
+    if (!sent) return Response.json({ error: "email_failed" }, { status: 502 });
     return Response.json({ ok: true });
   }
 

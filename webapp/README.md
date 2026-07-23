@@ -44,6 +44,7 @@ forecast, churn detection, tiers).
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Real web push |
 | `ANTHROPIC_API_KEY` | Optional — AI FAQ answers (falls back to local search) |
 | `FRESHDESK_DOMAIN` + `FRESHDESK_API_KEY` | Optional — push support tickets to Freshdesk. Without them, tickets stay local (`sync_status: local_only`). `FRESHDESK_DOMAIN` is just the subdomain, e.g. `neonature` for `neonature.freshdesk.com` |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Optional — send login codes by email via Resend. Without them, `/api/auth/request-code` returns the code in the response (`devCode`) so testers can still sign in. `EMAIL_FROM` is a verified sender, e.g. `Neo Nature <login@yourdomain.com>` |
 
 ## Support tickets → Freshdesk (push-only)
 
