@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Bell, BellRing, Flame, Package, BookOpen, Tag, FlaskConical } from "lucide-react";
+import { Bell, BellRing, Flame, Package, BookOpen, Tag } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ensurePushSubscription } from "@/lib/push";
 import { useMe, useNotifications, useMarkAllRead, useTestNotification, useUpdatePrefs } from "@/lib/hooks";
@@ -32,14 +32,12 @@ export default function NotificationsPage() {
     }
   }, [me?.unread, markAllRead]);
 
-  const testPush = async () => {
+  const enablePush = async () => {
     const status = await ensurePushSubscription().catch(() => "unsupported" as const);
+    if (status === "denied") return toast("Notifications are blocked in your browser settings.");
+    if (status === "unsupported") return toast("Push isn't supported on this device.");
     testNotification.mutate(undefined, {
-      onSuccess: () => {
-        if (status === "subscribed") toast("Real push sent! Check your system notifications 🔔");
-        else if (status === "denied") toast("Push permission denied — delivered in-app instead.");
-        else toast("Push not supported here — delivered in-app instead.");
-      },
+      onSuccess: () => toast("Notifications enabled — you'll get dose reminders and order updates 🔔"),
     });
   };
 
@@ -52,26 +50,24 @@ export default function NotificationsPage() {
     <div>
       <PageHeader title="Notifications" subtitle="Stay on top of your routine" backHref="/" />
 
-      {/* DEMO test button */}
+      {/* enable push on this device */}
       <FadeUp className="px-5">
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+        <div className="card rounded-3xl p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
-              <FlaskConical className="h-5 w-5 text-amber-700" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)]">
+              <BellRing className="h-5 w-5 text-[var(--accent)]" />
             </div>
             <div className="flex-1">
-              <p className="text-base font-bold text-amber-800">Demo mode</p>
-              <p className="text-sm leading-snug text-amber-700">
-                Temporary button to preview how push notifications will feel.
-              </p>
+              <p className="text-base font-bold text-[var(--text)]">Push notifications</p>
+              <p className="text-sm leading-snug text-muted">Dose reminders and order updates, right on your phone.</p>
             </div>
           </div>
           <button
-            onClick={testPush}
-            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3 font-display text-base font-bold text-white"
+            onClick={enablePush}
+            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-3 font-display text-base font-bold text-white"
           >
-            <BellRing className="h-4 w-4" />
-            {testNotification.isPending ? "Sending…" : "Send test notification"}
+            <Bell className="h-4 w-4" />
+            {testNotification.isPending ? "Enabling…" : "Enable on this device"}
           </button>
         </div>
       </FadeUp>

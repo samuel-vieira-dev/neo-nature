@@ -5,7 +5,6 @@ import { Bell, ChevronRight, Clock, CreditCard, LifeBuoy, LogOut, MapPin, Packag
 import { useApp } from "@/lib/store";
 import { useMe, useUpdatePrefs, useReminders, useReminderMutations, useLogout } from "@/lib/hooks";
 import { FadeUp, Toggle } from "@/components/ui";
-import DemoControls from "@/components/DemoControls";
 
 export default function ProfilePage() {
   const { toast } = useApp();
@@ -86,7 +85,7 @@ export default function ProfilePage() {
             <p className="text-sm font-semibold text-[var(--text)]">Shipping address</p>
             <p className="text-sm text-muted">{me?.user.address}</p>
           </div>
-          <button onClick={() => toast("Demo: address editing arrives with Phase 2 ✏️")} className="text-sm font-bold text-[var(--accent)]">
+          <button onClick={() => toast("Address editing is coming soon ✏️")} className="text-sm font-bold text-[var(--accent)]">
             Edit
           </button>
         </div>
@@ -121,13 +120,8 @@ export default function ProfilePage() {
         </div>
       </FadeUp>
 
-      {/* demo controls */}
-      <FadeUp delay={0.18} className="mt-4 px-5">
-        <DemoControls />
-      </FadeUp>
-
       <FadeUp delay={0.22} className="mt-6 text-center">
-        <p className="text-xs text-muted">Neo Nature · v0.3 demo build</p>
+        <p className="text-xs text-muted">Neo Nature</p>
       </FadeUp>
     </div>
   );

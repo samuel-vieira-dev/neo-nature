@@ -54,8 +54,6 @@ function unauthorized(): Response {
   return Response.json({ error: "unauthorized" }, { status: 401 });
 }
 
-export const isDemoMode = () => process.env.DEMO_MODE === "true";
-
 /**
  * Wraps a route handler: resolves the user, converts thrown Responses into
  * returned responses, and reports unexpected errors as 500s.

@@ -3,22 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Leaf, Mail, KeyRound, ArrowRight, FlaskConical } from "lucide-react";
+import { Leaf, Mail, KeyRound, ArrowRight } from "lucide-react";
 import { CTA, FadeUp } from "@/components/ui";
-
-const personas = [
-  { id: "michael", name: "Michael", emoji: "💪", scenario: "Order in transit" },
-  { id: "jessica", name: "Jessica", emoji: "✨", scenario: "Bottle running low" },
-  { id: "robert", name: "Robert", emoji: "🌿", scenario: "3 days inactive" },
-] as const;
 
 export default function LoginPage() {
   const router = useRouter();
-  const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +27,7 @@ export default function LoginPage() {
     setBusy(false);
     if (!res.ok) return setError("Something went wrong — try again");
     const data = await res.json();
-    setDemoCode(data.demoCode ?? null);
+    setDevCode(data.devCode ?? null);
     setStep("code");
   };
 
@@ -50,22 +43,6 @@ export default function LoginPage() {
     if (!res.ok) return setError("That code didn't match — try again");
     router.push("/");
     router.refresh();
-  };
-
-  const loginAsPersona = async (persona: string) => {
-    setBusy(true);
-    const res = await fetch("/api/auth/persona", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ persona }),
-    });
-    setBusy(false);
-    if (res.ok) {
-      router.push("/");
-      router.refresh();
-    } else {
-      setError("Persona not seeded yet — run npm run db:seed");
-    }
   };
 
   return (
@@ -109,9 +86,9 @@ export default function LoginPage() {
                 <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted">
                   <KeyRound className="h-4 w-4" /> Enter the 6-digit code we sent to {email}
                 </label>
-                {demoCode && (
+                {devCode && (
                   <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-800">
-                    Demo mode — your code is <span className="font-mono text-base font-bold">{demoCode}</span>
+                    Your code is <span className="font-mono text-base font-bold">{devCode}</span>
                   </p>
                 )}
                 <input
@@ -134,31 +111,6 @@ export default function LoginPage() {
           {error && <p className="mt-3 text-center text-sm text-rose-700">{error}</p>}
         </div>
       </FadeUp>
-
-      {/* demo personas */}
-      {demo && (
-        <FadeUp delay={0.12} className="mt-6">
-          <div className="mb-3 flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-amber-600" />
-            <p className="text-sm font-bold uppercase tracking-wider text-amber-700">Demo scenarios</p>
-          </div>
-          <div className="space-y-2.5">
-            {personas.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => loginAsPersona(p.id)}
-                className="card flex min-h-[56px] w-full items-center gap-3 rounded-2xl p-4 text-left"
-              >
-                <span className="text-2xl">{p.emoji}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-bold text-[var(--text)]">{p.name}</span>
-                  <span className="block truncate text-sm text-muted">{p.scenario}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </FadeUp>
-      )}
     </div>
   );
 }

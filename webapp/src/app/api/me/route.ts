@@ -49,6 +49,5 @@ export const GET = withUser(async (user) => {
     lastDoseDay: days[0] ?? null,
     unread: unreadRows.length,
     bottle,
-    demo: { mode: process.env.DEMO_MODE === "true", dayOffset: user.demoDayOffset },
   });
 });
