@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { otpCodes, users } from "@/db/schema";
 import { createSession } from "@/server/session";
 import { linkOrdersToUser } from "@/server/buygoods";
+import { isAdminEmail } from "@/server/admin";
 
 const bodySchema = z.object({ email: z.string().email(), code: z.string().min(4).max(8) });
 
@@ -27,13 +28,21 @@ export async function POST(request: Request) {
 
   await db.update(otpCodes).set({ usedAt: new Date() }).where(eq(otpCodes.id, otp.id));
 
+  const admin = isAdminEmail(email);
   let user = await db.query.users.findFirst({ where: eq(users.email, email) });
   if (!user) {
     const id = crypto.randomUUID();
     const name = email.split("@")[0];
     [user] = await db
       .insert(users)
-      .values({ id, email, name: name.charAt(0).toUpperCase() + name.slice(1), fullName: name })
+      .values({
+        id,
+        email,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        fullName: name,
+        // admins skip onboarding — they go straight to the /admin panel
+        onboardedAt: admin ? new Date() : null,
+      })
       .returning();
   }
 
@@ -41,5 +50,5 @@ export async function POST(request: Request) {
   await linkOrdersToUser(user.id, email);
 
   await createSession(user.id);
-  return Response.json({ ok: true, onboarded: !!user.onboardedAt });
+  return Response.json({ ok: true, onboarded: !!user.onboardedAt, isAdmin: admin });
 }

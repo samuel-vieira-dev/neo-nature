@@ -55,6 +55,13 @@ export async function requireUser(): Promise<User> {
   throw unauthorized();
 }
 
+/** Loads the authenticated user or null (never throws) — for page gating. */
+export async function getUser(): Promise<User | null> {
+  const uid = await sessionUserId();
+  if (!uid) return null;
+  return (await db.query.users.findFirst({ where: eq(users.id, uid) })) ?? null;
+}
+
 function unauthorized(): Response {
   return Response.json({ error: "unauthorized" }, { status: 401 });
 }

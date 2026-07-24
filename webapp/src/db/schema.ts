@@ -99,13 +99,22 @@ export const orders = pgTable(
     shippingStatus: text("shipping_status"), // BuyGoods human text, e.g. "Shipped on 27 Feb, 2023"
     fulfilledAt: timestamp("fulfilled_at", { withTimezone: true, mode: "date" }),
     address: text("address").notNull().default(""),
+    // customer + attribution (from the BuyGoods IPN) — powers the admin CRM
+    customerName: text("customer_name").notNull().default(""),
+    customerPhone: text("customer_phone"),
+    saleOrigin: text("sale_origin").notNull().default("Direct"), // affiliate || traffic_source || funnel || Direct
+    affiliate: text("affiliate"), // aff_name
+    trafficSource: text("traffic_source"),
+    funnel: text("funnel"), // funnel_codename
+    subid: text("subid"),
+    paymentMethod: text("payment_method"),
     trackingSteps: jsonb("tracking_steps")
       .$type<{ label: string; detail: string; date: string; done: boolean; current?: boolean }[]>()
       .notNull()
       .default([]),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("orders_email").on(t.email)]
+  (t) => [index("orders_email").on(t.email), index("orders_origin").on(t.saleOrigin)]
 );
 
 export const orderItems = pgTable("order_items", {

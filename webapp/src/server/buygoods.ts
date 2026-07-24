@@ -108,6 +108,20 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     .join(", ");
   const trackingSteps = buildTrackingSteps(status, placedAt, fulfilledAt, shippingStatus);
 
+  // customer + attribution (for the admin CRM)
+  const customerName =
+    p.customer_name?.trim() ||
+    [p.customer_firstname, p.customer_lastname].filter(Boolean).join(" ").trim() ||
+    "";
+  const customerPhone = p.customer_phone?.trim() || null;
+  const affiliate = p.aff_name?.trim() || null;
+  const trafficSource = p.traffic_source?.trim() || null;
+  const funnel = p.funnel_codename?.trim() || null;
+  const subid = p.subid?.trim() || null;
+  const paymentMethod = p.payment_method?.trim() || null;
+  const saleOrigin = affiliate || trafficSource || funnel || (subid ? `subid:${subid}` : "Direct");
+  const attribution = { customerName, customerPhone, affiliate, trafficSource, funnel, subid, paymentMethod, saleOrigin };
+
   // link to an app account if one exists for this email
   const user = email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null;
 
@@ -126,6 +140,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
         fulfilledAt,
         address: address || existing.address,
         trackingSteps,
+        ...attribution,
       })
       .where(eq(orders.id, existing.id));
 
@@ -156,6 +171,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     fulfilledAt,
     address,
     trackingSteps,
+    ...attribution,
   });
 
   await db.insert(orderItems).values({

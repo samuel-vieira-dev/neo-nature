@@ -11,7 +11,13 @@ export default function OnboardingGate() {
   const router = useRouter();
 
   useEffect(() => {
-    if (me && !me.user.onboarded && !pathname.startsWith("/onboarding") && !pathname.startsWith("/login")) {
+    if (
+      me &&
+      !me.user.onboarded &&
+      !pathname.startsWith("/onboarding") &&
+      !pathname.startsWith("/login") &&
+      !pathname.startsWith("/admin")
+    ) {
       router.replace("/onboarding");
     }
   }, [me, pathname, router]);
