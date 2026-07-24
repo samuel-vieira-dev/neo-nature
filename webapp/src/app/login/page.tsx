@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Leaf, Mail, KeyRound, ArrowRight } from "lucide-react";
+import { Mail, KeyRound, ArrowRight } from "lucide-react";
 import { CTA, FadeUp } from "@/components/ui";
 
 export default function LoginPage() {
@@ -21,7 +22,7 @@ export default function LoginPage() {
     setError(null);
 
     // test account: signs straight in as "Samuel"
-    if (email.toLowerCase().trim() === "demo@neonatura.com") {
+    if (email.toLowerCase().trim() === "demo@neonature.com") {
       const res = await fetch("/api/auth/demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -64,13 +65,8 @@ export default function LoginPage() {
     <div className="flex min-h-dvh flex-col justify-center px-6 pb-16">
       {/* brand */}
       <FadeUp className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--accent)]">
-          <Leaf className="h-8 w-8 text-white" />
-        </div>
-        <h1 className="mt-4 font-display text-3xl font-extrabold text-[var(--text)]">
-          Neo <span className="text-[var(--accent)]">Nature</span>
-        </h1>
-        <p className="mt-1 text-base text-muted">Your daily wellness companion</p>
+        <Image src="/logo.svg" alt="Neo Nature" width={240} height={39} priority className="mx-auto h-10 w-auto" />
+        <p className="mt-3 text-base text-muted">Your daily wellness companion</p>
       </FadeUp>
 
       {/* auth card */}

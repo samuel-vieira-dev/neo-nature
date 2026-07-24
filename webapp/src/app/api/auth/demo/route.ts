@@ -5,7 +5,7 @@ import { createSession } from "@/server/session";
 import { productById } from "@/lib/data";
 
 // Fixed test account: signing in with this email logs straight in as "Samuel".
-const DEMO_EMAIL = "demo@neonatura.com";
+const DEMO_EMAIL = "demo@neonature.com";
 const DEMO_ID = "demo-samuel";
 
 export async function POST(request: Request) {
