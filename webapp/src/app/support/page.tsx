@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send } from "lucide-react";
+import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send, Phone } from "lucide-react";
 import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
 import { faqs } from "@/lib/data";
@@ -115,7 +115,7 @@ export default function SupportPage() {
 
   return (
     <div>
-      <PageHeader title="Support" subtitle="We reply within 24 hours — usually much faster" backHref="/" />
+      <PageHeader title="Support" subtitle="We reply in about 1 hour on average" backHref="/" />
 
       {/* AI FAQ search */}
       <FadeUp className="px-5">
@@ -126,6 +126,12 @@ export default function SupportPage() {
         <CTA href="/support/new">
           <MessageCirclePlus className="h-5 w-5" /> Open a ticket
         </CTA>
+        <a
+          href="tel:+18772864137"
+          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-white text-base font-bold text-[var(--text)]"
+        >
+          <Phone className="h-5 w-5 text-[var(--accent)]" /> Call us · +1 877 286 4137
+        </a>
         <p className="mt-2 text-center text-sm text-muted">
           Problems, refunds, wrong items — we make it right, no hoops.
         </p>

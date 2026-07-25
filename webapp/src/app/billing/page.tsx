@@ -40,7 +40,7 @@ export default function BillingPage() {
       },
       {
         onSuccess: () => {
-          toast("Ticket created — we'll clarify this charge within 24h 💚");
+          toast("Ticket created — we'll clarify this charge, usually within an hour 💚");
           router.push("/support");
         },
       }
@@ -131,7 +131,7 @@ export default function BillingPage() {
         <div className="card flex items-start gap-3 rounded-2xl p-4">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
           <p className="text-sm leading-relaxed text-muted">
-            60-day money-back guarantee on everything. Refunds processed within 48h through the app — no phone calls,
+            90-day money-back guarantee on everything. Refunds processed within 48h through the app — no phone calls,
             no return shipping.
           </p>
         </div>

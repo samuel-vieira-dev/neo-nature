@@ -133,7 +133,7 @@ export default function ProductPage() {
             </CTA>
           </div>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-sm text-muted">
-            <ShieldCheck className="h-4 w-4 text-[var(--accent)]" /> 60-day money-back guarantee, no questions asked
+            <ShieldCheck className="h-4 w-4 text-[var(--accent)]" /> 90-day money-back guarantee, no questions asked
           </p>
         </div>
       </FadeUp>

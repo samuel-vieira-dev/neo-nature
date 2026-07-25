@@ -56,7 +56,7 @@ export default function ShopPage() {
       <FadeUp delay={0.04} className="mt-4 px-5">
         <div className="card flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-semibold text-muted">
           <span className="flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4 text-[var(--accent)]" /> 60-day guarantee
+            <ShieldCheck className="h-4 w-4 text-[var(--accent)]" /> 90-day guarantee
           </span>
           <span className="flex items-center gap-1.5">
             <Truck className="h-4 w-4 text-[var(--accent)]" /> Free US shipping

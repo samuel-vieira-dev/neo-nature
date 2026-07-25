@@ -132,7 +132,7 @@ export default function NewTicketPage() {
               </div>
               {issue === "refund" && (
                 <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-center text-sm text-[var(--accent-strong)]">
-                  Covered by our 60-day guarantee — refunds are processed within 48h, no questions asked. 💚
+                  Covered by our 90-day guarantee — refunds are processed within 48h, no questions asked. 💚
                 </p>
               )}
               {issue && (
@@ -182,7 +182,7 @@ export default function NewTicketPage() {
                         onSuccess: (res) => {
                           setTicketId(res.ticket.id);
                           setStep(3);
-                          toast("A specialist will reach out within 24h 💚");
+                          toast("A specialist will reach out shortly — usually within an hour 💚");
                         },
                       }
                     )
@@ -244,7 +244,7 @@ export default function NewTicketPage() {
                 {issue === "refund" && ticketId
                   ? "Refund confirmed — processed within 48 hours, and you can keep the bottle."
                   : ticketId
-                  ? "Our team will reply within 24 hours. You'll get a push notification the moment we answer."
+                  ? "Our team usually replies within an hour. You'll get a push notification the moment we answer."
                   : "Done — no ticket needed. You'll see the change reflected right away."}
               </p>
               <div className="mt-6 space-y-3">

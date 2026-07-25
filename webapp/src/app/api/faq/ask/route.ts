@@ -45,7 +45,7 @@ export const POST = withUser(async (user, request: Request) => {
   return Response.json({
     answer: best
       ? best.a
-      : "I couldn't find that in our FAQ — open a ticket and a human will get back to you within 24 hours!",
+      : "I couldn't find that in our FAQ — open a ticket and a human will get back to you, usually within an hour!",
     source: "search",
     related: related.map((f) => f.q),
   });

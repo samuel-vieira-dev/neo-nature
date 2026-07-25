@@ -51,7 +51,7 @@ export const POST = withUser(async (user, request: Request) => {
       lastMessage:
         kind === "refund"
           ? "Refund received — we'll process it within 48 hours. You can keep the bottle."
-          : "Our team will get back to you by email within 24 hours.",
+          : "Our team usually replies by email within an hour.",
     })
     .returning();
 
