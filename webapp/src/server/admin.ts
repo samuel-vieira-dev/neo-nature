@@ -1,5 +1,7 @@
-import { requireUser } from "./session";
-import type { User } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users, type User } from "@/db/schema";
+import { adminSessionUserId, destroyAdminSession } from "./session";
 
 // Admin allowlist. Override with ADMIN_EMAILS (comma-separated) on Railway.
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "admin@neonature.com")
@@ -11,11 +13,25 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-/** Loads the current user and asserts they're an admin, else throws a Response. */
-export async function requireAdmin(): Promise<User> {
-  const user = await requireUser(); // throws 401 when not signed in
-  if (!isAdminEmail(user.email)) throw Response.json({ error: "forbidden" }, { status: 403 });
+/**
+ * Resolves the current admin from the SEPARATE admin session cookie (nn_admin),
+ * so it's independent from the customer app session (nn_session). Returns null
+ * when there's no valid admin session.
+ */
+export async function getAdminUser(): Promise<User | null> {
+  const uid = await adminSessionUserId();
+  if (!uid) return null;
+  const user = await db.query.users.findFirst({ where: eq(users.id, uid) });
+  if (!user || !isAdminEmail(user.email)) return null;
   return user;
+}
+
+/** Asserts an admin session, else throws a Response (clears a stale cookie). */
+export async function requireAdmin(): Promise<User> {
+  const user = await getAdminUser();
+  if (user) return user;
+  await destroyAdminSession();
+  throw Response.json({ error: "forbidden" }, { status: 403 });
 }
 
 /** Wraps an admin route handler: resolves the admin, converts thrown Responses. */

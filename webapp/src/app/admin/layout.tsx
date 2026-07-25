@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/server/session";
-import { isAdminEmail } from "@/server/admin";
+import { getAdminUser } from "@/server/admin";
 import AdminNav from "@/components/AdminNav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getUser();
-  if (!isAdminEmail(user?.email)) redirect("/login");
+  const admin = await getAdminUser();
+  if (!admin) redirect("/admin-login");
 
   return (
     <div className="min-h-dvh">

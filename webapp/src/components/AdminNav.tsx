@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Users, Send, Megaphone, LogOut } from "lucide-react";
-import { useLogout } from "@/lib/hooks";
 
 const links = [
   { href: "/admin", label: "Customers", icon: Users, exact: true },
@@ -14,7 +13,12 @@ const links = [
 
 export default function AdminNav() {
   const pathname = usePathname();
-  const logout = useLogout();
+  const router = useRouter();
+  const adminLogout = async () => {
+    await fetch("/api/auth/admin-logout", { method: "POST" });
+    router.push("/admin-login");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
@@ -38,7 +42,7 @@ export default function AdminNav() {
             );
           })}
           <button
-            onClick={() => logout.mutate()}
+            onClick={adminLogout}
             className="ml-1 flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted hover:bg-[var(--surface)]"
             aria-label="Sign out"
           >

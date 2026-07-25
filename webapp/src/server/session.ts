@@ -4,10 +4,13 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, type User } from "@/db/schema";
 
-const COOKIE = "nn_session";
+// Two independent sessions so the customer app and the admin panel can be open
+// in normal browser tabs at the same time (same origin, different cookies).
+export const APP_COOKIE = "nn_session";
+export const ADMIN_COOKIE = "nn_admin";
 const secret = () => new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret-change-me");
 
-export async function createSession(userId: string) {
+async function setSessionCookie(name: string, userId: string) {
   const token = await new SignJWT({ uid: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -15,7 +18,7 @@ export async function createSession(userId: string) {
     .sign(secret());
 
   const jar = await cookies();
-  jar.set(COOKIE, token, {
+  jar.set(name, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -24,14 +27,9 @@ export async function createSession(userId: string) {
   });
 }
 
-export async function destroySession() {
+async function userIdFromCookie(name: string): Promise<string | null> {
   const jar = await cookies();
-  jar.delete(COOKIE);
-}
-
-export async function sessionUserId(): Promise<string | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
+  const token = jar.get(name)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
@@ -39,6 +37,18 @@ export async function sessionUserId(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export const createSession = (userId: string) => setSessionCookie(APP_COOKIE, userId);
+export const createAdminSession = (userId: string) => setSessionCookie(ADMIN_COOKIE, userId);
+export const sessionUserId = () => userIdFromCookie(APP_COOKIE);
+export const adminSessionUserId = () => userIdFromCookie(ADMIN_COOKIE);
+
+export async function destroySession() {
+  (await cookies()).delete(APP_COOKIE);
+}
+export async function destroyAdminSession() {
+  (await cookies()).delete(ADMIN_COOKIE);
 }
 
 /** Loads the authenticated user or throws a 401 Response */

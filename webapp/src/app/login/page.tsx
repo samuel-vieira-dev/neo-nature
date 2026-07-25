@@ -57,8 +57,7 @@ export default function LoginPage() {
     });
     setBusy(false);
     if (!res.ok) return setError("That code didn't match — try again");
-    const data = await res.json().catch(() => ({}));
-    router.push(data.isAdmin ? "/admin" : "/");
+    router.push("/");
     router.refresh();
   };
 
