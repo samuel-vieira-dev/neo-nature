@@ -21,7 +21,11 @@ const PRIORITY: Record<TicketKind, number> = {
 };
 
 export type FreshdeskTicketInput = {
-  email: string;
+  // SMS-only customers have no email — Freshdesk can create the contact from
+  // phone + name instead. Send email when we have it; phone is the fallback.
+  email?: string;
+  phone?: string;
+  name?: string;
   subject: string;
   description?: string;
   kind: TicketKind;
@@ -38,8 +42,9 @@ export type FreshdeskTicketInput = {
  */
 export function buildTicketPayload(input: FreshdeskTicketInput) {
   const orderLine = input.orderNumber && input.orderNumber !== "—" ? `\n\nOrder: ${input.orderNumber}` : "";
+  const contact = input.email ? { email: input.email } : { phone: input.phone, name: input.name || "Neo Nature customer" };
   return {
-    email: input.email,
+    ...contact,
     subject: input.subject,
     description: `${input.description?.trim() || input.subject}${orderLine}`,
     priority: PRIORITY[input.kind],

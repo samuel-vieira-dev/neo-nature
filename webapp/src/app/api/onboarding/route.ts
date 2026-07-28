@@ -16,13 +16,15 @@ const schema = z.object({
     .max(3)
     .default([]),
   photoId: z.number().optional(),
+  // SMS sign-ups have no name — onboarding collects one (email sign-ups skip this).
+  firstName: z.string().trim().max(80).optional(),
 });
 
 export const POST = withUser(async (user, request: Request) => {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  const { niche, motivation, productId, firstDoseTaken, reminders: reminderList, photoId } = parsed.data;
+  const { niche, motivation, productId, firstDoseTaken, reminders: reminderList, photoId, firstName } = parsed.data;
   const product = productById(productId);
   if (!product) return Response.json({ error: "unknown_product" }, { status: 400 });
 
@@ -30,7 +32,12 @@ export const POST = withUser(async (user, request: Request) => {
 
   await db
     .update(users)
-    .set({ niche, motivation, onboardedAt: user.onboardedAt ?? now })
+    .set({
+      niche,
+      motivation,
+      onboardedAt: user.onboardedAt ?? now,
+      ...(firstName ? { name: firstName, fullName: firstName } : {}),
+    })
     .where(eq(users.id, user.id));
 
   // active bottle for dose-remaining forecasts

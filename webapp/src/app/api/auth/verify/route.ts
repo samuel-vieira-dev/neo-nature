@@ -4,20 +4,20 @@ import { db } from "@/db";
 import { otpCodes, users } from "@/db/schema";
 import { createSession } from "@/server/session";
 import { linkOrdersToUser } from "@/server/buygoods";
-import { isAdminEmail } from "@/server/admin";
+import { isValidE164 } from "@/lib/phone-format";
 
-const bodySchema = z.object({ email: z.string().email(), code: z.string().min(4).max(8) });
+const bodySchema = z.object({ phone: z.string().refine(isValidE164, "invalid_phone"), code: z.string().min(4).max(8) });
 
 export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  const email = parsed.data.email.toLowerCase().trim();
+  const phone = parsed.data.phone;
   const code = parsed.data.code.trim();
 
   const otp = await db.query.otpCodes.findFirst({
     where: and(
-      eq(otpCodes.email, email),
+      eq(otpCodes.phone, phone),
       eq(otpCodes.code, code),
       gt(otpCodes.expiresAt, new Date()),
       isNull(otpCodes.usedAt)
@@ -28,27 +28,16 @@ export async function POST(request: Request) {
 
   await db.update(otpCodes).set({ usedAt: new Date() }).where(eq(otpCodes.id, otp.id));
 
-  const admin = isAdminEmail(email);
-  let user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  let user = await db.query.users.findFirst({ where: eq(users.phone, phone) });
   if (!user) {
     const id = crypto.randomUUID();
-    const name = email.split("@")[0];
-    [user] = await db
-      .insert(users)
-      .values({
-        id,
-        email,
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        fullName: name,
-        // admins skip onboarding — they go straight to the /admin panel
-        onboardedAt: admin ? new Date() : null,
-      })
-      .returning();
+    // SMS sign-ups have no name yet — onboarding collects a first name.
+    [user] = await db.insert(users).values({ id, phone }).returning();
   }
 
   // link any orders that arrived (via BuyGoods) before this account existed
-  await linkOrdersToUser(user.id, email);
+  await linkOrdersToUser(user.id, { email: user.email, phone: user.phone });
 
   await createSession(user.id);
-  return Response.json({ ok: true, onboarded: !!user.onboardedAt, isAdmin: admin });
+  return Response.json({ ok: true, onboarded: !!user.onboardedAt });
 }

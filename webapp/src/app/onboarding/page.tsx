@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { ArrowRight, Bell, Camera, Check, Flame, Leaf, Plus, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { useMe } from "@/lib/hooks";
 import { uploadPhoto } from "@/lib/photo";
 import { ensurePushSubscription } from "@/lib/push";
 import { CTA } from "@/components/ui";
@@ -25,11 +26,14 @@ export default function OnboardingPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const { toast } = useApp();
+  const { data: me } = useMe();
   const fileRef = useRef<HTMLInputElement>(null);
+  const needsName = !!me && !me.user.name;
 
   const [step, setStep] = useState(0);
   const [niche, setNiche] = useState<Niche | null>(null);
   const [motivation, setMotivation] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [firstDoseTaken, setFirstDoseTaken] = useState(false);
   const [photoId, setPhotoId] = useState<number | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -78,6 +82,7 @@ export default function OnboardingPage() {
         firstDoseTaken,
         reminders: reminderList,
         photoId: photoId ?? undefined,
+        firstName: needsName ? firstName.trim() : undefined,
       }),
     });
     setBusy(false);
@@ -154,6 +159,18 @@ export default function OnboardingPage() {
 
             {niche && (
               <div className="mt-4">
+                {needsName && (
+                  <div className="mb-4">
+                    <label className="text-sm font-semibold text-muted">First name</label>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="e.g. Michael"
+                      className="card mt-2 w-full min-h-[52px] rounded-2xl px-4 text-base placeholder:text-muted"
+                    />
+                  </div>
+                )}
                 <label className="text-sm font-semibold text-muted">
                   What made you start today? <span className="text-muted">(we&apos;ll remind you when it matters)</span>
                 </label>
@@ -165,7 +182,15 @@ export default function OnboardingPage() {
                   className="card mt-2 w-full resize-none rounded-2xl p-4 text-base placeholder:text-muted"
                 />
                 <div className="mt-4">
-                  <CTA onClick={() => setStep(2)}>
+                  <CTA
+                    onClick={() => {
+                      if (needsName && !firstName.trim()) {
+                        toast("Please enter your first name");
+                        return;
+                      }
+                      setStep(2);
+                    }}
+                  >
                     Continue <ArrowRight className="h-4 w-4" />
                   </CTA>
                 </div>

@@ -47,17 +47,26 @@ export const POST = withUser(async (user, request: Request) => {
       subject,
       orderNumber,
       kind,
-      email: user.email,
+      email: user.email || user.phone || "",
       lastMessage:
         kind === "refund"
-          ? "Refund received — we'll process it within 48 hours. You can keep the bottle."
+          ? "Refund request received — we'll analyze it within 48 hours and send further instructions"
           : "Our team usually replies by email within an hour.",
     })
     .returning();
 
   // 2) Push to Freshdesk (system of record). Failure degrades gracefully:
   //    the ticket stays local with sync_status so ops can reconcile.
-  const result = await createFreshdeskTicket({ email: user.email, subject, description, kind, orderNumber });
+  // SMS-only customers have no email — Freshdesk falls back to phone + name.
+  const result = await createFreshdeskTicket({
+    email: user.email || undefined,
+    phone: user.phone || undefined,
+    name: user.fullName || user.name || undefined,
+    subject,
+    description,
+    kind,
+    orderNumber,
+  });
   if (result.ok) {
     await db
       .update(tickets)
