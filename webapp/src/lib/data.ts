@@ -137,11 +137,11 @@ export const productById = (id: string) => products.find((p) => p.id === id);
 
 export const faqs = [
   { q: "Where is my order?", a: "Every order ships within 24h (Mon–Fri) and typically arrives in 3–5 business days. Track it in real time on the Orders tab — no need to open a ticket." },
-  { q: "What is your refund policy?", a: "Every purchase is covered by a 90-day, no-questions-asked money-back guarantee. Open a ticket and we'll process it within 48 hours — you don't even need to return the bottle." },
+  { q: "What is your refund policy?", a: "Every purchase is covered by a 90-day, no-questions-asked money-back guarantee. Open a ticket and we'll process it within 48 hours." },
   { q: "How should I take my supplement?", a: "Each product page lists the exact dose and best timing. As a rule: take it at the same time every day, with a meal, and log it in the app to keep your streak alive." },
   { q: "Can I change my shipping address?", a: "If your order hasn't shipped yet, open a ticket with the new address and we'll update it. Once shipped, we can ask the carrier to redirect." },
   { q: "When will I start feeling results?", a: "Most of our key ingredients show measurable effects between weeks 3 and 6 of DAILY use. The first two weeks are about building levels in your body — it's completely normal to feel little at first. Consistency is the whole game." },
-  { q: "What does the charge look like on my card?", a: "All charges appear as NEONATURE* followed by the product name (e.g. NEONATURE*HEROUP 855-201-4437). Check the Billing screen for your full history. If anything looks off, tap 'Get help with this charge' — it's faster than calling your bank." },
+  { q: "What does the charge look like on my card?", a: "Charges appear under the name of our secure checkout platform — currently BuyGoods (e.g. \"BUYGOODS*...\") — not \"Neo Nature\". Check the Billing screen for your history. If anything looks off, tap 'Get help with this charge' — it's faster than calling your bank." },
   { q: "Can I take more than the recommended dose?", a: "No — more isn't better. Our formulas are clinically dosed. Doubling the dose won't double results, but doubling your consistency practically will." },
   { q: "Is it safe with my medication?", a: "Our products are made with natural ingredients in FDA-registered facilities, but always check with your doctor before combining any supplement with prescription medication — especially blood thinners, diabetes or blood-pressure meds." },
   { q: "What happens if I miss a dose?", a: "Just take the next one at the usual time (don't double up) and check in again the next day. Consistency over time is what matters, not a perfect record." },

@@ -242,7 +242,7 @@ export default function NewTicketPage() {
               </h2>
               <p className="mx-auto mt-2 max-w-64 text-base text-muted">
                 {issue === "refund" && ticketId
-                  ? "Refund confirmed — processed within 48 hours, and you can keep the bottle."
+                  ? "Refund request received — we'll analyze it within 48 hours and send further instructions"
                   : ticketId
                   ? "Our team usually replies within an hour. You'll get a push notification the moment we answer."
                   : "Done — no ticket needed. You'll see the change reflected right away."}

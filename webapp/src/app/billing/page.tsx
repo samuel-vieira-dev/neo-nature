@@ -82,9 +82,9 @@ export default function BillingPage() {
         <div className="card flex items-start gap-3 rounded-2xl p-4">
           <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
           <p className="text-sm leading-relaxed text-muted">
-            Charges from us always appear as{" "}
-            <span className="font-mono text-xs font-bold text-[var(--text)]">NEONATURE*</span> on your statement.
-            Don&apos;t recognize something? Tap it below — it&apos;s faster than calling your bank.
+            Charges appear under the name of our secure checkout platform — currently{" "}
+            <span className="font-mono text-xs font-bold text-[var(--text)]">BuyGoods</span> — not &quot;Neo
+            Nature&quot;. Don&apos;t recognize something? Tap it below — it&apos;s faster than calling your bank.
           </p>
         </div>
       </FadeUp>

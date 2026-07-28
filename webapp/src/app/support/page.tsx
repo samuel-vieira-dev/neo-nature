@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send, Phone } from "lucide-react";
@@ -41,6 +40,7 @@ function AskAI() {
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && ask(question)}
+            onFocus={() => result && setQuestion("")}
             placeholder="Ask anything — results, charges, shipping…"
             className="w-full bg-transparent py-3 text-base placeholder:text-muted focus:outline-none"
           />
@@ -128,9 +128,9 @@ export default function SupportPage() {
         </CTA>
         <a
           href="tel:+18772864137"
-          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-white text-base font-bold text-[var(--text)]"
+          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:bg-amber-700"
         >
-          <Phone className="h-5 w-5 text-[var(--accent)]" /> Call us · +1 877 286 4137
+          <Phone className="h-5 w-5 text-white" /> Call us · +1 877 286 4137
         </a>
         <p className="mt-2 text-center text-sm text-muted">
           Problems, refunds, wrong items — we make it right, no hoops.
@@ -198,12 +198,6 @@ export default function SupportPage() {
             );
           })}
         </div>
-      </FadeUp>
-
-      <FadeUp delay={0.14} className="mt-6 px-5 text-center">
-        <p className="text-sm text-muted">
-          Prefer email? <Link href="/support/new" className="font-semibold text-[var(--accent)]">support@neonature.com</Link>
-        </p>
       </FadeUp>
     </div>
   );
