@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, users } from "@/db/schema";
 import { notifyUser } from "@/server/push";
+import { normalizeIngestPhone } from "@/lib/phone-format";
 
 // ---------------------------------------------------------------------------
 // BuyGoods IPN ingestion. BuyGoods POSTs form-urlencoded order events to
@@ -114,13 +115,24 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     [p.customer_firstname, p.customer_lastname].filter(Boolean).join(" ").trim() ||
     "";
   const customerPhone = p.customer_phone?.trim() || null;
+  const customerPhoneE164 = normalizeIngestPhone(customerPhone);
   const affiliate = p.aff_name?.trim() || null;
   const trafficSource = p.traffic_source?.trim() || null;
   const funnel = p.funnel_codename?.trim() || null;
   const subid = p.subid?.trim() || null;
   const paymentMethod = p.payment_method?.trim() || null;
   const saleOrigin = affiliate || trafficSource || funnel || (subid ? `subid:${subid}` : "Direct");
-  const attribution = { customerName, customerPhone, affiliate, trafficSource, funnel, subid, paymentMethod, saleOrigin };
+  const attribution = {
+    customerName,
+    customerPhone,
+    customerPhoneE164,
+    affiliate,
+    trafficSource,
+    funnel,
+    subid,
+    paymentMethod,
+    saleOrigin,
+  };
 
   // link to an app account if one exists for this email
   const user = email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null;
@@ -197,9 +209,19 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
 }
 
 /**
- * When a user signs up (or logs in) with an email that already has orders,
- * link those orders to the account. Called from the OTP verify flow.
+ * When a user signs up (or logs in) with an email/phone that already has
+ * orders, link those orders to the account. Called from the OTP verify flow.
+ * Matches on whichever identifiers are available — SMS-only accounts have no
+ * email, so phone is the only key in that case.
  */
-export async function linkOrdersToUser(userId: string, email: string): Promise<void> {
-  await db.update(orders).set({ userId }).where(eq(orders.email, email.toLowerCase().trim()));
+export async function linkOrdersToUser(userId: string, ids: { email?: string | null; phone?: string | null }): Promise<void> {
+  const conditions = [];
+  if (ids.email) conditions.push(eq(orders.email, ids.email.toLowerCase().trim()));
+  if (ids.phone) conditions.push(eq(orders.customerPhoneE164, ids.phone));
+  if (conditions.length === 0) return;
+
+  await db
+    .update(orders)
+    .set({ userId })
+    .where(conditions.length > 1 ? or(...conditions) : conditions[0]);
 }

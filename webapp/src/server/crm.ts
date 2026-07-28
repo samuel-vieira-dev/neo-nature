@@ -56,8 +56,8 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
   const reachableUsers = new Set(pushRows.map((r) => r.user_id));
 
   const map = new Map<string, CustomerRow>();
-  const get = (email: string): CustomerRow => {
-    const key = email.toLowerCase();
+  const get = (key: string): CustomerRow => {
+    key = key.toLowerCase();
     let row = map.get(key);
     if (!row) {
       row = {
@@ -94,15 +94,25 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     if (row) row.products = [...set];
   }
 
-  // fold in app users (adds accounts that may have no orders yet)
+  // fold in app users (adds accounts that may have no orders yet). Matched by
+  // email primarily; SMS-only accounts (no email) instead join the cluster of
+  // whichever BuyGoods order was paid with the same phone number — falling
+  // back to the phone itself as the cluster key when no such order exists.
   for (const u of allUsers) {
-    if (!u.email) continue;
-    const row = get(u.email);
+    let key: string | null = u.email ? u.email.toLowerCase() : null;
+    if (!key && u.phone) {
+      const orderMatch = sorted.find((o) => o.customerPhoneE164 === u.phone);
+      key = orderMatch ? orderMatch.email.toLowerCase() : u.phone;
+    }
+    if (!key) key = u.id;
+
+    const row = get(key);
     row.hasApp = true;
     row.userId = u.id;
     row.onboarded = !!u.onboardedAt;
     row.churnFlag = u.churnFlag;
     if (!row.name && u.fullName) row.name = u.fullName;
+    if (!row.phone && u.phone) row.phone = u.phone;
     const dose = dosesByUser.get(u.id);
     if (dose) {
       row.totalDoses = dose.count;

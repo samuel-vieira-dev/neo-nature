@@ -1,9 +1,19 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { orders, orderItems, type Order } from "@/db/schema";
+import { orders, orderItems, type Order, type User } from "@/db/schema";
 import { withUser } from "@/server/session";
 
 type Item = typeof orderItems.$inferSelect;
+
+// Orders are matched to the signed-in user by userId (once linked), OR by
+// email/phone (for orders that arrived via BuyGoods before/without linking —
+// SMS-only accounts have no email, so phone is the only key in that case).
+export function userOrdersCondition(user: Pick<User, "id" | "email" | "phone">) {
+  const conditions = [eq(orders.userId, user.id)];
+  if (user.email) conditions.push(eq(orders.email, user.email.toLowerCase()));
+  if (user.phone) conditions.push(eq(orders.customerPhoneE164, user.phone));
+  return conditions.length > 1 ? or(...conditions) : conditions[0];
+}
 
 export function serializeOrder(o: Order, items: Item[]) {
   return {
@@ -26,11 +36,9 @@ export function serializeOrder(o: Order, items: Item[]) {
   };
 }
 
-// Orders are matched to the signed-in user by email (they may have been created
-// by a BuyGoods webhook before the account existed).
 export const GET = withUser(async (user) => {
   const rows = await db.query.orders.findMany({
-    where: eq(orders.email, user.email.toLowerCase()),
+    where: userOrdersCondition(user),
     orderBy: [desc(orders.placedAt)],
   });
   const items = rows.length
