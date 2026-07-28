@@ -20,7 +20,10 @@ import {
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // slug for personas ("michael"), uuid otherwise
-  email: text("email").notNull().unique(),
+  // Customers now sign in with a phone (SMS OTP); email is kept for legacy
+  // accounts + Freshdesk/CRM lookups but is nullable for phone-only signups.
+  email: text("email").unique(),
+  phone: text("phone").unique(), // E.164, e.g. "+15551234567"
   name: text("name").notNull().default(""),
   fullName: text("full_name").notNull().default(""),
   niche: text("niche"), // mens_health | weight_loss | diabetes
@@ -41,7 +44,10 @@ export const users = pgTable("users", {
 
 export const otpCodes = pgTable("otp_codes", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull(),
+  // Login codes are keyed by phone now (SMS); email kept nullable for any
+  // still-pending legacy flows.
+  email: text("email"),
+  phone: text("phone"),
   code: text("code").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
@@ -91,6 +97,9 @@ export const orders = pgTable(
     // orders can arrive before the customer signs up — matched by email at read time
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     email: text("email").notNull().default(""),
+    // Best-effort E.164 normalization of customer_phone (see src/lib/phone-format.ts)
+    // — powers phone-based order linking for SMS-only accounts.
+    customerPhoneE164: text("customer_phone_e164"),
     number: text("number").notNull(), // human order id (order_id)
     placedAt: timestamp("placed_at", { withTimezone: true, mode: "date" }).notNull(),
     status: text("status").notNull(), // confirmed | shipped | canceled | refunded
@@ -114,7 +123,11 @@ export const orders = pgTable(
       .default([]),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("orders_email").on(t.email), index("orders_origin").on(t.saleOrigin)]
+  (t) => [
+    index("orders_email").on(t.email),
+    index("orders_origin").on(t.saleOrigin),
+    index("orders_phone").on(t.customerPhoneE164),
+  ]
 );
 
 export const orderItems = pgTable("order_items", {
