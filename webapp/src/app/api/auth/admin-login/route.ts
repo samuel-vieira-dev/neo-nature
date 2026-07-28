@@ -6,7 +6,6 @@ import { createAdminSession } from "@/server/session";
 
 // Fixed admin email — the account gate is the password, not the email address.
 const ADMIN_EMAIL = "admin@neonature.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "NeoNatureAdm2026";
 
 const bodySchema = z.object({ password: z.string().min(1) });
 
@@ -17,7 +16,14 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  if (parsed.data.password !== ADMIN_PASSWORD) {
+  // The password lives ONLY in the environment — never hardcoded, so it can be
+  // rotated without a deploy and never lands in the repo.
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) {
+    console.error("[admin-login] ADMIN_PASSWORD is not set — admin login disabled");
+    return Response.json({ error: "not_configured" }, { status: 503 });
+  }
+  if (parsed.data.password !== expected) {
     return Response.json({ error: "wrong_password" }, { status: 401 });
   }
 

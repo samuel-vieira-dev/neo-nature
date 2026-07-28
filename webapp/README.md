@@ -46,7 +46,7 @@ forecast, churn detection, tiers).
 | `FRESHDESK_DOMAIN` + `FRESHDESK_API_KEY` | Optional — push support tickets to Freshdesk. Without them, tickets stay local (`sync_status: local_only`). `FRESHDESK_DOMAIN` is just the subdomain, e.g. `neonature` for `neonature.freshdesk.com` |
 | `RESEND_API_KEY` + `EMAIL_FROM` | Optional, legacy — send login codes by email via Resend. Customer login is now SMS-based (see Twilio below); this is unused by the current login flow but kept for reference. |
 | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM_NUMBER` | Optional — send customer login codes by SMS via Twilio's Messaging API. Without them, `/api/auth/request-code` returns the code in the response (`devCode`) so testers can still sign in. Local dev intentionally has no Twilio creds so tests never send real SMS. |
-| `ADMIN_PASSWORD` | Password for `/admin-login` (replaces OTP for the admin panel). Defaults to `NeoNatureAdm2026` if unset — always set an explicit value in production. |
+| `ADMIN_PASSWORD` | **Required** for `/admin-login` (replaces OTP for the admin panel). There is no fallback — if unset, admin login returns 503. Never commit the value; set it in the Railway variables and in your local `.env.local`. |
 
 ## Support tickets → Freshdesk (push-only)
 

@@ -31,6 +31,7 @@ export const GET = withUser(async (user) => {
       name: user.name,
       fullName: user.fullName,
       email: user.email,
+      phone: user.phone,
       niche: user.niche,
       motivation: user.motivation,
       address: user.address,

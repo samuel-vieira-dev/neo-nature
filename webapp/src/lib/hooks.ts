@@ -26,7 +26,8 @@ export type Me = {
     id: string;
     name: string;
     fullName: string;
-    email: string;
+    email: string | null;
+    phone: string | null;
     niche: string | null;
     motivation: string | null;
     address: string;

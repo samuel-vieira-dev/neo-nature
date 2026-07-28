@@ -134,8 +134,13 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     saleOrigin,
   };
 
-  // link to an app account if one exists for this email
-  const user = email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null;
+  // Link to an app account if one exists — by phone first (customers sign in
+  // with the phone they bought with), falling back to email for legacy accounts.
+  const user =
+    (customerPhoneE164
+      ? await db.query.users.findFirst({ where: eq(users.phone, customerPhoneE164), columns: { id: true } })
+      : null) ??
+    (email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null);
 
   const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
 
