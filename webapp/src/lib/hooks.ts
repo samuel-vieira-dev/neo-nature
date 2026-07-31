@@ -1,12 +1,21 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 // ---------------------------------------------------------------------------
 // Server-state hooks (React Query). All data lives in Postgres now — these are
 // the only way pages read/write it.
 // ---------------------------------------------------------------------------
+
+/**
+ * Pages where a missing customer session is NOT an error, so a 401 must never
+ * bounce the browser to /login. The admin area runs on its own session
+ * (nn_admin) — redirecting from there would kick the admin out of /admin-login.
+ */
+function isCustomerAuthPage(pathname: string): boolean {
+  return pathname.startsWith("/login") || pathname.startsWith("/admin");
+}
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -14,7 +23,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (res.status === 401 && typeof window !== "undefined") {
-    if (!window.location.pathname.startsWith("/login")) window.location.href = "/login";
+    if (!isCustomerAuthPage(window.location.pathname)) window.location.href = "/login";
     throw new Error("unauthorized");
   }
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? `HTTP ${res.status}`);
@@ -49,7 +58,14 @@ export type Me = {
 };
 
 export function useMe() {
-  return useQuery({ queryKey: ["me"], queryFn: () => api<Me>("/api/me") });
+  // Skip on the admin area: it has no customer session, so the request would
+  // only ever 401 (and admins shouldn't pay for a pointless round-trip).
+  const pathname = usePathname();
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: () => api<Me>("/api/me"),
+    enabled: !pathname.startsWith("/admin"),
+  });
 }
 
 export function useCheckIn() {

@@ -3,8 +3,10 @@ export async function adminApi<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
-  if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+  // An expired/absent ADMIN session sends the admin back to the admin login —
+  // never to the customer /login.
+  if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
+    if (!window.location.pathname.startsWith("/admin-login")) window.location.href = "/admin-login";
     throw new Error("unauthorized");
   }
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? `HTTP ${res.status}`);
