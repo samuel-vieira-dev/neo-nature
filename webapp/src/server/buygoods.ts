@@ -85,11 +85,15 @@ export type IngestResult =
 
 /**
  * Upserts an order from a parsed IPN. Idempotent by order_id_global.
- * Skips BuyGoods test-tool pings (RUNNING_OFFLINE=1) so they don't pollute
- * real data — they're still captured in webhook_logs for inspection.
+ * Skips BuyGoods test-tool pings (is_test=1) so they don't pollute real data
+ * — they're still captured in webhook_logs for inspection.
+ *
+ * Note: RUNNING_OFFLINE=1 is NOT a test-ping indicator despite its name —
+ * BuyGoods sends it on every IPN, including confirmed live sales. Filtering
+ * on it (the previous behavior here) silently dropped real orders.
  */
 export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise<IngestResult> {
-  if (p.RUNNING_OFFLINE === "1") return { ok: true, status: "skipped_test" };
+  if (p.is_test === "1") return { ok: true, status: "skipped_test" };
 
   const bgId = p.order_id_global?.trim();
   if (!bgId) return { ok: false, reason: "missing order_id_global" };
