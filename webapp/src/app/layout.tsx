@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "Neo Nature — Your Daily Wellness Companion",
   description: "Track your orders, build your streak, and get the most out of every Neo Nature supplement.",
   manifest: "/manifest.json",
-  icons: { icon: "/icon.svg" },
+  icons: { icon: "/icon.svg", shortcut: "/icon-192.png", apple: "/apple-touch-icon.png" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Neo Nature" },
 };
 

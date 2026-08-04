@@ -1,5 +1,7 @@
 "use client";
 
+import { registerServiceWorker } from "@/lib/pwa";
+
 /**
  * Registers the service worker and subscribes this browser to real web push.
  * Returns "subscribed" | "denied" | "unsupported".
@@ -15,7 +17,7 @@ export async function ensurePushSubscription(): Promise<"subscribed" | "denied" 
   if (perm === "default") perm = await Notification.requestPermission();
   if (perm !== "granted") return "denied";
 
-  const reg = await navigator.serviceWorker.register("/sw.js");
+  const reg = (await registerServiceWorker()) ?? (await navigator.serviceWorker.register("/sw.js"));
   await navigator.serviceWorker.ready;
 
   let sub = await reg.pushManager.getSubscription();

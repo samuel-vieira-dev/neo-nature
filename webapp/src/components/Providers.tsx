@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProvider } from "@/lib/store";
 import OnboardingGate from "@/components/OnboardingGate";
+import { registerServiceWorker } from "@/lib/pwa";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [client] = useState(
     () =>
       new QueryClient({
@@ -14,6 +17,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
+
+  useEffect(() => {
+    if (!pathname.startsWith("/admin")) registerServiceWorker();
+  }, [pathname]);
 
   return (
     <QueryClientProvider client={client}>

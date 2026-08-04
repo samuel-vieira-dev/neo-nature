@@ -6,6 +6,21 @@ import { db, rawSql } from "@/db";
 // stats, and the push-audience resolver — all from one source so filters match.
 // ---------------------------------------------------------------------------
 
+export type CustomerOrder = {
+  id: string;
+  number: string;
+  placedAt: string;
+  status: "confirmed" | "shipped" | "canceled" | "refunded";
+  total: number;
+  currency: string;
+  shippingStatus: string | null;
+  fulfilledAt: string | null;
+  saleOrigin: string;
+  paymentMethod: string | null;
+  address: string;
+  items: { productName: string; sku: string | null; qty: number; price: number }[];
+};
+
 export type CustomerRow = {
   email: string;
   name: string;
@@ -23,6 +38,7 @@ export type CustomerRow = {
   churnFlag: boolean;
   reachable: boolean; // has at least one push subscription
   userId: string | null;
+  orders: CustomerOrder[];
 };
 
 export type CustomerFilters = {
@@ -46,10 +62,10 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     rawSql<{ user_id: string }[]>`SELECT DISTINCT user_id FROM push_subscriptions`,
   ]);
 
-  const itemsByOrder = new Map<string, string[]>();
+  const itemsByOrder = new Map<string, CustomerOrder["items"]>();
   for (const it of allItems) {
     const arr = itemsByOrder.get(it.orderId) ?? [];
-    if (it.productName) arr.push(it.productName);
+    arr.push({ productName: it.productName, sku: it.sku, qty: it.qty, price: Number(it.price) });
     itemsByOrder.set(it.orderId, arr);
   }
   const dosesByUser = new Map(doseAgg.map((d) => [d.user_id, { count: Number(d.cnt), last: d.last_day }]));
@@ -64,7 +80,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
         email: key, name: "", phone: null, ordersCount: 0, totalSpent: 0,
         firstOrderAt: null, lastOrderAt: null, saleOrigin: "Direct", products: [],
         hasApp: false, onboarded: false, lastDoseDay: null, totalDoses: 0,
-        churnFlag: false, reachable: false, userId: null,
+        churnFlag: false, reachable: false, userId: null, orders: [],
       };
       map.set(key, row);
     }
@@ -85,13 +101,31 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     if (o.customerName) row.name = o.customerName;
     if (o.customerPhone) row.phone = o.customerPhone;
     row.saleOrigin = o.saleOrigin || row.saleOrigin;
+    const items = itemsByOrder.get(o.id) ?? [];
     const set = productSet.get(row.email) ?? new Set<string>();
-    for (const pn of itemsByOrder.get(o.id) ?? []) set.add(pn);
+    for (const it of items) if (it.productName) set.add(it.productName);
     productSet.set(row.email, set);
+    row.orders.push({
+      id: o.id,
+      number: o.number,
+      placedAt: at,
+      status: o.status as CustomerOrder["status"],
+      total: Number(o.total),
+      currency: o.currency,
+      shippingStatus: o.shippingStatus,
+      fulfilledAt: o.fulfilledAt ? o.fulfilledAt.toISOString() : null,
+      saleOrigin: o.saleOrigin,
+      paymentMethod: o.paymentMethod,
+      address: o.address,
+      items,
+    });
   }
   for (const [email, set] of productSet) {
     const row = map.get(email);
     if (row) row.products = [...set];
+  }
+  for (const row of map.values()) {
+    row.orders.sort((a, b) => b.placedAt.localeCompare(a.placedAt));
   }
 
   // fold in app users (adds accounts that may have no orders yet). Matched by

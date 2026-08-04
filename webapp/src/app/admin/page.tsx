@@ -1,10 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search } from "lucide-react";
+import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
 
+type CustomerOrder = {
+  id: string;
+  number: string;
+  placedAt: string;
+  status: "confirmed" | "shipped" | "canceled" | "refunded";
+  total: number;
+  currency: string;
+  shippingStatus: string | null;
+  fulfilledAt: string | null;
+  saleOrigin: string;
+  paymentMethod: string | null;
+  address: string;
+  items: { productName: string; sku: string | null; qty: number; price: number }[];
+};
 type CustomerRow = {
   email: string;
   name: string;
@@ -21,6 +35,8 @@ type CustomerRow = {
   totalDoses: number;
   churnFlag: boolean;
   reachable: boolean;
+  userId: string | null;
+  orders: CustomerOrder[];
 };
 type Stats = {
   customers: number;
@@ -40,8 +56,16 @@ type Resp = {
 };
 
 const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const money2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const shortDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }) : "—";
+
+const statusTones: Record<CustomerOrder["status"], string> = {
+  shipped: "bg-emerald-50 text-emerald-700",
+  confirmed: "bg-sky-50 text-sky-700",
+  canceled: "bg-rose-50 text-rose-700",
+  refunded: "bg-amber-50 text-amber-700",
+};
 
 function StatCard({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
@@ -61,6 +85,16 @@ export default function AdminCustomersPage() {
   const [product, setProduct] = useState("");
   const [status, setStatus] = useState("");
   const [reachable, setReachable] = useState(false);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  const toggle = (email: string) => {
+    setOpen((s) => {
+      const next = new Set(s);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  };
 
   const params = new URLSearchParams();
   if (q) params.set("q", q);
@@ -145,6 +179,7 @@ export default function AdminCustomersPage() {
         <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
             <tr>
+              <th className="w-8 px-2 py-3"></th>
               <th className="px-4 py-3 font-semibold">Customer</th>
               <th className="px-4 py-3 font-semibold">Origin</th>
               <th className="px-4 py-3 font-semibold">Orders</th>
@@ -155,34 +190,93 @@ export default function AdminCustomersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {rows.map((r) => (
-              <tr key={r.email} className="hover:bg-[var(--surface)]">
-                <td className="px-4 py-3">
-                  <p className="font-semibold text-[var(--text)]">{r.name || "—"}</p>
-                  <p className="text-xs text-muted">{r.email}</p>
-                  <div className="mt-1 flex gap-1">
-                    {r.hasApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
-                    {r.reachable && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Push</span>}
-                    {r.churnFlag && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Churn</span>}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>
-                <td className="px-4 py-3 text-[var(--text)]">{r.ordersCount}</td>
-                <td className="px-4 py-3 font-semibold text-[var(--text)]">{money(r.totalSpent)}</td>
-                <td className="px-4 py-3 text-muted">{shortDate(r.firstOrderAt)}</td>
-                <td className="px-4 py-3 text-muted">{shortDate(r.lastOrderAt)}</td>
-                <td className="px-4 py-3 text-muted">
-                  {r.hasApp ? (
-                    <span>{r.totalDoses} doses · last {shortDate(r.lastDoseDay)}</span>
-                  ) : (
-                    <span className="text-xs">No app account</span>
+            {rows.map((r) => {
+              const isOpen = open.has(r.email);
+              const hasCanceledOrRefunded = r.orders.some((o) => o.status === "canceled" || o.status === "refunded");
+              return (
+                <Fragment key={r.email}>
+                  <tr onClick={() => toggle(r.email)} className="cursor-pointer hover:bg-[var(--surface)]">
+                    <td className="px-2 py-3 text-muted">
+                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-[var(--text)]">{r.name || "—"}</p>
+                      <p className="text-xs text-muted">{r.email}</p>
+                      <div className="mt-1 flex gap-1">
+                        {r.hasApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
+                        {r.reachable && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Push</span>}
+                        {r.churnFlag && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Churn</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>
+                    <td className="px-4 py-3 text-[var(--text)]">{r.ordersCount}</td>
+                    <td className="px-4 py-3 font-semibold text-[var(--text)]">{money(r.totalSpent)}</td>
+                    <td className="px-4 py-3 text-muted">{shortDate(r.firstOrderAt)}</td>
+                    <td className="px-4 py-3 text-muted">{shortDate(r.lastOrderAt)}</td>
+                    <td className="px-4 py-3 text-muted">
+                      {r.hasApp ? (
+                        <span>{r.totalDoses} doses · last {shortDate(r.lastDoseDay)}</span>
+                      ) : (
+                        <span className="text-xs">No app account</span>
+                      )}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={8} className="bg-[var(--surface)] px-4 py-3">
+                        {r.orders.length === 0 ? (
+                          <p className="py-2 text-sm text-muted">No orders yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {r.orders.map((o) => (
+                              <div key={o.id} className="rounded-xl border border-[var(--border)] bg-white p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-display text-sm font-bold text-[var(--text)]">#{o.number}</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${statusTones[o.status]}`}>
+                                      {o.status}
+                                    </span>
+                                  </div>
+                                  <span className="font-semibold text-[var(--text)]">{money2(o.total)} {o.currency}</span>
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-4">
+                                  <span>Placed: {shortDate(o.placedAt)}</span>
+                                  <span>Origin: {o.saleOrigin}</span>
+                                  <span>Payment: {o.paymentMethod || "—"}</span>
+                                  <span>
+                                    Fulfillment: {o.shippingStatus || "—"}
+                                    {o.fulfilledAt ? ` (${shortDate(o.fulfilledAt)})` : ""}
+                                  </span>
+                                </div>
+                                {o.address && <p className="mt-1 text-xs text-muted">{o.address}</p>}
+                                {o.items.length > 0 && (
+                                  <ul className="mt-2 space-y-0.5 text-xs text-[var(--text)]">
+                                    {o.items.map((it, i) => (
+                                      <li key={i} className="flex justify-between gap-2">
+                                        <span>
+                                          {it.productName || "Product"} {it.sku ? `· ${it.sku}` : ""} × {it.qty}
+                                        </span>
+                                        <span className="text-muted">{money2(it.price)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            ))}
+                            {hasCanceledOrRefunded && (
+                              <p className="pt-1 text-xs text-muted">LTV counts confirmed and shipped orders only.</p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                   )}
-                </td>
-              </tr>
-            ))}
+                </Fragment>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted">No customers match these filters.</td>
+                <td colSpan={8} className="px-4 py-10 text-center text-muted">No customers match these filters.</td>
               </tr>
             )}
           </tbody>

@@ -1,5 +1,22 @@
 /* Neo Nature service worker — receives real web push and shows system notifications */
 
+// A fetch handler is required by Chrome/Android before it will offer the
+// install prompt. This is a pass-through only — no offline caching, since
+// the app is 100% API-driven and a stale cache would show old order data.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request));
+  }
+});
+
 self.addEventListener("push", (event) => {
   let data = { title: "Neo Nature 🌿", body: "", url: "/" };
   try {
@@ -11,8 +28,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
       data: { url: data.url },
     })
   );

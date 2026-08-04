@@ -10,7 +10,9 @@ import { useApp } from "@/lib/store";
 import { useMe } from "@/lib/hooks";
 import { uploadPhoto } from "@/lib/photo";
 import { ensurePushSubscription } from "@/lib/push";
+import { useIsStandalone } from "@/lib/pwa";
 import { CTA } from "@/components/ui";
+import InstallGuide from "@/components/InstallGuide";
 import { productById } from "@/lib/data";
 import { goals, habitAnchors, type Niche } from "@/lib/protocol";
 
@@ -29,6 +31,9 @@ export default function OnboardingPage() {
   const { data: me } = useMe();
   const fileRef = useRef<HTMLInputElement>(null);
   const needsName = !!me && !me.user.name;
+  const standalone = useIsStandalone();
+  // Already installed → skip the "add to home screen" step entirely.
+  const steps = standalone ? [0, 2, 3, 4] : [0, 1, 2, 3, 4];
 
   const [step, setStep] = useState(0);
   const [niche, setNiche] = useState<Niche | null>(null);
@@ -98,16 +103,19 @@ export default function OnboardingPage() {
     <div className="flex min-h-dvh flex-col px-6 pb-10 pt-10">
       {/* progress */}
       <div className="mb-6 flex justify-center gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className="h-2 rounded-full transition-all duration-200"
-            style={{
-              width: step === i ? 24 : 8,
-              backgroundColor: step >= i ? "var(--accent)" : "var(--border)",
-            }}
-          />
-        ))}
+        {steps.map((s, i) => {
+          const currentIdx = steps.indexOf(step);
+          return (
+            <span
+              key={s}
+              className="h-2 rounded-full transition-all duration-200"
+              style={{
+                width: currentIdx === i ? 24 : 8,
+                backgroundColor: currentIdx >= i ? "var(--accent)" : "var(--border)",
+              }}
+            />
+          );
+        })}
       </div>
 
       <AnimatePresence mode="wait">
@@ -124,16 +132,37 @@ export default function OnboardingPage() {
               Two minutes of setup, and we&apos;ll make sure this is the supplement that finally works — because you&apos;ll actually take it.
             </p>
             <div className="mt-8">
-              <CTA onClick={() => setStep(1)}>
+              <CTA onClick={() => setStep(standalone ? 2 : 1)}>
                 Let&apos;s go <ArrowRight className="h-4 w-4" />
               </CTA>
             </div>
           </motion.div>
         )}
 
-        {/* STEP 1 — goal + motivation */}
+        {/* STEP 1 — install prompt */}
         {step === 1 && (
           <motion.div key="s1" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+            <h2 className="font-display text-2xl font-bold text-[var(--text)]">Keep Neo Nature one tap away</h2>
+            <p className="mt-1 text-base text-muted">
+              Add it to your home screen — no app store, no browser tabs to hunt for.
+            </p>
+            <div className="mt-5">
+              <InstallGuide />
+            </div>
+            <div className="mt-6 space-y-3">
+              <CTA onClick={() => setStep(2)}>
+                Continue <ArrowRight className="h-4 w-4" />
+              </CTA>
+              <button onClick={() => setStep(2)} className="w-full text-center text-sm text-muted">
+                Skip for now
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* STEP 2 — goal + motivation */}
+        {step === 2 && (
+          <motion.div key="s2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
             <h2 className="font-display text-2xl font-bold text-[var(--text)]">What brings you here?</h2>
             <p className="mt-1 text-base text-muted">We&apos;ll tailor your setup around it.</p>
             <div className="mt-5 space-y-3">
@@ -188,7 +217,7 @@ export default function OnboardingPage() {
                         toast("Please enter your first name");
                         return;
                       }
-                      setStep(2);
+                      setStep(3);
                     }}
                   >
                     Continue <ArrowRight className="h-4 w-4" />
@@ -199,9 +228,9 @@ export default function OnboardingPage() {
           </motion.div>
         )}
 
-        {/* STEP 2 — first dose */}
-        {step === 2 && product && (
-          <motion.div key="s2" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="flex flex-1 flex-col">
+        {/* STEP 3 — first dose */}
+        {step === 3 && product && (
+          <motion.div key="s3" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="flex flex-1 flex-col">
             <h2 className="font-display text-2xl font-bold text-[var(--text)]">Day 1 starts now</h2>
             <p className="mt-1 text-base text-muted">
               People who take their first dose right away are far more likely to finish the bottle.
@@ -246,11 +275,11 @@ export default function OnboardingPage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              <CTA onClick={() => setStep(3)}>
+              <CTA onClick={() => setStep(4)}>
                 Continue <ArrowRight className="h-4 w-4" />
               </CTA>
               {!firstDoseTaken && (
-                <button onClick={() => setStep(3)} className="w-full text-center text-sm text-muted">
+                <button onClick={() => setStep(4)} className="w-full text-center text-sm text-muted">
                   I&apos;ll take it later today
                 </button>
               )}
@@ -258,9 +287,9 @@ export default function OnboardingPage() {
           </motion.div>
         )}
 
-        {/* STEP 3 — reminders + push */}
-        {step === 3 && (
-          <motion.div key="s3" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+        {/* STEP 4 — reminders + push */}
+        {step === 4 && (
+          <motion.div key="s4" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
             <h2 className="font-display text-2xl font-bold text-[var(--text)]">Never miss a dose</h2>
             <p className="mt-1 text-base text-muted">
               Anchor it to something you already do every day — that&apos;s how habits stick.
