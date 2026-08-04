@@ -1,7 +1,7 @@
 import { desc, eq, isNull, and } from "drizzle-orm";
 import { db } from "@/db";
 import { doseLogs, notifications, bottles } from "@/db/schema";
-import { withUser } from "@/server/session";
+import { withUser, impersonatorId } from "@/server/session";
 import { appNow, userToday } from "@/server/time";
 import { computeStreak, bottleForecast } from "@/server/domain";
 
@@ -9,7 +9,8 @@ export const GET = withUser(async (user) => {
   const today = userToday(user);
   const now = appNow(user);
 
-  const [doses, unreadRows, bottleRows] = await Promise.all([
+  const [impersonatedBy, doses, unreadRows, bottleRows] = await Promise.all([
+    impersonatorId(),
     db.query.doseLogs.findMany({ where: eq(doseLogs.userId, user.id), orderBy: [desc(doseLogs.day)] }),
     db.query.notifications.findMany({
       where: and(eq(notifications.userId, user.id), isNull(notifications.readAt)),
@@ -50,5 +51,8 @@ export const GET = withUser(async (user) => {
     lastDoseDay: days[0] ?? null,
     unread: unreadRows.length,
     bottle,
+    // an admin previewing this account skips the onboarding gate — see
+    // OnboardingGate — so leads can be inspected without faking their answers
+    impersonating: !!impersonatedBy,
   });
 });

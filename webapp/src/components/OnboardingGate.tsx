@@ -14,6 +14,8 @@ export default function OnboardingGate() {
     if (
       me &&
       !me.user.onboarded &&
+      // an admin previewing a lead's account gets the real app, not onboarding
+      !me.impersonating &&
       !pathname.startsWith("/onboarding") &&
       !pathname.startsWith("/login") &&
       !pathname.startsWith("/admin")

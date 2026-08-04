@@ -55,6 +55,7 @@ export type Me = {
   lastDoseDay: string | null;
   unread: number;
   bottle: { productId: string; dosesTaken: number; dosesLeft: number; daysLeft: number; runsOutAt: string } | null;
+  impersonating: boolean;
 };
 
 export function useMe() {

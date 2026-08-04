@@ -112,14 +112,17 @@ export default function AdminCustomersPage() {
   const rows = data?.customers ?? [];
   const [impersonating, setImpersonating] = useState<string | null>(null);
 
-  const impersonate = async (userId: string, e: React.MouseEvent) => {
+  // Leads (no app account yet) are resolved server-side from their email —
+  // the account gets provisioned on first preview. See /api/admin/impersonate.
+  const impersonate = async (r: CustomerRow, e: React.MouseEvent) => {
     e.stopPropagation();
-    setImpersonating(userId);
+    setImpersonating(r.email);
     try {
-      await adminApi("/api/admin/impersonate", { method: "POST", body: JSON.stringify({ userId }) });
+      const payload = r.userId ? { userId: r.userId } : { email: r.email };
+      await adminApi("/api/admin/impersonate", { method: "POST", body: JSON.stringify(payload) });
       window.open("/orders", "_blank", "noopener");
     } catch {
-      alert("Couldn't start impersonation session.");
+      alert("Couldn't start the preview session.");
     } finally {
       setImpersonating(null);
     }
@@ -220,17 +223,19 @@ export default function AdminCustomersPage() {
                         {r.hasApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
                         {r.reachable && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Push</span>}
                         {r.churnFlag && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Churn</span>}
-                        {r.hasApp && r.userId && (
-                          <button
-                            onClick={(e) => impersonate(r.userId!, e)}
-                            disabled={impersonating === r.userId}
-                            title="View the app as this customer"
-                            className="ml-1 flex items-center gap-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text)] hover:bg-[var(--border)] disabled:opacity-50"
-                          >
-                            <LogIn className="h-3 w-3" />
-                            {impersonating === r.userId ? "…" : "View as"}
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => impersonate(r, e)}
+                          disabled={impersonating === r.email}
+                          title={
+                            r.userId
+                              ? "View the app as this customer"
+                              : "Preview this lead's app view (creates their account)"
+                          }
+                          className="ml-1 flex items-center gap-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text)] hover:bg-[var(--border)] disabled:opacity-50"
+                        >
+                          <LogIn className="h-3 w-3" />
+                          {impersonating === r.email ? "…" : "View as"}
+                        </button>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>
