@@ -10,11 +10,13 @@ export const APP_COOKIE = "nn_session";
 export const ADMIN_COOKIE = "nn_admin";
 const secret = () => new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret-change-me");
 
-async function setSessionCookie(name: string, userId: string) {
-  const token = await new SignJWT({ uid: userId })
+async function setSessionCookie(name: string, userId: string, opts?: { expiresIn?: string; maxAgeSec?: number; extra?: Record<string, unknown> }) {
+  const expiresIn = opts?.expiresIn ?? "30d";
+  const maxAge = opts?.maxAgeSec ?? 60 * 60 * 24 * 30;
+  const token = await new SignJWT({ uid: userId, ...opts?.extra })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(expiresIn)
     .sign(secret());
 
   const jar = await cookies();
@@ -22,27 +24,50 @@ async function setSessionCookie(name: string, userId: string) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge,
     path: "/",
   });
 }
 
-async function userIdFromCookie(name: string): Promise<string | null> {
+async function payloadFromCookie(name: string): Promise<Record<string, unknown> | null> {
   const jar = await cookies();
   const token = jar.get(name)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return (payload.uid as string) ?? null;
+    return payload;
   } catch {
     return null;
   }
+}
+
+async function userIdFromCookie(name: string): Promise<string | null> {
+  const payload = await payloadFromCookie(name);
+  return (payload?.uid as string) ?? null;
 }
 
 export const createSession = (userId: string) => setSessionCookie(APP_COOKIE, userId);
 export const createAdminSession = (userId: string) => setSessionCookie(ADMIN_COOKIE, userId);
 export const sessionUserId = () => userIdFromCookie(APP_COOKIE);
 export const adminSessionUserId = () => userIdFromCookie(ADMIN_COOKIE);
+
+const IMPERSONATION_TTL = "15m";
+
+/**
+ * Logs an admin into a customer's own session cookie so they can view the
+ * live app exactly as the customer does. Short-lived (15m) and carries the
+ * impersonating admin's id in the JWT so the UI can show a banner and the
+ * action is traceable — this never touches the admin's own nn_admin cookie,
+ * so returning to /admin needs no re-login.
+ */
+export const createImpersonationSession = (userId: string, adminUserId: string) =>
+  setSessionCookie(APP_COOKIE, userId, { expiresIn: IMPERSONATION_TTL, maxAgeSec: 60 * 15, extra: { impersonatedBy: adminUserId } });
+
+/** Returns the impersonating admin's user id if the current app session is an impersonation, else null. */
+export async function impersonatorId(): Promise<string | null> {
+  const payload = await payloadFromCookie(APP_COOKIE);
+  return (payload?.impersonatedBy as string) ?? null;
+}
 
 export async function destroySession() {
   (await cookies()).delete(APP_COOKIE);

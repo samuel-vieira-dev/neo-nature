@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown } from "lucide-react";
+import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown, LogIn } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
 
 type CustomerOrder = {
@@ -110,6 +110,20 @@ export default function AdminCustomersPage() {
 
   const stats = data?.stats;
   const rows = data?.customers ?? [];
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+
+  const impersonate = async (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImpersonating(userId);
+    try {
+      await adminApi("/api/admin/impersonate", { method: "POST", body: JSON.stringify({ userId }) });
+      window.open("/orders", "_blank", "noopener");
+    } catch {
+      alert("Couldn't start impersonation session.");
+    } finally {
+      setImpersonating(null);
+    }
+  };
 
   return (
     <div>
@@ -202,10 +216,21 @@ export default function AdminCustomersPage() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-[var(--text)]">{r.name || "—"}</p>
                       <p className="text-xs text-muted">{r.email}</p>
-                      <div className="mt-1 flex gap-1">
+                      <div className="mt-1 flex items-center gap-1">
                         {r.hasApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
                         {r.reachable && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Push</span>}
                         {r.churnFlag && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Churn</span>}
+                        {r.hasApp && r.userId && (
+                          <button
+                            onClick={(e) => impersonate(r.userId!, e)}
+                            disabled={impersonating === r.userId}
+                            title="View the app as this customer"
+                            className="ml-1 flex items-center gap-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text)] hover:bg-[var(--border)] disabled:opacity-50"
+                          >
+                            <LogIn className="h-3 w-3" />
+                            {impersonating === r.userId ? "…" : "View as"}
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>

@@ -236,6 +236,16 @@ export const webhookLogs = pgTable("webhook_logs", {
   receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+// Audit trail for sensitive admin actions (e.g. impersonating a customer).
+export const adminActionLogs = pgTable("admin_action_logs", {
+  id: serial("id").primaryKey(),
+  adminUserId: text("admin_user_id").notNull(),
+  action: text("action").notNull(), // e.g. "impersonate"
+  targetUserId: text("target_user_id"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type DoseLog = typeof doseLogs.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
