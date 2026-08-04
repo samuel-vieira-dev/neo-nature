@@ -80,21 +80,18 @@ function buildTrackingSteps(status: OrderStatus, placed: Date, fulfilledAt: Date
 }
 
 export type IngestResult =
-  | { ok: true; status: "skipped_test" | "created" | "updated"; orderId?: string }
+  | { ok: true; status: "created" | "updated"; orderId?: string }
   | { ok: false; reason: string };
 
 /**
  * Upserts an order from a parsed IPN. Idempotent by order_id_global.
- * Skips BuyGoods test-tool pings (is_test=1) so they don't pollute real data
- * — they're still captured in webhook_logs for inspection.
+ * Test orders (is_test=1) are ingested like any other — the team validates
+ * BuyGoods test purchases against the real CRM.
  *
  * Note: RUNNING_OFFLINE=1 is NOT a test-ping indicator despite its name —
- * BuyGoods sends it on every IPN, including confirmed live sales. Filtering
- * on it (the previous behavior here) silently dropped real orders.
+ * BuyGoods sends it on every IPN, including confirmed live sales.
  */
 export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise<IngestResult> {
-  if (p.is_test === "1") return { ok: true, status: "skipped_test" };
-
   const bgId = p.order_id_global?.trim();
   if (!bgId) return { ok: false, reason: "missing order_id_global" };
 
