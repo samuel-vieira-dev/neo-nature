@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users, bottles, reminders, doseLogs } from "@/db/schema";
 import { withUser } from "@/server/session";
 import { appNow, userToday } from "@/server/time";
+import { linkOrdersToUser } from "@/server/buygoods";
 import { productById } from "@/lib/data";
 
 const schema = z.object({
@@ -16,19 +17,31 @@ const schema = z.object({
     .max(3)
     .default([]),
   photoId: z.number().optional(),
-  // SMS sign-ups have no name — onboarding collects one (email sign-ups skip this).
+  // Accounts created outside BuyGoods have no name/email on file — onboarding
+  // asks for them. BuyGoods customers already have both, so these stay absent.
   firstName: z.string().trim().max(80).optional(),
+  email: z.string().trim().toLowerCase().email().max(160).optional(),
 });
 
 export const POST = withUser(async (user, request: Request) => {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  const { niche, motivation, productId, firstDoseTaken, reminders: reminderList, photoId, firstName } = parsed.data;
+  const { niche, motivation, productId, firstDoseTaken, reminders: reminderList, photoId, firstName, email } =
+    parsed.data;
   const product = productById(productId);
   if (!product) return Response.json({ error: "unknown_product" }, { status: 400 });
 
   const now = appNow(user);
+
+  // Only fill what's still missing — a BuyGoods name/email always wins.
+  const setName = !user.name && firstName ? firstName : null;
+  const setEmail = !user.email && email ? email : null;
+
+  if (setEmail) {
+    const taken = await db.query.users.findFirst({ where: eq(users.email, setEmail), columns: { id: true } });
+    if (taken) return Response.json({ error: "email_taken" }, { status: 409 });
+  }
 
   await db
     .update(users)
@@ -36,9 +49,13 @@ export const POST = withUser(async (user, request: Request) => {
       niche,
       motivation,
       onboardedAt: user.onboardedAt ?? now,
-      ...(firstName ? { name: firstName, fullName: firstName } : {}),
+      ...(setName ? { name: setName, fullName: user.fullName || setName } : {}),
+      ...(setEmail ? { email: setEmail } : {}),
     })
     .where(eq(users.id, user.id));
+
+  // an account that just gained an email may match orders ingested earlier
+  if (setEmail) await linkOrdersToUser(user.id, { email: setEmail, phone: user.phone });
 
   // active bottle for dose-remaining forecasts
   await db.update(bottles).set({ active: false }).where(eq(bottles.userId, user.id));

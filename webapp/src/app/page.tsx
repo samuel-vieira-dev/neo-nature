@@ -8,6 +8,7 @@ import { useMe, useOrders, useCheckIn } from "@/lib/hooks";
 import { FadeUp, CTA } from "@/components/ui";
 import Banner from "@/components/Banner";
 import { productById } from "@/lib/data";
+import { firstNameOf } from "@/lib/name";
 
 export default function Home() {
   const { toast } = useApp();
@@ -16,6 +17,8 @@ export default function Home() {
   const checkInMutation = useCheckIn();
 
   const hydrated = !!me;
+  // greet with the first name only, even when BuyGoods gave us a full name
+  const firstName = firstNameOf(me?.user.name || me?.user.fullName);
   const streak = me?.streak ?? 0;
   const checkedInToday = me?.checkedInToday ?? false;
 
@@ -49,7 +52,7 @@ export default function Home() {
       <FadeUp className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted">{greeting},</p>
-          <h1 className="font-display text-2xl font-bold text-[var(--text)]">{me?.user.name ?? "…"}</h1>
+          <h1 className="font-display text-2xl font-bold text-[var(--text)]">{firstName || "…"}</h1>
         </div>
         <Link
           href="/notifications"
@@ -72,7 +75,7 @@ export default function Home() {
       {me?.user.churnFlag && !checkedInToday && (
         <FadeUp delay={0.06} className="mt-4">
           <p className="text-center text-sm font-semibold text-[var(--accent)]">
-            We missed you, {me.user.name} — pick it back up today.
+            We missed you, {firstName} — pick it back up today.
           </p>
         </FadeUp>
       )}

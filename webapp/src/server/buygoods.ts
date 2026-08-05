@@ -1,8 +1,9 @@
-import { eq, or } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, users } from "@/db/schema";
 import { notifyUser } from "@/server/push";
 import { normalizeIngestPhone } from "@/lib/phone-format";
+import { firstNameOf } from "@/lib/name";
 
 // ---------------------------------------------------------------------------
 // BuyGoods IPN ingestion. BuyGoods POSTs form-urlencoded order events to
@@ -162,6 +163,9 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
       })
       .where(eq(orders.id, existing.id));
 
+    const ownerId = existing.userId ?? user?.id;
+    if (ownerId) await hydrateUserFromOrders(ownerId);
+
     // notify on first transition into "shipped"
     if (status === "shipped" && existing.status !== "shipped" && (existing.userId ?? user?.id)) {
       await notifyUser(existing.userId ?? user!.id, {
@@ -202,6 +206,8 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     price: num(p.product_price || p.total_clean).toFixed(2),
   });
 
+  if (user?.id) await hydrateUserFromOrders(user.id);
+
   if (status === "shipped" && user?.id) {
     await notifyUser(user.id, {
       title: "Your order shipped! 📦",
@@ -230,4 +236,39 @@ export async function linkOrdersToUser(userId: string, ids: { email?: string | n
     .update(orders)
     .set({ userId })
     .where(conditions.length > 1 ? or(...conditions) : conditions[0]);
+
+  await hydrateUserFromOrders(userId);
+}
+
+/**
+ * BuyGoods already told us who the customer is, so onboarding never has to ask:
+ * copy name/email/address off the customer's most recent linked order into any
+ * field the account is still missing. Accounts created outside BuyGoods have no
+ * orders to copy from — those are the ones onboarding still asks.
+ */
+export async function hydrateUserFromOrders(userId: string): Promise<void> {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) return;
+  if (user.name && user.fullName && user.email && user.address) return;
+
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.userId, userId),
+    orderBy: [desc(orders.placedAt)],
+  });
+  if (!order) return;
+
+  const fullName = order.customerName.trim();
+  const email = order.email.trim().toLowerCase();
+
+  const patch: Partial<typeof users.$inferInsert> = {};
+  if (!user.fullName && fullName) patch.fullName = fullName;
+  if (!user.name && fullName) patch.name = firstNameOf(fullName);
+  if (!user.address && order.address) patch.address = order.address;
+  if (!user.email && email) {
+    // email is unique — skip if a legacy account already owns it
+    const taken = await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } });
+    if (!taken) patch.email = email;
+  }
+
+  if (Object.keys(patch).length > 0) await db.update(users).set(patch).where(eq(users.id, userId));
 }

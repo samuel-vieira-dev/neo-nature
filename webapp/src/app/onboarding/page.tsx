@@ -30,7 +30,10 @@ export default function OnboardingPage() {
   const { toast } = useApp();
   const { data: me } = useMe();
   const fileRef = useRef<HTMLInputElement>(null);
+  // BuyGoods customers already have a name/email on file (copied off their order
+  // at sign-in) — we only ask people who created an account on their own.
   const needsName = !!me && !me.user.name;
+  const needsEmail = !!me && !me.user.email;
   const standalone = useIsStandalone();
   // Already installed → skip the "add to home screen" step entirely.
   const steps = standalone ? [0, 2, 3, 4] : [0, 1, 2, 3, 4];
@@ -39,6 +42,7 @@ export default function OnboardingPage() {
   const [niche, setNiche] = useState<Niche | null>(null);
   const [motivation, setMotivation] = useState("");
   const [firstName, setFirstName] = useState("");
+  const [email, setEmail] = useState("");
   const [firstDoseTaken, setFirstDoseTaken] = useState(false);
   const [photoId, setPhotoId] = useState<number | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -88,11 +92,14 @@ export default function OnboardingPage() {
         reminders: reminderList,
         photoId: photoId ?? undefined,
         firstName: needsName ? firstName.trim() : undefined,
+        email: needsEmail ? email.trim() : undefined,
       }),
     });
     setBusy(false);
     if (!res.ok) {
-      toast("Something went wrong — try again");
+      const err = (await res.json().catch(() => null))?.error;
+      toast(err === "email_taken" ? "That email is already on another account" : "Something went wrong — try again");
+      if (err === "email_taken" || err === "invalid_request") setStep(2);
       return;
     }
     await qc.invalidateQueries();
@@ -200,6 +207,22 @@ export default function OnboardingPage() {
                     />
                   </div>
                 )}
+                {needsEmail && (
+                  <div className="mb-4">
+                    <label className="text-sm font-semibold text-muted">
+                      Email <span className="text-muted">(for order updates & support)</span>
+                    </label>
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@email.com"
+                      className="card mt-2 w-full min-h-[52px] rounded-2xl px-4 text-base placeholder:text-muted"
+                    />
+                  </div>
+                )}
                 <label className="text-sm font-semibold text-muted">
                   What made you start today? <span className="text-muted">(we&apos;ll remind you when it matters)</span>
                 </label>
@@ -215,6 +238,10 @@ export default function OnboardingPage() {
                     onClick={() => {
                       if (needsName && !firstName.trim()) {
                         toast("Please enter your first name");
+                        return;
+                      }
+                      if (needsEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+                        toast("Please enter a valid email");
                         return;
                       }
                       setStep(3);

@@ -15,7 +15,8 @@ export default function ProfilePage() {
   const logout = useLogout();
 
   const firstReminder = remindersData?.reminders[0];
-  const initials = me ? me.user.fullName.split(" ").map((s) => s[0]).join("").slice(0, 2) : "··";
+  const displayName = me ? me.user.fullName || me.user.name : "";
+  const initials = displayName ? displayName.split(/\s+/).map((s) => s[0]).join("").slice(0, 2) : "··";
 
   return (
     <div className="pt-8">
@@ -24,7 +25,7 @@ export default function ProfilePage() {
         <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent)] font-display text-3xl font-bold text-white">
           {initials}
         </div>
-        <h1 className="mt-3 font-display text-2xl font-bold text-[var(--text)]">{me?.user.fullName ?? "…"}</h1>
+        <h1 className="mt-3 font-display text-2xl font-bold text-[var(--text)]">{displayName || "…"}</h1>
         <p className="text-sm text-muted">
           {me?.user.email}
           {me && (
