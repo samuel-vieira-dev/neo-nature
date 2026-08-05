@@ -167,7 +167,7 @@ export default function AdminCustomersPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name or email"
+            placeholder="Search name, email or order id"
             className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
           />
         </div>

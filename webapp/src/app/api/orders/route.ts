@@ -18,7 +18,9 @@ export function userOrdersCondition(user: Pick<User, "id" | "email" | "phone">) 
 export function serializeOrder(o: Order, items: Item[]) {
   return {
     id: o.id,
-    number: o.number,
+    // BuyGoods' order_id_global — the id support and suppliers work with. The
+    // numeric order_id stays on the row (o.number) for cross-referencing.
+    number: o.buygoodsOrderId ?? o.number,
     date: o.placedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     status: o.status as "confirmed" | "shipped" | "canceled" | "refunded",
     total: Number(o.total),

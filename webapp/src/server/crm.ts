@@ -107,7 +107,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     productSet.set(row.email, set);
     row.orders.push({
       id: o.id,
-      number: o.number,
+      number: o.buygoodsOrderId ?? o.number, // order_id_global — what support quotes
       placedAt: at,
       status: o.status as CustomerOrder["status"],
       total: Number(o.total),
@@ -168,7 +168,12 @@ export function applyFilters(rows: CustomerRow[], f: CustomerFilters): CustomerR
     if (f.status === "churned" && !r.churnFlag) return false;
     if (f.q) {
       const q = f.q.toLowerCase();
-      if (!r.email.includes(q) && !r.name.toLowerCase().includes(q)) return false;
+      // support usually arrives with an order id in hand, so match those too
+      const matches =
+        r.email.includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        r.orders.some((o) => o.number.toLowerCase().includes(q));
+      if (!matches) return false;
     }
     return true;
   });

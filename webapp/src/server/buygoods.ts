@@ -166,7 +166,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     if (status === "shipped" && existing.status !== "shipped" && (existing.userId ?? user?.id)) {
       await notifyUser(existing.userId ?? user!.id, {
         title: "Your order shipped! 📦",
-        body: `Order ${existing.number} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
+        body: `Order ${existing.buygoodsOrderId ?? existing.number} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
         icon: "package",
         url: `/orders/${existing.id}`,
       });
@@ -205,7 +205,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
   if (status === "shipped" && user?.id) {
     await notifyUser(user.id, {
       title: "Your order shipped! 📦",
-      body: `Order ${p.order_id || bgId} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
+      body: `Order ${bgId} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
       icon: "package",
       url: `/orders/${id}`,
     });
