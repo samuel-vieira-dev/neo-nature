@@ -21,8 +21,9 @@ const PRIORITY: Record<TicketKind, number> = {
 };
 
 export type FreshdeskTicketInput = {
-  // SMS-only customers have no email — Freshdesk can create the contact from
-  // phone + name instead. Send email when we have it; phone is the fallback.
+  // Everything we know about the requester goes over: agents need the email to
+  // reply, the phone to call, and the name to greet. Freshdesk only *requires*
+  // a name when the contact has to be created from a phone with no email.
   email?: string;
   phone?: string;
   name?: string;
@@ -42,7 +43,15 @@ export type FreshdeskTicketInput = {
  */
 export function buildTicketPayload(input: FreshdeskTicketInput) {
   const orderLine = input.orderNumber && input.orderNumber !== "—" ? `\n\nOrder: ${input.orderNumber}` : "";
-  const contact = input.email ? { email: input.email } : { phone: input.phone, name: input.name || "Neo Nature customer" };
+
+  const contact: { email?: string; phone?: string; name?: string } = {};
+  if (input.email) contact.email = input.email;
+  if (input.phone) contact.phone = input.phone;
+  if (input.name) contact.name = input.name;
+  // Freshdesk rejects a phone-only requester without a name, so a placeholder
+  // stands in — but only in that case, never over a name we actually have.
+  else if (contact.phone && !contact.email) contact.name = "Neo Nature customer";
+
   return {
     ...contact,
     subject: input.subject,
@@ -70,12 +79,24 @@ export async function createFreshdeskTicket(input: FreshdeskTicketInput): Promis
   // Basic auth: API key as username, any string as password (docs use "X")
   const auth = Buffer.from(`${apiKey}:X`).toString("base64");
 
-  try {
-    const res = await fetch(`https://${domain}.freshdesk.com/api/v2/tickets`, {
+  const post = (body: object) =>
+    fetch(`https://${domain}.freshdesk.com/api/v2/tickets`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-      body: JSON.stringify(buildTicketPayload(input)),
+      body: JSON.stringify(body),
     });
+
+  try {
+    let res = await post(buildTicketPayload(input));
+
+    // A phone that already belongs to another Freshdesk contact is rejected —
+    // happens when an SMS-only customer later gets an email on their account.
+    // The email alone still identifies them, so retry rather than lose the ticket.
+    if (res.status === 400 && input.phone && input.email) {
+      const detail = await res.text().catch(() => "");
+      console.warn(`[freshdesk] retrying without phone after 400: ${detail.slice(0, 200)}`);
+      res = await post(buildTicketPayload({ ...input, phone: undefined }));
+    }
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");

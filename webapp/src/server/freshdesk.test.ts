@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { buildTicketPayload } from "./freshdesk";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { buildTicketPayload, createFreshdeskTicket } from "./freshdesk";
 
 describe("buildTicketPayload", () => {
   it("maps kind to Freshdesk priority and always opens the ticket", () => {
@@ -25,9 +25,91 @@ describe("buildTicketPayload", () => {
     expect(noOrder.description).not.toContain("Order:");
   });
 
+  it("sends every requester detail it has, so agents can reply, call and greet", () => {
+    const full = buildTicketPayload({
+      email: "jef@neonature.com.br",
+      phone: "+5582988601037",
+      name: "Jefte Nascimento",
+      subject: "Hi",
+      kind: "support",
+    });
+    expect(full.email).toBe("jef@neonature.com.br");
+    expect(full.phone).toBe("+5582988601037");
+    expect(full.name).toBe("Jefte Nascimento");
+  });
+
+  it("names a phone-only requester, which Freshdesk rejects without one", () => {
+    const smsOnly = buildTicketPayload({ phone: "+5582988601037", subject: "Hi", kind: "support" });
+    expect(smsOnly.name).toBe("Neo Nature customer");
+    expect(smsOnly.email).toBeUndefined();
+
+    // a real name always wins over the placeholder
+    const named = buildTicketPayload({ phone: "+5582988601037", name: "Jefte", subject: "Hi", kind: "support" });
+    expect(named.name).toBe("Jefte");
+  });
+
+  it("omits contact fields it doesn't have instead of sending blanks", () => {
+    const emailOnly = buildTicketPayload({ email: "a@b.com", subject: "Hi", kind: "support" });
+    expect(emailOnly.phone).toBeUndefined();
+    expect(emailOnly.name).toBeUndefined();
+  });
+
   it("falls back to the subject when no description is given", () => {
     expect(buildTicketPayload({ email: "a@b.com", subject: "Broken bottle", kind: "support" }).description).toBe(
       "Broken bottle"
     );
+  });
+});
+
+describe("createFreshdeskTicket", () => {
+  const input = { email: "jef@neonature.com.br", phone: "+5582988601037", subject: "Hi", kind: "support" } as const;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  const configure = () => {
+    vi.stubEnv("FRESHDESK_DOMAIN", "neonature");
+    vi.stubEnv("FRESHDESK_API_KEY", "key");
+  };
+  const bodyOf = (call: unknown[]) => JSON.parse((call[1] as { body: string }).body);
+
+  it("drops the phone and retries when Freshdesk rejects it as another contact's", async () => {
+    configure();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 400, ok: false, text: async () => "phone already in use" })
+      .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ id: 42 }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await createFreshdeskTicket(input)).toEqual({ ok: true, freshdeskId: 42 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(bodyOf(fetchMock.mock.calls[0]).phone).toBe("+5582988601037");
+    // the retry keeps the email — that alone still identifies the customer
+    expect(bodyOf(fetchMock.mock.calls[1]).phone).toBeUndefined();
+    expect(bodyOf(fetchMock.mock.calls[1]).email).toBe("jef@neonature.com.br");
+  });
+
+  it("does not retry a phone-only requester, having no other way to identify them", async () => {
+    configure();
+    const fetchMock = vi.fn().mockResolvedValue({ status: 400, ok: false, text: async () => "bad request" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await createFreshdeskTicket({ ...input, email: undefined })).toEqual({
+      ok: false,
+      reason: "api_error",
+      detail: "400",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends one request when Freshdesk accepts the first", async () => {
+    configure();
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true, json: async () => ({ id: 7 }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await createFreshdeskTicket(input)).toEqual({ ok: true, freshdeskId: 7 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
