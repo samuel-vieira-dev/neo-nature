@@ -143,6 +143,7 @@ export type OrderDto = {
   total: number;
   currency: string;
   shippingStatus: string | null;
+  trackingUrl: string | null;
   address: string;
   tracking: { label: string; detail: string; date: string; done: boolean; current?: boolean }[];
   items: { productName: string; sku: string | null; thumbnailUrl: string | null; qty: number; price: number }[];

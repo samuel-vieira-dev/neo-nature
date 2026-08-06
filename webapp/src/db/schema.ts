@@ -106,6 +106,9 @@ export const orders = pgTable(
     total: numeric("total", { precision: 10, scale: 2 }).notNull(),
     currency: text("currency").notNull().default("USD"),
     shippingStatus: text("shipping_status"), // BuyGoods human text, e.g. "Shipped on 27 Feb, 2023"
+    // Carrier tracking number (BuyGoods field: shipping_tracking_id). Sent on
+    // fulfillment despite what earlier comments here claimed — see buygoods.ts.
+    shippingTrackingId: text("shipping_tracking_id"),
     fulfilledAt: timestamp("fulfilled_at", { withTimezone: true, mode: "date" }),
     address: text("address").notNull().default(""),
     // customer + attribution (from the BuyGoods IPN) — powers the admin CRM

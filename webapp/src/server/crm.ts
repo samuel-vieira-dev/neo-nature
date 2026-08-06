@@ -1,4 +1,5 @@
 import { db, rawSql } from "@/db";
+import { buildTrackingUrl } from "@/lib/tracking";
 
 // ---------------------------------------------------------------------------
 // CRM aggregation. A "customer" is keyed by email and unifies BuyGoods orders
@@ -14,6 +15,7 @@ export type CustomerOrder = {
   total: number;
   currency: string;
   shippingStatus: string | null;
+  trackingUrl: string | null;
   fulfilledAt: string | null;
   saleOrigin: string;
   paymentMethod: string | null;
@@ -113,6 +115,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
       total: Number(o.total),
       currency: o.currency,
       shippingStatus: o.shippingStatus,
+      trackingUrl: o.shippingTrackingId ? buildTrackingUrl(o.shippingTrackingId) : null,
       fulfilledAt: o.fulfilledAt ? o.fulfilledAt.toISOString() : null,
       saleOrigin: o.saleOrigin,
       paymentMethod: o.paymentMethod,

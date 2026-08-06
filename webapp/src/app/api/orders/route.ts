@@ -2,6 +2,7 @@ import { desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, type Order, type User } from "@/db/schema";
 import { withUser } from "@/server/session";
+import { buildTrackingUrl } from "@/lib/tracking";
 
 type Item = typeof orderItems.$inferSelect;
 
@@ -26,6 +27,7 @@ export function serializeOrder(o: Order, items: Item[]) {
     total: Number(o.total),
     currency: o.currency,
     shippingStatus: o.shippingStatus,
+    trackingUrl: o.shippingTrackingId ? buildTrackingUrl(o.shippingTrackingId) : null,
     address: o.address,
     tracking: o.trackingSteps,
     items: items.map((i) => ({

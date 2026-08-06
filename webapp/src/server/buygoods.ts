@@ -10,10 +10,10 @@ import { firstNameOf } from "@/lib/name";
 // /webhook-buygoods-info (and duplicates the same fields on the query string).
 // We upsert an order keyed by order_id_global, matched to an app user by email.
 //
-// BuyGoods does NOT send a carrier tracking number — only a shipping STATUS
-// text ("Shipped on 27 Feb, 2023") + fulfillment date. So the app tracks order
-// STATUS, not a carrier parcel. A real tracking link needs a 3PL (see
-// INTEGRACOES.md item 9).
+// BuyGoods DOES send a carrier tracking number on fulfillment — the
+// shipping_tracking_id field (e.g. "GFUS01065804546499") — despite this
+// comment previously claiming otherwise. See buildTrackingUrl in
+// src/lib/tracking.ts for the customer-facing link.
 // ---------------------------------------------------------------------------
 
 type Params = Record<string, string>;
@@ -106,6 +106,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
   ).toFixed(2);
   const currency = p.currency || "USD";
   const shippingStatus = p.shipping_status || undefined;
+  const shippingTrackingId = p.shipping_tracking_id?.trim() || undefined;
   const address = [p.shipping_address, p.shipping_city, p.shipping_state, p.shipping_zip, p.shipping_country]
     .filter(Boolean)
     .join(", ");
@@ -156,6 +157,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
         total,
         currency,
         shippingStatus,
+        shippingTrackingId: shippingTrackingId ?? existing.shippingTrackingId,
         fulfilledAt,
         address: address || existing.address,
         trackingSteps,
@@ -190,6 +192,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     total,
     currency,
     shippingStatus,
+    shippingTrackingId,
     fulfilledAt,
     address,
     trackingSteps,

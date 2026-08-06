@@ -13,6 +13,7 @@ type CustomerOrder = {
   total: number;
   currency: string;
   shippingStatus: string | null;
+  trackingUrl: string | null;
   fulfilledAt: string | null;
   saleOrigin: string;
   paymentMethod: string | null;
@@ -277,6 +278,16 @@ export default function AdminCustomersPage() {
                                     Fulfillment: {o.shippingStatus || "—"}
                                     {o.fulfilledAt ? ` (${shortDate(o.fulfilledAt)})` : ""}
                                   </span>
+                                  {o.trackingUrl && (
+                                    <a
+                                      href={o.trackingUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-semibold text-[var(--accent)] hover:underline"
+                                    >
+                                      Track package →
+                                    </a>
+                                  )}
                                 </div>
                                 {o.address && <p className="mt-1 text-xs text-muted">{o.address}</p>}
                                 {o.items.length > 0 && (

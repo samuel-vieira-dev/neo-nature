@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { LifeBuoy, MapPin, Package, Truck, Check, XCircle } from "lucide-react";
+import { LifeBuoy, MapPin, Package, Truck, Check, XCircle, ExternalLink } from "lucide-react";
 import { useOrder } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 
@@ -54,6 +54,16 @@ export default function OrderDetailPage() {
             </div>
             <Chip tone={chip.tone}>{chip.label}</Chip>
           </div>
+          {order.trackingUrl && (
+            <a
+              href={order.trackingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] text-sm font-semibold text-white"
+            >
+              <Truck className="h-4 w-4" /> Track package <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
       </FadeUp>
 
