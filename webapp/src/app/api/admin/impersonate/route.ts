@@ -11,12 +11,12 @@ const schema = z
   .refine((d) => d.userId || d.email, { message: "need_identifier" });
 
 /**
- * Resolves the account behind a CRM row that has no app user yet ("lead").
- * Creates the same row the OTP login would have created — keyed on the phone
- * and email BuyGoods gave us — then links their orders and copies name/address
- * off the latest one. Nothing is faked: onboarding is skipped by the session
- * (see /api/me `impersonating`), not by writing answers the customer didn't give,
- * so if they later sign in for real they still get the genuine onboarding.
+ * Resolves the account behind a CRM row that has no app user yet ("lead"),
+ * creating the same row the OTP login would have created — keyed on the phone
+ * and email BuyGoods gave us. Nothing is faked: onboarding is skipped by the
+ * session (see /api/me `impersonating`), not by writing answers the customer
+ * didn't give, so if they later sign in for real they still get the genuine
+ * onboarding.
  */
 async function resolveLead(email: string): Promise<{ user: User; provisioned: boolean } | null> {
   const key = email.toLowerCase().trim();
@@ -33,9 +33,7 @@ async function resolveLead(email: string): Promise<{ user: User; provisioned: bo
   if (existing) return { user: existing, provisioned: false };
 
   const [user] = await db.insert(users).values({ id: crypto.randomUUID(), email: key, phone }).returning();
-  await linkOrdersToUser(user.id, { email: key, phone }); // also hydrates name/address
-  const hydrated = await db.query.users.findFirst({ where: eq(users.id, user.id) });
-  return { user: hydrated ?? user, provisioned: true };
+  return { user, provisioned: true };
 }
 
 // Opens the customer's own app session for the admin (15 min, see
@@ -55,12 +53,21 @@ export const POST = withAdmin(async (admin, req: Request) => {
   if (!resolved) return Response.json({ error: "not_found" }, { status: 404 });
 
   const { user: target, provisioned } = resolved;
-  await createImpersonationSession(target.id, admin.id);
+
+  // Bring the account up to date exactly as a real login would: link any
+  // orders matching this email/phone and copy name/address off the latest one.
+  // Accounts provisioned before hydration existed — or that simply never
+  // logged in again — still have an empty name, and the preview has to show
+  // what the customer actually sees.
+  await linkOrdersToUser(target.id, { email: target.email, phone: target.phone });
+  const fresh = (await db.query.users.findFirst({ where: eq(users.id, target.id) })) ?? target;
+
+  await createImpersonationSession(fresh.id, admin.id);
   await db.insert(adminActionLogs).values({
     adminUserId: admin.id,
     action: provisioned ? "impersonate_lead" : "impersonate",
-    targetUserId: target.id,
-    metadata: { targetName: target.name, targetEmail: target.email, provisioned },
+    targetUserId: fresh.id,
+    metadata: { targetName: fresh.name, targetEmail: fresh.email, provisioned },
   });
 
   return Response.json({ ok: true });
