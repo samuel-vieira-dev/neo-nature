@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CreditCard, HelpCircle, ShieldCheck } from "lucide-react";
+import { CalendarClock, CreditCard, HelpCircle, Loader2, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "@/lib/store";
 import { useCreateTicket } from "@/lib/hooks";
+import { useRequestIds } from "@/lib/request-id";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 
 type BillingDto = {
@@ -22,6 +24,8 @@ export default function BillingPage() {
   const { toast } = useApp();
   const router = useRouter();
   const createTicket = useCreateTicket();
+  const requestId = useRequestIds();
+  const [pending, setPending] = useState<string | null>(null);
   const { data } = useQuery({
     queryKey: ["billing"],
     queryFn: async () => {
@@ -31,18 +35,26 @@ export default function BillingPage() {
     },
   });
 
-  // chargeback deflection: in-app help is easier than calling the card issuer
+  // chargeback deflection: in-app help is easier than calling the card issuer.
+  // The ticket goes through Freshdesk and takes seconds, so guard the repeat tap
+  // (in-flight check) and the ones that race past it (idempotency key).
   const helpWithCharge = (descriptor: string, amount: number, date: string) => {
+    if (createTicket.isPending) return;
+    const action = `charge:${descriptor}:${amount}:${date}`;
+    setPending(action);
     createTicket.mutate(
       {
         subject: `Question about charge ${descriptor} — $${amount} on ${date}`,
         kind: "billing",
+        clientRequestId: requestId(action),
       },
       {
         onSuccess: () => {
           toast("Ticket created — we'll clarify this charge, usually within an hour 💚");
           router.push("/support");
         },
+        onError: () => toast("We couldn't open your ticket — please try again."),
+        onSettled: () => setPending(null),
       }
     );
   };
@@ -113,9 +125,18 @@ export default function BillingPage() {
                 {inv.status !== "upcoming" && (
                   <button
                     onClick={() => helpWithCharge(inv.cardDescriptor, inv.amount, inv.date)}
-                    className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface)] py-2 text-sm font-semibold text-muted active:bg-[var(--border)]"
+                    disabled={createTicket.isPending}
+                    className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--surface)] py-2 text-sm font-semibold text-muted active:bg-[var(--border)] disabled:opacity-60"
                   >
-                    <HelpCircle className="h-4 w-4" /> Get help with this charge
+                    {pending === `charge:${inv.cardDescriptor}:${inv.amount}:${inv.date}` ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Opening your ticket…
+                      </>
+                    ) : (
+                      <>
+                        <HelpCircle className="h-4 w-4" /> Get help with this charge
+                      </>
+                    )}
                   </button>
                 )}
               </div>

@@ -180,8 +180,13 @@ export function useTickets() {
 export function useCreateTicket() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { subject: string; orderNumber?: string; kind?: string; description?: string }) =>
-      api<{ ok: true; ticket: TicketDto }>("/api/tickets", { method: "POST", body: JSON.stringify(body) }),
+    mutationFn: (body: {
+      subject: string;
+      orderNumber?: string;
+      kind?: string;
+      description?: string;
+      clientRequestId?: string;
+    }) => api<{ ok: true; ticket: TicketDto }>("/api/tickets", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tickets"] }),
   });
 }

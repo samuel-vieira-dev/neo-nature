@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { ArrowRight, Camera, CheckCircle2, PartyPopper, Package, HeartHandshake, MessageCirclePlus, Phone } from "lucide-react";
+import { ArrowRight, Camera, CheckCircle2, Loader2, PartyPopper, Package, HeartHandshake, MessageCirclePlus, Phone } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { useOrders, useCreateTicket } from "@/lib/hooks";
+import { useRequestIds } from "@/lib/request-id";
 import { PageHeader, CTA } from "@/components/ui";
 import { issueTypes } from "@/lib/data";
 
@@ -20,6 +21,7 @@ export default function NewTicketPage() {
   const { toast } = useApp();
   const { data: ordersData } = useOrders();
   const createTicket = useCreateTicket();
+  const requestId = useRequestIds();
   const orders = ordersData?.orders ?? [];
 
   const [step, setStep] = useState(0);
@@ -27,23 +29,40 @@ export default function NewTicketPage() {
   const [issue, setIssue] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [ticketId, setTicketId] = useState<string | null>(null);
+  // Which action is in flight, so only the tapped button shows a spinner.
+  const [pending, setPending] = useState<string | null>(null);
 
-  const submit = () => {
-    const issueLabel = issueTypes.find((i) => i.id === issue)?.label ?? "Support request";
+  // Creating a ticket goes through Freshdesk and takes seconds. Every entry
+  // point funnels through here so the second tap can't open a second ticket:
+  // the in-flight check stops it in the UI, and the idempotency key stops it
+  // on the server if one slips through anyway (multi-touch, retry, two tabs).
+  const openTicket = (
+    action: string,
+    body: { subject: string; kind?: string; description?: string },
+    onDone: (ticketId: string) => void
+  ) => {
+    if (createTicket.isPending) return;
+    setPending(action);
     createTicket.mutate(
-      {
-        subject: issueLabel,
-        orderNumber: orderNumber ?? "—",
-        kind: issue === "refund" ? "refund" : "support",
-        description,
-      },
+      { ...body, orderNumber: orderNumber ?? "—", clientRequestId: requestId(action) },
       {
         onSuccess: (res) => {
           setTicketId(res.ticket.id);
           setStep(3);
-          confetti({ particleCount: 40, spread: 55, origin: { y: 0.4 }, colors: ["#047857", "#34d399"] });
+          onDone(res.ticket.id);
         },
+        onError: () => toast("We couldn't open your ticket — please try again."),
+        onSettled: () => setPending(null),
       }
+    );
+  };
+
+  const submit = () => {
+    const issueLabel = issueTypes.find((i) => i.id === issue)?.label ?? "Support request";
+    openTicket(
+      "submit",
+      { subject: issueLabel, kind: issue === "refund" ? "refund" : "support", description },
+      () => confetti({ particleCount: 40, spread: 55, origin: { y: 0.4 }, colors: ["#047857", "#34d399"] })
     );
   };
 
@@ -152,51 +171,58 @@ export default function NewTicketPage() {
               <p className="mt-1 text-base text-muted">
                 Totally your call. But if one of these solves it, it&apos;s yours in one tap:
               </p>
+              {/* These read as selection cards like the previous steps, but they
+                  submit. They must show they were heard on the first tap, or
+                  people tap again — and again. */}
               <div className="mt-4 space-y-3">
                 <button
                   onClick={() =>
-                    createTicket.mutate(
-                      { subject: "Free replacement bottle requested", orderNumber: orderNumber ?? "—", kind: "support" },
-                      {
-                        onSuccess: (res) => {
-                          setTicketId(res.ticket.id);
-                          setStep(3);
-                          toast("Replacement on the way — no charge 📦");
-                        },
-                      }
+                    openTicket("replacement", { subject: "Free replacement bottle requested", kind: "support" }, () =>
+                      toast("Replacement on the way — no charge 📦")
                     )
                   }
-                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                  disabled={createTicket.isPending}
+                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-60"
                 >
-                  <Package className="h-5 w-5 shrink-0 text-sky-700" />
+                  {pending === "replacement" ? (
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin text-sky-700" />
+                  ) : (
+                    <Package className="h-5 w-5 shrink-0 text-sky-700" />
+                  )}
                   <span className="flex-1">
-                    <span className="block text-base font-bold text-[var(--text)]">Free replacement bottle</span>
+                    <span className="block text-base font-bold text-[var(--text)]">
+                      {pending === "replacement" ? "Sending your request…" : "Free replacement bottle"}
+                    </span>
                     <span className="block text-sm text-muted">Damaged or unsatisfying? We&apos;ll reship free</span>
                   </span>
                 </button>
                 <button
                   onClick={() =>
-                    createTicket.mutate(
-                      { subject: "Specialist consultation requested", orderNumber: orderNumber ?? "—", kind: "support" },
-                      {
-                        onSuccess: (res) => {
-                          setTicketId(res.ticket.id);
-                          setStep(3);
-                          toast("A specialist will reach out shortly — usually within an hour 💚");
-                        },
-                      }
+                    openTicket("specialist", { subject: "Specialist consultation requested", kind: "support" }, () =>
+                      toast("A specialist will reach out shortly — usually within an hour 💚")
                     )
                   }
-                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left"
+                  disabled={createTicket.isPending}
+                  className="card flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-60"
                 >
-                  <HeartHandshake className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+                  {pending === "specialist" ? (
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--accent)]" />
+                  ) : (
+                    <HeartHandshake className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+                  )}
                   <span className="flex-1">
-                    <span className="block text-base font-bold text-[var(--text)]">Talk to a specialist</span>
+                    <span className="block text-base font-bold text-[var(--text)]">
+                      {pending === "specialist" ? "Sending your request…" : "Talk to a specialist"}
+                    </span>
                     <span className="block text-sm text-muted">Dosage, timing, expectations — often it&apos;s fixable</span>
                   </span>
                 </button>
               </div>
-              <button onClick={() => setStep(6)} className="mt-4 w-full text-center text-base font-semibold text-rose-700">
+              <button
+                onClick={() => setStep(6)}
+                disabled={createTicket.isPending}
+                className="mt-4 w-full text-center text-base font-semibold text-rose-700 disabled:opacity-60"
+              >
                 No thanks — continue with my refund
               </button>
             </motion.div>
@@ -246,7 +272,15 @@ export default function NewTicketPage() {
                 <Camera className="h-4 w-4" /> Add a photo (optional)
               </button>
               <div className="mt-5">
-                <CTA onClick={submit}>{createTicket.isPending ? "Submitting…" : "Submit ticket"}</CTA>
+                <CTA onClick={submit} disabled={createTicket.isPending}>
+                  {createTicket.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" /> Submitting…
+                    </>
+                  ) : (
+                    "Submit ticket"
+                  )}
+                </CTA>
               </div>
             </motion.div>
           )}

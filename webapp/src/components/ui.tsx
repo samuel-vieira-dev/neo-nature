@@ -111,19 +111,27 @@ export function Chip({ tone, children }: { tone: "green" | "blue" | "amber" | "g
   return <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-/** Big solid CTA button — min-height 56px per the 45+ design spec */
+/**
+ * Big solid CTA button — min-height 56px per the 45+ design spec.
+ *
+ * `disabled` exists so screens that submit something can block the second tap
+ * while the first request is in flight. Without it a slow endpoint (Freshdesk
+ * takes seconds) lets an impatient customer fire the same action many times.
+ */
 export function CTA({
   children,
   onClick,
   href,
   className = "",
   variant = "primary",
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   href?: string;
   className?: string;
   variant?: "primary" | "secondary";
+  disabled?: boolean;
 }) {
   const styles =
     variant === "primary"
@@ -131,14 +139,16 @@ export function CTA({
       : "card text-[var(--text)]";
   const inner = (
     <span
-      className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 font-display text-base font-bold transition-colors active:scale-[0.98] ${styles} ${className}`}
+      className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 font-display text-base font-bold transition-colors active:scale-[0.98] ${styles} ${
+        disabled ? "pointer-events-none opacity-60" : ""
+      } ${className}`}
     >
       {children}
     </span>
   );
   if (href) return <Link href={href} className="block">{inner}</Link>;
   return (
-    <button onClick={onClick} className="block w-full">
+    <button onClick={onClick} disabled={disabled} className="block w-full">
       {inner}
     </button>
   );

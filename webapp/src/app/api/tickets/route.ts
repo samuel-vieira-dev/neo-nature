@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { tickets } from "@/db/schema";
@@ -10,6 +10,8 @@ const createSchema = z.object({
   orderNumber: z.string().max(40).default("—"),
   kind: z.enum(["support", "refund", "billing"]).default("support"),
   description: z.string().max(4000).optional(),
+  // Idempotency key: same submission intent retried => same ticket, one Freshdesk push.
+  clientRequestId: z.string().min(8).max(64).optional(),
 });
 
 const serialize = (t: typeof tickets.$inferSelect) => ({
@@ -21,6 +23,17 @@ const serialize = (t: typeof tickets.$inferSelect) => ({
   lastMessage: t.lastMessage,
   date: t.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
 });
+
+/**
+ * Mints the next ticket id. `tickets.id` is the global primary key, so it must
+ * be unique across every user — a DB sequence gives us that atomically, even
+ * with concurrent requests. Keeps the customer-facing "T-####" display format
+ * (it shows up in our copy and in Freshdesk ticket descriptions).
+ */
+async function nextTicketId() {
+  const [row] = await db.execute<{ n: string }>(sql`select nextval('ticket_id_seq') as n`);
+  return `T-${row.n}`;
+}
 
 export const GET = withUser(async (user) => {
   const rows = await db.query.tickets.findMany({
@@ -34,12 +47,17 @@ export const POST = withUser(async (user, request: Request) => {
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  const { subject, orderNumber, kind, description } = parsed.data;
-  const id = `T-${Math.floor(2200 + Math.random() * 700)}`;
+  const { subject, orderNumber, kind, description, clientRequestId } = parsed.data;
+  const id = await nextTicketId();
 
   // 1) Persist the local mirror first — we must never lose the customer's message,
   //    even if Freshdesk is down or not yet configured.
-  const [row] = await db
+  //
+  //    ON CONFLICT on the idempotency key is what makes a burst of taps safe: the
+  //    losing requests insert nothing and return the ticket the winner created,
+  //    so step 2 below (the Freshdesk push) runs exactly once per intent. A null
+  //    clientRequestId never conflicts, so callers without one behave as before.
+  const [inserted] = await db
     .insert(tickets)
     .values({
       id,
@@ -48,12 +66,28 @@ export const POST = withUser(async (user, request: Request) => {
       orderNumber,
       kind,
       email: user.email || user.phone || "",
+      clientRequestId,
       lastMessage:
         kind === "refund"
           ? "Refund request received — we'll analyze it within 48 hours and send further instructions"
           : "Our team usually replies by email within an hour.",
     })
+    .onConflictDoNothing({ target: tickets.clientRequestId })
     .returning();
+
+  if (!inserted) {
+    const existing = await db.query.tickets.findFirst({
+      where: eq(tickets.clientRequestId, clientRequestId!),
+    });
+    // The key is a client-minted UUID, so this should always be the same
+    // customer — but never hand back another account's ticket if it isn't.
+    if (!existing || existing.userId !== user.id) {
+      return Response.json({ error: "duplicate_request" }, { status: 409 });
+    }
+    return Response.json({ ok: true, ticket: serialize(existing), deduped: true });
+  }
+
+  const row = inserted;
 
   // 2) Push to Freshdesk (system of record). Failure degrades gracefully:
   //    the ticket stays local with sync_status so ops can reconcile.

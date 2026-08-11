@@ -10,6 +10,7 @@ import {
   numeric,
   uniqueIndex,
   index,
+  pgSequence,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -200,8 +201,14 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 
 // -------- support --------
 
+// Ticket ids are minted from this sequence as "T-" || nextval, so they are
+// unique across ALL users (the id is the global primary key). It starts at 2900
+// — above the highest value the old random "T-2200..2899" scheme could produce
+// — so a freshly minted id can never collide with a legacy row.
+export const ticketIdSeq = pgSequence("ticket_id_seq", { startWith: 2900 });
+
 export const tickets = pgTable("tickets", {
-  id: text("id").primaryKey(), // "T-2201"
+  id: text("id").primaryKey(), // "T-2901" — see ticketIdSeq
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   subject: text("subject").notNull(),
   orderNumber: text("order_number").notNull().default("—"),
@@ -213,6 +220,11 @@ export const tickets = pgTable("tickets", {
   email: text("email").notNull().default(""), // requester email snapshot (Freshdesk keys on this)
   freshdeskId: integer("freshdesk_id"), // Freshdesk ticket id once created
   syncStatus: text("sync_status").notNull().default("pending"), // pending | synced | local_only
+  // Idempotency key minted by the client, one per submission intent (not per
+  // tap). Repeated taps on a slow submit reuse it, so the unique index turns
+  // duplicate POSTs into a no-op that returns the ticket already created —
+  // nothing extra reaches Freshdesk. Nullable: older clients simply don't dedupe.
+  clientRequestId: text("client_request_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
