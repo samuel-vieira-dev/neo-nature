@@ -3,10 +3,10 @@ import { db } from "@/db";
 import { webhookLogs } from "@/db/schema";
 import { withUser } from "@/server/session";
 
-/** Authenticated viewer for captured BuyGoods test payloads (see /webhook-buygoods-info). */
+/** Authenticated viewer for captured Konnektive payloads (see /webhook-konnektive). */
 export const GET = withUser(async () => {
   const rows = await db.query.webhookLogs.findMany({
-    where: eq(webhookLogs.source, "buygoods"),
+    where: eq(webhookLogs.source, "konnektive"),
     orderBy: [desc(webhookLogs.receivedAt)],
     limit: 50,
   });

@@ -239,7 +239,7 @@ export const jobRuns = pgTable("job_runs", {
 
 // -------- inbound webhooks (raw capture, pre-integration) --------
 
-/** Raw capture of every hit to /webhook-buygoods-info — inspect these to design the real BuyGoods integration */
+/** Raw capture of every hit to /webhook-buygoods-info and /webhook-konnektive — inspect these to design the real integrations */
 export const webhookLogs = pgTable("webhook_logs", {
   id: serial("id").primaryKey(),
   source: text("source").notNull().default("buygoods"),
