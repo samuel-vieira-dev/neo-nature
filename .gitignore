@@ -1,1 +1,4 @@
 .DS_Store
+
+# agent worktrees — nested checkouts, never part of the repo
+**/.claude/worktrees/
