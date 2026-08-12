@@ -189,6 +189,26 @@ describe("normalize — status", () => {
     expect(ok(normalize({ ...directFulfillment, orderStatus: "REFUNDED" })).status).toBe("refunded");
     expect(ok(normalize({ ...directFulfillment, orderStatus: "CANCELLED" })).status).toBe("canceled");
   });
+
+  it("maps a chargeback to refunded status but flags isChargeback, unlike a plain refund", () => {
+    const chargeback = ok(normalize({ ...directFulfillment, orderStatus: "CHARGEBACK" }));
+    expect(chargeback.status).toBe("refunded");
+    expect(chargeback.isChargeback).toBe(true);
+
+    const refund = ok(normalize({ ...directFulfillment, orderStatus: "REFUNDED" }));
+    expect(refund.isChargeback).toBe(false);
+  });
+});
+
+describe("normalize — refund amount", () => {
+  it("is null when the feed doesn't report one, not the full order total", () => {
+    expect(ok(normalize({ ...directFulfillment, orderStatus: "REFUNDED" })).refundAmount).toBeNull();
+  });
+
+  it("picks up a reported refund amount, which may be partial", () => {
+    const o = ok(normalize({ ...directFulfillment, orderStatus: "REFUNDED", refundAmount: "147.00" }));
+    expect(o.refundAmount).toBe("147.00");
+  });
 });
 
 describe("normalize — totals", () => {

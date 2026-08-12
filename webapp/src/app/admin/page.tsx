@@ -15,6 +15,10 @@ type CustomerOrder = {
   shippingStatus: string | null;
   trackingUrl: string | null;
   fulfilledAt: string | null;
+  refundedAt: string | null;
+  chargebackAt: string | null;
+  refundAmount: number | null;
+  chargebackAmount: number | null;
   saleOrigin: string;
   paymentMethod: string | null;
   address: string;
@@ -287,6 +291,20 @@ export default function AdminCustomersPage() {
                                     >
                                       Track package →
                                     </a>
+                                  )}
+                                  {o.chargebackAt && (
+                                    <span className="font-semibold text-rose-700">
+                                      Chargeback: {o.chargebackAmount != null ? money2(o.chargebackAmount) : "amount unknown"}
+                                      {o.total != null && o.chargebackAmount != null && o.chargebackAmount < o.total ? " (partial)" : ""}
+                                      {` (${shortDate(o.chargebackAt)})`}
+                                    </span>
+                                  )}
+                                  {o.refundedAt && !o.chargebackAt && (
+                                    <span className="font-semibold text-amber-700">
+                                      Refund: {o.refundAmount != null ? money2(o.refundAmount) : "amount unknown"}
+                                      {o.refundAmount != null && o.refundAmount < o.total ? " (partial)" : ""}
+                                      {` (${shortDate(o.refundedAt)})`}
+                                    </span>
                                   )}
                                 </div>
                                 {o.address && <p className="mt-1 text-xs text-muted">{o.address}</p>}

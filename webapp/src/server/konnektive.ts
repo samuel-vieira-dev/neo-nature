@@ -10,7 +10,13 @@ import type { NormalizedOrder, KonnektiveItem, OrderStatus } from "@/server/konn
 // against real captures without a database.
 export * from "@/server/konnektive-parse";
 
-function buildTrackingSteps(status: OrderStatus, placed: Date, fulfilledAt: Date | null, shippingStatus: string | undefined) {
+function buildTrackingSteps(
+  status: OrderStatus,
+  placed: Date,
+  fulfilledAt: Date | null,
+  shippingStatus: string | undefined,
+  refundedAt?: Date | null
+) {
   const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   if (status === "canceled") {
     return [
@@ -21,7 +27,7 @@ function buildTrackingSteps(status: OrderStatus, placed: Date, fulfilledAt: Date
   if (status === "refunded") {
     return [
       { label: "Order confirmed", detail: "", date: fmt(placed), done: true },
-      { label: "Refunded", detail: "Your refund has been processed.", date: "", done: true, current: true },
+      { label: "Refunded", detail: "Your refund has been processed.", date: refundedAt ? fmt(refundedAt) : "", done: true, current: true },
     ];
   }
   const shipped = status === "shipped";
@@ -68,9 +74,19 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
     paymentMethod: o.paymentMethod,
     saleOrigin: o.saleOrigin,
   };
-  const trackingSteps = buildTrackingSteps(o.status, o.placedAt, o.fulfilledAt, o.shippingStatus);
 
   const existing = await db.query.orders.findFirst({ where: eq(orders.konnektiveOrderId, o.clientOrderId) });
+
+  // Stamp the first time we observe the transition; never overwrite once set,
+  // and skip fabricating "now" on a backfill replay of history we can't date.
+  const now = new Date();
+  const refundedAt = existing?.refundedAt ?? (o.status === "refunded" && !o.isChargeback && !o.isReplay ? now : null);
+  const chargebackAt = existing?.chargebackAt ?? (o.isChargeback && !o.isReplay ? now : null);
+  // Amount, unlike the stamp, comes straight off the payload — not fabricated,
+  // so no replay gating; only "unknown until the feed reports one" gating.
+  const refundAmount = existing?.refundAmount ?? (o.status === "refunded" && !o.isChargeback ? o.refundAmount : null);
+  const chargebackAmount = existing?.chargebackAmount ?? (o.isChargeback ? o.refundAmount : null);
+  const trackingSteps = buildTrackingSteps(o.status, o.placedAt, o.fulfilledAt, o.shippingStatus, o.isChargeback ? chargebackAt : refundedAt);
 
   if (existing) {
     await db
@@ -84,6 +100,10 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
         shippingStatus: o.shippingStatus ?? existing.shippingStatus,
         shippingTrackingId: o.shippingTrackingId ?? existing.shippingTrackingId,
         fulfilledAt: o.fulfilledAt ?? existing.fulfilledAt,
+        refundedAt,
+        chargebackAt,
+        refundAmount,
+        chargebackAmount,
         address: o.address || existing.address,
         trackingSteps,
         ...attribution,
@@ -134,6 +154,10 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
     shippingStatus: o.shippingStatus,
     shippingTrackingId: o.shippingTrackingId,
     fulfilledAt: o.fulfilledAt,
+    refundedAt,
+    chargebackAt,
+    refundAmount,
+    chargebackAmount,
     address: o.address,
     trackingSteps,
     ...attribution,

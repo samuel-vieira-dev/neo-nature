@@ -120,7 +120,23 @@ export const orders = pgTable(
     // Carrier tracking number (BuyGoods field: shipping_tracking_id). Sent on
     // fulfillment despite what earlier comments here claimed — see buygoods.ts.
     shippingTrackingId: text("shipping_tracking_id"),
+    // Pre-existing production column, added outside this codebase (no history
+    // in schema.ts) — presumably an external Track17 shipment-tracking
+    // integration set up directly against the DB. Declared here so `db:push`
+    // stops proposing to drop it.
+    track17Registered: boolean("track17_registered").default(false),
     fulfilledAt: timestamp("fulfilled_at", { withTimezone: true, mode: "date" }),
+    // Stamped the first time we observe the transition into that state (webhook
+    // receipt time, not necessarily the exact upstream event time) — never
+    // overwritten once set. Null on backfill replays of history we can't date.
+    refundedAt: timestamp("refunded_at", { withTimezone: true, mode: "date" }),
+    chargebackAt: timestamp("chargeback_at", { withTimezone: true, mode: "date" }),
+    // What the feed reported was actually returned — refunds are often partial
+    // (a customer keeps part of the order), so this can be less than `total`.
+    // Null when the feed didn't report an amount, NOT when it's a full refund —
+    // never assume full total from a missing value.
+    refundAmount: numeric("refund_amount", { precision: 10, scale: 2 }),
+    chargebackAmount: numeric("chargeback_amount", { precision: 10, scale: 2 }),
     address: text("address").notNull().default(""),
     // customer + attribution (from the BuyGoods IPN) — powers the admin CRM
     customerName: text("customer_name").notNull().default(""),

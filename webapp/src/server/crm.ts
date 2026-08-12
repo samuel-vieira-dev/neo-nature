@@ -17,6 +17,10 @@ export type CustomerOrder = {
   shippingStatus: string | null;
   trackingUrl: string | null;
   fulfilledAt: string | null;
+  refundedAt: string | null;
+  chargebackAt: string | null;
+  refundAmount: number | null;
+  chargebackAmount: number | null;
   saleOrigin: string;
   paymentMethod: string | null;
   address: string;
@@ -117,6 +121,10 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
       shippingStatus: o.shippingStatus,
       trackingUrl: o.shippingTrackingId ? buildTrackingUrl(o.shippingTrackingId) : null,
       fulfilledAt: o.fulfilledAt ? o.fulfilledAt.toISOString() : null,
+      refundedAt: o.refundedAt ? o.refundedAt.toISOString() : null,
+      chargebackAt: o.chargebackAt ? o.chargebackAt.toISOString() : null,
+      refundAmount: o.refundAmount != null ? Number(o.refundAmount) : null,
+      chargebackAmount: o.chargebackAmount != null ? Number(o.chargebackAmount) : null,
       saleOrigin: o.saleOrigin,
       paymentMethod: o.paymentMethod,
       address: o.address,

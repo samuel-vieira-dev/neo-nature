@@ -80,6 +80,10 @@ export type NormalizedOrder = {
   subid: string | null;
   paymentMethod: string | null;
   saleOrigin: string;
+  /** Bank-initiated dispute rather than a merchant refund — status is still "refunded". */
+  isChargeback: boolean;
+  /** Amount actually refunded/charged back, when the feed reports one — may be less than `total`. */
+  refundAmount: string | null;
   /** Backfill/replay rather than a live event — ingest it, but stay silent. */
   isReplay: boolean;
 };
@@ -123,9 +127,15 @@ function readFulfillment(p: Raw): { status: string; tracking: string; shippedAt:
   };
 }
 
+/** Bank-initiated dispute, distinct from a merchant-issued refund but tracked under the same "refunded" status. */
+function isChargeback(p: Raw): boolean {
+  const orderStatus = str(p.orderStatus).toUpperCase();
+  return orderStatus.includes("CHARGEBACK") || orderStatus.includes("DISPUTE");
+}
+
 function deriveStatus(p: Raw): OrderStatus {
   const orderStatus = str(p.orderStatus).toUpperCase();
-  if (orderStatus.includes("REFUND")) return "refunded";
+  if (orderStatus.includes("REFUND") || isChargeback(p)) return "refunded";
   if (orderStatus.includes("CANCEL") || orderStatus.includes("VOID")) return "canceled";
 
   const { status, tracking } = readFulfillment(p);
@@ -172,6 +182,20 @@ function readItems(p: Raw): KonnektiveItem[] {
 function readTotal(p: Raw): string {
   const candidates = [num(p.totalAmount), num(p.totalPrice), num(p.orderTotal)].filter((n) => n > 0);
   return (candidates.length > 0 ? Math.max(...candidates) : 0).toFixed(2);
+}
+
+/**
+ * Refund/chargeback amount, when the feed reports one. Refunds are frequently
+ * partial (customer keeps part of the order), so this must NOT default to the
+ * full order total when absent — null means "amount unknown", not "full refund".
+ * Field names are best-effort (no confirmed real capture with a refund amount
+ * yet — check webhook_logs for the actual payload and adjust if these miss).
+ */
+function readRefundAmount(p: Raw): string | null {
+  const candidates = [num(p.refundAmount), num(p.refund_amount), num(p.totalRefunded), num(p.amountRefunded)].filter(
+    (n) => n > 0
+  );
+  return candidates.length > 0 ? Math.max(...candidates).toFixed(2) : null;
 }
 
 /** Flattens either feed shape into one order, or explains why it was skipped. */
@@ -246,6 +270,8 @@ export function normalize(payload: unknown, opts: { replayHeader?: boolean } = {
       subid,
       paymentMethod,
       saleOrigin: affiliate || trafficSource || funnel || (subid ? `subid:${subid}` : "Direct"),
+      isChargeback: isChargeback(p),
+      refundAmount: readRefundAmount(p),
       isReplay: p.proxyReplay === true || opts.replayHeader === true,
     },
   };

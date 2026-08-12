@@ -43,15 +43,39 @@ function num(s: string | undefined): number {
 
 type OrderStatus = "confirmed" | "shipped" | "canceled" | "refunded";
 
+/** Bank-initiated dispute, distinct from a merchant-issued refund but tracked under the same "refunded" status. */
+function isChargebackEvent(p: Params, eventTag: string | undefined): boolean {
+  const action = (p.action_type || p.type || eventTag || "").toLowerCase();
+  return action.includes("chargeback") || action.includes("dispute");
+}
+
+/**
+ * Refund/chargeback amount, when the IPN reports one. Refunds are frequently
+ * partial (customer keeps part of the order), so this must NOT default to the
+ * full order total when absent — null means "amount unknown", not "full refund".
+ * Field name is best-effort (no confirmed real capture with a refund amount
+ * yet — check webhook_logs for the actual payload and adjust if this misses).
+ */
+function readRefundAmount(p: Params): string | null {
+  const candidates = [num(p.refund_amount), num(p.amount_refunded), num(p.total_refunded)].filter((n) => n > 0);
+  return candidates.length > 0 ? Math.max(...candidates).toFixed(2) : null;
+}
+
 function deriveStatus(p: Params, eventTag: string | undefined): OrderStatus {
   const action = (p.action_type || p.type || eventTag || "").toLowerCase();
   if (p.was_canceled === "1" || action.includes("cancel")) return "canceled";
-  if (action.includes("refund")) return "refunded";
+  if (action.includes("refund") || isChargebackEvent(p, eventTag)) return "refunded";
   const shipped = Number(p.was_fulfilled || 0) >= 1 || /^shipped/i.test(p.shipping_status || "");
   return shipped ? "shipped" : "confirmed";
 }
 
-function buildTrackingSteps(status: OrderStatus, placed: Date, fulfilledAt: Date | null, shippingStatus: string | undefined) {
+function buildTrackingSteps(
+  status: OrderStatus,
+  placed: Date,
+  fulfilledAt: Date | null,
+  shippingStatus: string | undefined,
+  refundedAt?: Date | null
+) {
   const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   if (status === "canceled") {
     return [
@@ -62,7 +86,7 @@ function buildTrackingSteps(status: OrderStatus, placed: Date, fulfilledAt: Date
   if (status === "refunded") {
     return [
       { label: "Order confirmed", detail: "", date: fmt(placed), done: true },
-      { label: "Refunded", detail: "Your refund has been processed.", date: "", done: true, current: true },
+      { label: "Refunded", detail: "Your refund has been processed.", date: refundedAt ? fmt(refundedAt) : "", done: true, current: true },
     ];
   }
   const shipped = status === "shipped";
@@ -110,7 +134,18 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
   const address = [p.shipping_address, p.shipping_city, p.shipping_state, p.shipping_zip, p.shipping_country]
     .filter(Boolean)
     .join(", ");
-  const trackingSteps = buildTrackingSteps(status, placedAt, fulfilledAt, shippingStatus);
+  const isChargeback = isChargebackEvent(p, eventTag);
+
+  const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
+
+  // Stamp the first time we observe the transition; never overwrite once set.
+  const now = new Date();
+  const refundedAt = existing?.refundedAt ?? (status === "refunded" && !isChargeback ? now : null);
+  const chargebackAt = existing?.chargebackAt ?? (isChargeback ? now : null);
+  const refundAmountValue = readRefundAmount(p);
+  const refundAmount = existing?.refundAmount ?? (status === "refunded" && !isChargeback ? refundAmountValue : null);
+  const chargebackAmount = existing?.chargebackAmount ?? (isChargeback ? refundAmountValue : null);
+  const trackingSteps = buildTrackingSteps(status, placedAt, fulfilledAt, shippingStatus, isChargeback ? chargebackAt : refundedAt);
 
   // customer + attribution (for the admin CRM)
   const customerName =
@@ -145,8 +180,6 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
       : null) ??
     (email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null);
 
-  const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
-
   if (existing) {
     await db
       .update(orders)
@@ -159,6 +192,10 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
         shippingStatus,
         shippingTrackingId: shippingTrackingId ?? existing.shippingTrackingId,
         fulfilledAt,
+        refundedAt,
+        chargebackAt,
+        refundAmount,
+        chargebackAmount,
         address: address || existing.address,
         trackingSteps,
         ...attribution,
@@ -194,6 +231,10 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     shippingStatus,
     shippingTrackingId,
     fulfilledAt,
+    refundedAt,
+    chargebackAt,
+    refundAmount,
+    chargebackAmount,
     address,
     trackingSteps,
     ...attribution,
