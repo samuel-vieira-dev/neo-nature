@@ -88,13 +88,23 @@ export const bottles = pgTable("bottles", {
   active: boolean("active").notNull().default(true),
 });
 
-// -------- commerce (fed by BuyGoods IPN — see src/server/buygoods.ts) --------
+// -------- commerce --------
+// Two independent order feeds write here, and they carry different orders (not
+// the same order twice): BuyGoods IPN (src/server/buygoods.ts) and Konnektive
+// (src/server/konnektive.ts). `source` says which one owns a row; each feed
+// keys idempotency off its own id column and never touches the other's rows.
 
 export const orders = pgTable(
   "orders",
   {
-    id: text("id").primaryKey(), // our id: "bg-<order_id_global>"
+    id: text("id").primaryKey(), // "bg-<order_id_global>" or "kn-<clientOrderId>"
+    source: text("source").notNull().default("buygoods"), // buygoods | konnektive
     buygoodsOrderId: text("buygoods_order_id").unique(), // order_id_global (idempotency key)
+    // Konnektive's clientOrderId — the hash ("F5A8CD676F"). Deliberately not
+    // `orderId`, which is the hash on the proxy feed but the numeric id on the
+    // direct feed; clientOrderId is the one field that means the same thing in
+    // both. The numeric id lands in `number` for display.
+    konnektiveOrderId: text("konnektive_order_id").unique(),
     // orders can arrive before the customer signs up — matched by email at read time
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     email: text("email").notNull().default(""),
