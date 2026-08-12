@@ -252,7 +252,9 @@ export default function AdminCustomersPage() {
                       {r.hasApp ? (
                         <span>{r.totalDoses} doses · last {shortDate(r.lastDoseDay)}</span>
                       ) : (
-                        <span className="text-xs">No app account</span>
+                        // An account can exist without the customer ever using
+                        // it — "View as" provisions one for leads.
+                        <span className="text-xs">{r.userId ? "Never signed in" : "No app account"}</span>
                       )}
                     </td>
                   </tr>

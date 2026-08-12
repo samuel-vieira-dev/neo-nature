@@ -24,6 +24,7 @@ export async function POST(request: Request) {
         fullName: "Samuel",
         niche: "mens_health",
         onboardedAt: new Date(),
+        lastLoginAt: new Date(),
       })
       .returning();
 
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
       });
     }
   }
+
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
   await createSession(user.id);
   return Response.json({ ok: true });

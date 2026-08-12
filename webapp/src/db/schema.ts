@@ -32,6 +32,10 @@ export const users = pgTable("users", {
   address: text("address").notNull().default(""),
   demoDayOffset: integer("demo_day_offset").notNull().default(0), // time travel
   onboardedAt: timestamp("onboarded_at", { withTimezone: true, mode: "date" }),
+  // Last time the customer themselves signed in (OTP/demo login). Stays null
+  // for accounts the admin merely provisioned to preview a lead, which is what
+  // the CRM's "App" tag keys on — see crm.ts.
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
   churnFlag: boolean("churn_flag").notNull().default(false),
   freezes: integer("freezes").notNull().default(2),
   bestStreak: integer("best_streak").notNull().default(0),

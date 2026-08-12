@@ -38,6 +38,9 @@ export async function POST(request: Request) {
   // link any orders that arrived (via BuyGoods) before this account existed
   await linkOrdersToUser(user.id, { email: user.email, phone: user.phone });
 
+  // Marks the account as genuinely used by the customer (the CRM's "App" tag).
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
   await createSession(user.id);
   return Response.json({ ok: true, onboarded: !!user.onboardedAt });
 }

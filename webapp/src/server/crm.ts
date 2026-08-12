@@ -152,7 +152,10 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     if (!key) key = u.id;
 
     const row = get(key);
-    row.hasApp = true;
+    // "App" means the customer actually signed in — NOT that a users row
+    // exists. "View as" on a lead provisions the account (see
+    // /api/admin/impersonate) and must not make the CRM claim adoption.
+    if (u.lastLoginAt) row.hasApp = true;
     row.userId = u.id;
     row.onboarded = !!u.onboardedAt;
     row.churnFlag = u.churnFlag;
