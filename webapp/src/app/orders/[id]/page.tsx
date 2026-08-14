@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { LifeBuoy, MapPin, Package, Truck, Check, XCircle, ExternalLink } from "lucide-react";
 import { useOrder } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
+import { humanizeStatus } from "@/lib/tracking";
 
 const statusChip = {
   confirmed: { tone: "blue" as const, label: "Confirmed" },
@@ -50,7 +51,6 @@ export default function OrderDetailPage() {
                 {order.status === "canceled" && "Order canceled"}
                 {order.status === "refunded" && "Order refunded"}
               </p>
-              {order.shippingStatus && <p className="text-sm text-muted">{order.shippingStatus}</p>}
             </div>
             <Chip tone={chip.tone}>{chip.label}</Chip>
           </div>
@@ -88,10 +88,10 @@ export default function OrderDetailPage() {
                   </span>
                   <div className="min-w-0">
                     <p className={`text-base font-semibold ${step.done ? "text-[var(--text)]" : "text-muted"}`}>
-                      {step.label}
+                      {humanizeStatus(step.label)}
                       {step.current && !ended && <span className="ml-2 text-xs font-bold text-[var(--accent)]">NOW</span>}
                     </p>
-                    {step.detail && <p className="text-sm text-muted">{step.detail}</p>}
+                    {step.detail && <p className="text-sm text-muted">{humanizeStatus(step.detail)}</p>}
                     {step.date && <p className="mt-0.5 text-xs text-muted">{step.date}</p>}
                   </div>
                 </div>

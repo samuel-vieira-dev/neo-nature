@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ChevronRight, Package } from "lucide-react";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 import { useOrders } from "@/lib/hooks";
+import { humanizeStatus } from "@/lib/tracking";
 
 const statusChip = {
   confirmed: { tone: "blue" as const, label: "Confirmed" },
@@ -67,7 +68,7 @@ export default function OrdersPage() {
                       <p className="truncate text-sm font-semibold text-[var(--text)]">
                         {o.items.map((it) => `${it.qty > 1 ? `${it.qty}× ` : ""}${it.productName}`).join(", ") || "Order"}
                       </p>
-                      {o.shippingStatus && <p className="truncate text-xs text-muted">{o.shippingStatus}</p>}
+                      {o.shippingStatus && <p className="truncate text-xs text-muted">{humanizeStatus(o.shippingStatus)}</p>}
                     </div>
                     <div className="text-right">
                       <p className="font-display text-lg font-bold text-[var(--text)]">${o.total}</p>

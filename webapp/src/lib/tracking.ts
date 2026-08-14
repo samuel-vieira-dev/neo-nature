@@ -14,3 +14,20 @@ export function buildTrackingUrl(trackingId: string): string {
   if (template?.includes("{code}")) return template.replace("{code}", code);
   return `https://t.17track.net/en#nums=${code}`;
 }
+
+const ACRONYMS = new Set(["dhl", "us", "usa", "usps", "ups", "fedex"]);
+
+/**
+ * Carrier/fulfillment feeds send SCREAMING_SNAKE_CASE status codes
+ * ("PENDING_SHIPMENT", "EN ROUTE TO DHL ECOMMERCE DISTRIBUTION CENTER"). This
+ * turns them into normal sentence case for display, without touching text
+ * that's already human-written (has lowercase letters).
+ */
+export function humanizeStatus(raw: string | null | undefined): string {
+  if (!raw) return "";
+  if (/[a-z]/.test(raw)) return raw;
+  const words = raw.replace(/_/g, " ").toLowerCase().split(/\s+/);
+  return words
+    .map((w, i) => (ACRONYMS.has(w) ? w.toUpperCase() : i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
