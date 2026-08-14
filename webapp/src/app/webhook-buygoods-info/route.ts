@@ -1,15 +1,11 @@
-import { after } from "next/server";
 import { db } from "@/db";
 import { webhookLogs } from "@/db/schema";
 import { parseIpnParams, ingestBuyGoodsEvent } from "@/server/buygoods";
-import { forwardBuyGoodsEvent } from "@/server/forward";
 
 /**
  * BuyGoods IPN endpoint. Captures every hit (headers/query/body) to
- * webhook_logs for auditing, ingests order events into the orders table
- * (see src/server/buygoods.ts), and relays the payload to the n8n webhook of
- * the sending account (src/server/forward.ts). Always returns 200 so BuyGoods
- * doesn't retry.
+ * webhook_logs for auditing, then ingests order events into the orders table
+ * (see src/server/buygoods.ts). Always returns 200 so BuyGoods doesn't retry.
  *
  * Intentionally public — see PUBLIC_PATHS in src/proxy.ts. BuyGoods has no
  * session cookie.
@@ -44,10 +40,9 @@ async function capture(request: Request) {
     console.error("[webhook-buygoods-info] failed to persist log:", e);
   }
 
-  const params = parseIpnParams(query, rawBody);
-
   // 2) ingest the order event (skips test pings; idempotent by order id)
   try {
+    const params = parseIpnParams(query, rawBody);
     if (params.order_id_global) {
       const result = await ingestBuyGoodsEvent(params, query.event);
       console.log("[webhook-buygoods-info] ingest:", JSON.stringify(result));
@@ -55,17 +50,6 @@ async function capture(request: Request) {
   } catch (e) {
     console.error("[webhook-buygoods-info] ingest failed:", e);
   }
-
-  // 3) relay to the account's n8n webhook — after the response, so a slow or
-  // down n8n never makes BuyGoods wait (or retry).
-  after(async () => {
-    try {
-      const result = await forwardBuyGoodsEvent(params, rawBody, headers["content-type"] ?? null);
-      console.log("[webhook-buygoods-info] forward:", JSON.stringify(result));
-    } catch (e) {
-      console.error("[webhook-buygoods-info] forward failed:", e);
-    }
-  });
 
   return Response.json({ ok: true, received: true });
 }
