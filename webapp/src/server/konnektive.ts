@@ -105,6 +105,10 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
         refundAmount,
         chargebackAmount,
         address: o.address || existing.address,
+        // Headline product, from the first line. The direct feed carries no
+        // items[], so keep what we have rather than blanking it.
+        productName: o.items[0]?.name || existing.productName,
+        productCodename: o.items[0]?.productId || existing.productCodename,
         trackingSteps,
         ...attribution,
       })
@@ -159,6 +163,8 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
     refundAmount,
     chargebackAmount,
     address: o.address,
+    productName: o.items[0]?.name ?? "",
+    productCodename: o.items[0]?.productId ?? "",
     trackingSteps,
     ...attribution,
   });

@@ -142,6 +142,12 @@ export const orders = pgTable(
     refundAmount: numeric("refund_amount", { precision: 10, scale: 2 }),
     chargebackAmount: numeric("chargeback_amount", { precision: 10, scale: 2 }),
     address: text("address").notNull().default(""),
+    // The order's headline product, denormalized from order_items so the CRM
+    // and exports can read/filter it without a join. BuyGoods orders are always
+    // a single product; a multi-item Konnektive order records its FIRST item
+    // here, so order_items stays the source of truth for the full contents.
+    productName: text("product_name").notNull().default(""),
+    productCodename: text("product_codename").notNull().default(""),
     // customer + attribution (from the BuyGoods IPN) — powers the admin CRM
     customerName: text("customer_name").notNull().default(""),
     customerPhone: text("customer_phone"),

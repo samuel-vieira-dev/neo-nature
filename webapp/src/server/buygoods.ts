@@ -157,6 +157,11 @@ export async function ingestBuyGoodsEvent(
     .filter(Boolean)
     .join(", ");
   const isChargeback = isChargebackEvent(p, eventTag);
+  // Same values that go on the order_items row below, denormalized onto the
+  // order. Not every event carries them (some n8n fulfillment payloads omit
+  // product_codename), so an absent field must never blank out what we have.
+  const productName = p.product_name?.trim() || p.product?.trim() || "";
+  const productCodename = p.product_codename?.trim() || "";
 
   const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
 
@@ -220,6 +225,8 @@ export async function ingestBuyGoodsEvent(
         refundAmount,
         chargebackAmount,
         address: address || existing.address,
+        productName: productName || existing.productName,
+        productCodename: productCodename || existing.productCodename,
         trackingSteps,
         ...attribution,
       })
@@ -259,6 +266,8 @@ export async function ingestBuyGoodsEvent(
     refundAmount,
     chargebackAmount,
     address,
+    productName,
+    productCodename,
     trackingSteps,
     ...attribution,
   });
