@@ -18,9 +18,26 @@ import { firstNameOf } from "@/lib/name";
 
 type Params = Record<string, string>;
 
-/** Merge query + body form params; body is canonical, query fills gaps. */
+/**
+ * Merge query + body params; body is canonical, query fills gaps.
+ *
+ * BuyGoods posts form-urlencoded; since 2026-08-15 the client also relays
+ * events through n8n, which posts the same fields as a JSON object (values
+ * may arrive as numbers there — everything is coerced to string).
+ */
 export function parseIpnParams(query: Params, body: string): Params {
   const merged: Params = { ...query };
+  if (body.trim().startsWith("{")) {
+    try {
+      const json = JSON.parse(body) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(json)) {
+        if (v !== null && v !== undefined && typeof v !== "object") merged[k] = String(v);
+      }
+      return merged;
+    } catch {
+      // fall through — treat an unparseable body as form-encoded
+    }
+  }
   if (body) {
     const bodyParams = new URLSearchParams(body);
     for (const [k, v] of bodyParams) merged[k] = v;
@@ -116,7 +133,12 @@ export type IngestResult =
  * Note: RUNNING_OFFLINE=1 is NOT a test-ping indicator despite its name —
  * BuyGoods sends it on every IPN, including confirmed live sales.
  */
-export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise<IngestResult> {
+export async function ingestBuyGoodsEvent(
+  p: Params,
+  eventTag?: string,
+  opts: { isReplay?: boolean } = {}
+): Promise<IngestResult> {
+  const isReplay = opts.isReplay === true;
   const bgId = p.order_id_global?.trim();
   if (!bgId) return { ok: false, reason: "missing order_id_global" };
 
@@ -139,9 +161,10 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
   const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
 
   // Stamp the first time we observe the transition; never overwrite once set.
+  // Replays are historical, so "now" would be a lie — leave the stamp unset.
   const now = new Date();
-  const refundedAt = existing?.refundedAt ?? (status === "refunded" && !isChargeback ? now : null);
-  const chargebackAt = existing?.chargebackAt ?? (isChargeback ? now : null);
+  const refundedAt = existing?.refundedAt ?? (status === "refunded" && !isChargeback && !isReplay ? now : null);
+  const chargebackAt = existing?.chargebackAt ?? (isChargeback && !isReplay ? now : null);
   const refundAmountValue = readRefundAmount(p);
   const refundAmount = existing?.refundAmount ?? (status === "refunded" && !isChargeback ? refundAmountValue : null);
   const chargebackAmount = existing?.chargebackAmount ?? (isChargeback ? refundAmountValue : null);
@@ -205,8 +228,8 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
     const ownerId = existing.userId ?? user?.id;
     if (ownerId) await hydrateUserFromOrders(ownerId);
 
-    // notify on first transition into "shipped"
-    if (status === "shipped" && existing.status !== "shipped" && (existing.userId ?? user?.id)) {
+    // notify on first transition into "shipped" (never on replays — historical)
+    if (status === "shipped" && existing.status !== "shipped" && (existing.userId ?? user?.id) && !isReplay) {
       await notifyUser(existing.userId ?? user!.id, {
         title: "Your order shipped! 📦",
         body: `Order ${existing.buygoodsOrderId ?? existing.number} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
@@ -252,7 +275,7 @@ export async function ingestBuyGoodsEvent(p: Params, eventTag?: string): Promise
 
   if (user?.id) await hydrateUserFromOrders(user.id);
 
-  if (status === "shipped" && user?.id) {
+  if (status === "shipped" && user?.id && !isReplay) {
     await notifyUser(user.id, {
       title: "Your order shipped! 📦",
       body: `Order ${bgId} is on its way.${shippingStatus ? ` (${shippingStatus})` : ""}`,
