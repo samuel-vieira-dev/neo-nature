@@ -111,6 +111,13 @@ export const orders = pgTable(
     konnektiveOrderId: text("konnektive_order_id").unique(),
     // orders can arrive before the customer signs up — matched by email at read time
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // BuyGoods' own customer identity, used as a third linking key beside
+    // phone/email (survives a mistyped checkout email). The numeric user_id is
+    // scoped PER BuyGoods account and ranges overlap between accounts, so only
+    // the (account_id, user_id) PAIR identifies a customer — never match on
+    // user_id alone. Null on Konnektive orders (that feed has no customer id).
+    buygoodsAccountId: text("buygoods_account_id"),
+    buygoodsUserId: text("buygoods_user_id"),
     email: text("email").notNull().default(""),
     // Best-effort E.164 normalization of customer_phone (see src/lib/phone-format.ts)
     // — powers phone-based order linking for SMS-only accounts.
@@ -167,6 +174,7 @@ export const orders = pgTable(
     index("orders_email").on(t.email),
     index("orders_origin").on(t.saleOrigin),
     index("orders_phone").on(t.customerPhoneE164),
+    index("orders_bg_user").on(t.buygoodsAccountId, t.buygoodsUserId),
   ]
 );
 

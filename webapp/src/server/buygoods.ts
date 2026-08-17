@@ -1,4 +1,4 @@
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, users } from "@/db/schema";
 import { notifyUser } from "@/server/push";
@@ -163,6 +163,15 @@ export async function ingestBuyGoodsEvent(
   const productName = p.product_name?.trim() || p.product?.trim() || "";
   const productCodename = p.product_codename?.trim() || "";
 
+  // BuyGoods customer identity. account_id is missing from some event shapes
+  // (e.g. cancel/refund tails) but recoverable from the buy_url they embed.
+  // Only the PAIR identifies a customer — user_id ranges overlap across
+  // accounts (see schema.ts), so both must be present or neither is stored.
+  const bgAccountId =
+    p.account_id?.trim() || p.buy_url?.match(/account_id(?:%253D|%3D|=)(\d+)/)?.[1] || null;
+  const bgUserId = p.user_id?.trim() || null;
+  const bgIdentity = bgAccountId && bgUserId ? { bgAccountId, bgUserId } : null;
+
   const existing = await db.query.orders.findFirst({ where: eq(orders.buygoodsOrderId, bgId) });
 
   // Stamp the first time we observe the transition; never overwrite once set.
@@ -201,12 +210,26 @@ export async function ingestBuyGoodsEvent(
   };
 
   // Link to an app account if one exists — by phone first (customers sign in
-  // with the phone they bought with), falling back to email for legacy accounts.
+  // with the phone they bought with), falling back to email for legacy
+  // accounts, then to another order by the same BuyGoods customer that is
+  // already linked (survives a checkout email/phone typed differently).
   const user =
     (customerPhoneE164
       ? await db.query.users.findFirst({ where: eq(users.phone, customerPhoneE164), columns: { id: true } })
       : null) ??
-    (email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null);
+    (email ? await db.query.users.findFirst({ where: eq(users.email, email), columns: { id: true } }) : null) ??
+    (bgIdentity
+      ? await db.query.orders
+          .findFirst({
+            where: and(
+              eq(orders.buygoodsAccountId, bgIdentity.bgAccountId),
+              eq(orders.buygoodsUserId, bgIdentity.bgUserId),
+              isNotNull(orders.userId)
+            ),
+            columns: { userId: true },
+          })
+          .then((o) => (o?.userId ? { id: o.userId } : null))
+      : null);
 
   if (existing) {
     await db
@@ -227,6 +250,8 @@ export async function ingestBuyGoodsEvent(
         address: address || existing.address,
         productName: productName || existing.productName,
         productCodename: productCodename || existing.productCodename,
+        buygoodsAccountId: existing.buygoodsAccountId ?? bgIdentity?.bgAccountId ?? null,
+        buygoodsUserId: existing.buygoodsUserId ?? bgIdentity?.bgUserId ?? null,
         trackingSteps,
         ...attribution,
       })
@@ -268,6 +293,8 @@ export async function ingestBuyGoodsEvent(
     address,
     productName,
     productCodename,
+    buygoodsAccountId: bgIdentity?.bgAccountId ?? null,
+    buygoodsUserId: bgIdentity?.bgUserId ?? null,
     trackingSteps,
     ...attribution,
   });
@@ -312,6 +339,26 @@ export async function linkOrdersToUser(userId: string, ids: { email?: string | n
     .update(orders)
     .set({ userId })
     .where(conditions.length > 1 ? or(...conditions) : conditions[0]);
+
+  // Second pass: adopt orders by the same BuyGoods customer that email/phone
+  // missed (typo'd checkout email, differently formatted phone). Match on the
+  // (account_id, user_id) PAIR only — user_id alone collides across accounts.
+  const linked = await db
+    .selectDistinct({ acct: orders.buygoodsAccountId, uid: orders.buygoodsUserId })
+    .from(orders)
+    .where(and(eq(orders.userId, userId), isNotNull(orders.buygoodsAccountId), isNotNull(orders.buygoodsUserId)));
+  for (const pair of linked) {
+    await db
+      .update(orders)
+      .set({ userId })
+      .where(
+        and(
+          eq(orders.buygoodsAccountId, pair.acct!),
+          eq(orders.buygoodsUserId, pair.uid!),
+          isNull(orders.userId)
+        )
+      );
+  }
 
   await hydrateUserFromOrders(userId);
 }
