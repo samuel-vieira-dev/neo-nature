@@ -4,6 +4,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 import BottomNav from "@/components/BottomNav";
 import AppShell from "@/components/AppShell";
+import Clarity from "@/components/Clarity";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <AppShell>{children}</AppShell>
           <BottomNav />
         </Providers>
+        <Clarity />
       </body>
     </html>
   );
