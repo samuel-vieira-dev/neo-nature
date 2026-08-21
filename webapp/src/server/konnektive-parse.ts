@@ -257,7 +257,7 @@ export function normalize(payload: unknown, opts: { replayHeader?: boolean } = {
       email,
       customerName,
       customerPhone,
-      customerPhoneE164: normalizeIngestPhone(customerPhone),
+      customerPhoneE164: normalizeIngestPhone(customerPhone, str(p.shipCountry) || str(p.ship_country) || str(p.country) || null),
       address,
       items: readItems(p),
       shippingStatus: fulfillmentStatus || undefined,

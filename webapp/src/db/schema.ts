@@ -32,6 +32,11 @@ export const users = pgTable("users", {
   address: text("address").notNull().default(""),
   demoDayOffset: integer("demo_day_offset").notNull().default(0), // time travel
   onboardedAt: timestamp("onboarded_at", { withTimezone: true, mode: "date" }),
+  // Set when a first-time customer whose order has NOT arrived yet finished the
+  // lightweight pre-arrival setup (install + notifications) instead of the full
+  // onboarding. They get the app (home shows package tracking) while
+  // onboardedAt stays null; the full setup runs once the package is in hand.
+  awaitingDeliveryAt: timestamp("awaiting_delivery_at", { withTimezone: true, mode: "date" }),
   // Last time the customer themselves signed in (OTP/demo login). Stays null
   // for accounts the admin merely provisioned to preview a lead, which is what
   // the CRM's "App" tag keys on — see crm.ts.
@@ -155,6 +160,13 @@ export const orders = pgTable(
     // here, so order_items stays the source of truth for the full contents.
     productName: text("product_name").notNull().default(""),
     productCodename: text("product_codename").notNull().default(""),
+    // BuyGoods' flag_upsell: this row is an upsell/downsell booked in the same
+    // checkout session as a main order (BuyGoods creates a separate order per
+    // funnel step). The customer sees it folded into the main order — see
+    // src/server/order-groups.ts. Null when the feed didn't say (pre-2026-08-21
+    // rows until backfilled; Konnektive), in which case the u*/d* codename
+    // prefix is the fallback signal.
+    upsellFlag: boolean("upsell_flag"),
     // customer + attribution (from the BuyGoods IPN) — powers the admin CRM
     customerName: text("customer_name").notNull().default(""),
     customerPhone: text("customer_phone"),

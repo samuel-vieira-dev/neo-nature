@@ -162,6 +162,8 @@ export async function ingestBuyGoodsEvent(
   // product_codename), so an absent field must never blank out what we have.
   const productName = p.product_name?.trim() || p.product?.trim() || "";
   const productCodename = p.product_codename?.trim() || "";
+  // "1" on upsell/downsell orders, "0" on the main sale; absent on some tails.
+  const upsellFlag = p.flag_upsell === undefined || p.flag_upsell === "" ? null : p.flag_upsell === "1";
 
   // BuyGoods customer identity. account_id is missing from some event shapes
   // (e.g. cancel/refund tails) but recoverable from the buy_url they embed.
@@ -190,7 +192,9 @@ export async function ingestBuyGoodsEvent(
     [p.customer_firstname, p.customer_lastname].filter(Boolean).join(" ").trim() ||
     "";
   const customerPhone = p.customer_phone?.trim() || null;
-  const customerPhoneE164 = normalizeIngestPhone(customerPhone);
+  // International customers type local formats ("07713 480000"); the shipping
+  // country is the context that makes those parseable into E.164.
+  const customerPhoneE164 = normalizeIngestPhone(customerPhone, p.shipping_country || p.customer_country || p.country);
   const affiliate = p.aff_name?.trim() || null;
   const trafficSource = p.traffic_source?.trim() || null;
   const funnel = p.funnel_codename?.trim() || null;
@@ -250,6 +254,7 @@ export async function ingestBuyGoodsEvent(
         address: address || existing.address,
         productName: productName || existing.productName,
         productCodename: productCodename || existing.productCodename,
+        upsellFlag: upsellFlag ?? existing.upsellFlag,
         buygoodsAccountId: existing.buygoodsAccountId ?? bgIdentity?.bgAccountId ?? null,
         buygoodsUserId: existing.buygoodsUserId ?? bgIdentity?.bgUserId ?? null,
         trackingSteps,
@@ -293,6 +298,7 @@ export async function ingestBuyGoodsEvent(
     address,
     productName,
     productCodename,
+    upsellFlag,
     buygoodsAccountId: bgIdentity?.bgAccountId ?? null,
     buygoodsUserId: bgIdentity?.bgUserId ?? null,
     trackingSteps,

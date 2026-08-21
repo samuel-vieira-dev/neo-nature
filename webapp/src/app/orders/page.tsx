@@ -44,7 +44,10 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-display text-base font-bold text-[var(--text)]">Order {o.number}</p>
-                      <p className="text-sm text-muted">{o.date}</p>
+                      <p className="text-sm text-muted">
+                        {o.date}
+                        {o.items.length > 1 && ` · ${o.items.length} items`}
+                      </p>
                     </div>
                     <Chip tone={chip.tone}>{chip.label}</Chip>
                   </div>

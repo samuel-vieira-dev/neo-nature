@@ -10,7 +10,8 @@ import InstallGuide from "@/components/InstallGuide";
 
 const DISMISS_KEY = "nn_install_dismissed";
 
-const EXCLUDED_PREFIXES = ["/admin", "/login"];
+// /onboarding has its own install step — no point stacking the banner on top.
+const EXCLUDED_PREFIXES = ["/admin", "/login", "/onboarding"];
 
 export default function InstallBanner() {
   const pathname = usePathname();

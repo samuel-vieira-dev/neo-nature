@@ -43,8 +43,15 @@ export type Me = {
     memberSince: string;
     prefs: { doseReminder: boolean; orderUpdates: boolean; newContent: boolean; offers: boolean };
     onboarded: boolean;
+    // First-time customer whose package hadn't arrived: did the lightweight
+    // install+notifications setup instead of the full onboarding (see
+    // OnboardingGate). Home shows package tracking until they start the plan.
+    awaitingDelivery: boolean;
     churnFlag: boolean;
   };
+  // An order of theirs is still on its way (confirmed, or shipped and not yet
+  // delivered) — drives the pre-arrival onboarding/home.
+  pendingDelivery: boolean;
   today: string;
   now: string;
   streak: number;
@@ -135,18 +142,39 @@ export function useTestNotification() {
 
 // -------- orders --------
 
+export type OrderItemDto = {
+  productName: string;
+  sku: string | null;
+  thumbnailUrl: string | null;
+  qty: number;
+  price: number;
+  /** Came from an upsell/downsell order folded into this purchase. */
+  addOn: boolean;
+  /** The BuyGoods id of the row this line came from (differs from the purchase's on add-ons). */
+  orderNumber: string;
+  /** Status of that row — an add-on can be refunded on its own. */
+  status: "confirmed" | "shipped" | "canceled" | "refunded";
+};
+
+/** One purchase: the main order with its upsell/downsell orders folded in. */
 export type OrderDto = {
   id: string;
   number: string;
+  bundledNumbers: string[];
+  memberIds: string[];
   date: string;
+  placedAt: string;
   status: "confirmed" | "shipped" | "canceled" | "refunded";
   total: number;
   currency: string;
   shippingStatus: string | null;
+  trackingId: string | null;
   trackingUrl: string | null;
   address: string;
   tracking: { label: string; detail: string; date: string; done: boolean; current?: boolean }[];
-  items: { productName: string; sku: string | null; thumbnailUrl: string | null; qty: number; price: number }[];
+  delivered: boolean;
+  awaitingArrival: boolean;
+  items: OrderItemDto[];
 };
 
 export function useOrders() {

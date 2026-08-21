@@ -147,7 +147,7 @@ async function main() {
 
   // ---- exemplos para conferir na visao do cliente ----
   // Um pedido so aparece no app se estiver ligado a uma conta: por user_id, ou
-  // pelo email/telefone do cliente (ver userOrdersCondition em
+  // pelo email/telefone do cliente (ver userOrdersCondition em src/server/orders.ts —
   // src/app/api/orders/route.ts). Sem nenhum desses, o rastreio existe no banco
   // mas ninguem consegue ver — por isso a coluna "visivel".
   const exemplos = (await rawSql`

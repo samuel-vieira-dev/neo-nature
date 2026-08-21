@@ -25,6 +25,8 @@ const ACRONYMS = new Set(["dhl", "us", "usa", "usps", "ups", "fedex"]);
  */
 export function humanizeStatus(raw: string | null | undefined): string {
   if (!raw) return "";
+  // BuyGoods renders an unset fulfillment date as "Shipped on 29 Nov, -0001".
+  if (/-0001\b/.test(raw)) return raw.replace(/\s+on\s+.*-0001.*$/i, "").trim() || "Shipped";
   if (/[a-z]/.test(raw)) return raw;
   const words = raw.replace(/_/g, " ").toLowerCase().split(/\s+/);
   return words

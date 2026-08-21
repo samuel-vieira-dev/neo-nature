@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -13,6 +13,7 @@ import { ensurePushSubscription } from "@/lib/push";
 import { useIsStandalone } from "@/lib/pwa";
 import { CTA } from "@/components/ui";
 import InstallGuide from "@/components/InstallGuide";
+import PreArrivalSetup from "@/components/PreArrivalSetup";
 import { productById } from "@/lib/data";
 import { goals, habitAnchors, type Niche } from "@/lib/protocol";
 
@@ -24,7 +25,31 @@ const stepVariants = {
 
 type ReminderDraft = { time: string; habitAnchor: string | null };
 
+/**
+ * Picks the first-run flow. A brand-new customer whose order is still on its
+ * way gets the lightweight PreArrivalSetup (install + notifications) — the
+ * goal/first-dose/reminder setup below waits until the bottle is in hand and
+ * is reached from Home with ?setup=full (or automatically when no package is
+ * pending).
+ */
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingSwitch />
+    </Suspense>
+  );
+}
+
+function OnboardingSwitch() {
+  const { data: me } = useMe();
+  const params = useSearchParams();
+  const forceFull = params.get("setup") === "full";
+  if (!me) return null; // don't flash the wrong flow while /api/me loads
+  const preArrival = !forceFull && !me.user.onboarded && !me.user.awaitingDelivery && me.pendingDelivery;
+  return preArrival ? <PreArrivalSetup /> : <FullOnboarding />;
+}
+
+function FullOnboarding() {
   const router = useRouter();
   const qc = useQueryClient();
   const { toast } = useApp();

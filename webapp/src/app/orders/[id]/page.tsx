@@ -117,9 +117,17 @@ export default function OrderDetailPage() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-base font-semibold text-[var(--text)]">{it.productName}</p>
-                  <p className="text-sm text-muted">Qty {it.qty}</p>
+                  <p className="text-sm text-muted">
+                    Qty {it.qty}
+                    {it.addOn && " · added at checkout"}
+                    {it.status !== order.status && (it.status === "refunded" || it.status === "canceled") && (
+                      <span className="ml-1.5 rounded-full border border-[var(--border)] px-2 py-0.5 text-xs font-semibold text-muted">
+                        {it.status === "refunded" ? "Refunded" : "Canceled"}
+                      </span>
+                    )}
+                  </p>
                 </div>
-                <p className="font-display font-bold text-[var(--text)]">${it.price}</p>
+                <p className={`font-display font-bold ${it.status === "canceled" || it.status === "refunded" ? "text-muted line-through" : "text-[var(--text)]"}`}>${it.price}</p>
               </div>
             ))}
           </div>
@@ -127,6 +135,12 @@ export default function OrderDetailPage() {
             <span className="text-base text-muted">Total</span>
             <span className="font-display text-lg font-bold text-[var(--text)]">${order.total}</span>
           </div>
+          {order.bundledNumbers.length > 0 && (
+            <p className="mt-3 text-xs text-muted">
+              Items added at checkout ship together with this order. If support asks, they&apos;re filed under{" "}
+              {order.bundledNumbers.join(", ")}.
+            </p>
+          )}
         </div>
       </FadeUp>
 

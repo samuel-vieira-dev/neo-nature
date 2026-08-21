@@ -1,37 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Phone, KeyRound, ArrowRight } from "lucide-react";
+import { Phone, KeyRound, ArrowRight, ChevronDown } from "lucide-react";
 import { CTA, FadeUp } from "@/components/ui";
-import { normalizePhone } from "@/lib/phone-format";
+import { countryOptions, flagEmoji, normalizePhone, type CountryCode, type CountryOption } from "@/lib/phone-format";
 
-const COUNTRIES = [
-  { code: "US", flag: "🇺🇸", dial: "+1", label: "United States" },
-  { code: "BR", flag: "🇧🇷", dial: "+55", label: "Brazil" },
-  { code: "CA", flag: "🇨🇦", dial: "+1", label: "Canada" },
-  { code: "GB", flag: "🇬🇧", dial: "+44", label: "United Kingdom" },
-  { code: "AU", flag: "🇦🇺", dial: "+61", label: "Australia" },
-  { code: "MX", flag: "🇲🇽", dial: "+52", label: "Mexico" },
-  { code: "PT", flag: "🇵🇹", dial: "+351", label: "Portugal" },
-  { code: "ES", flag: "🇪🇸", dial: "+34", label: "Spain" },
-  { code: "DE", flag: "🇩🇪", dial: "+49", label: "Germany" },
-  { code: "FR", flag: "🇫🇷", dial: "+33", label: "France" },
-  { code: "IT", flag: "🇮🇹", dial: "+39", label: "Italy" },
-  { code: "IN", flag: "🇮🇳", dial: "+91", label: "India" },
-  { code: "AR", flag: "🇦🇷", dial: "+54", label: "Argentina" },
-  { code: "CL", flag: "🇨🇱", dial: "+56", label: "Chile" },
-  { code: "CO", flag: "🇨🇴", dial: "+57", label: "Colombia" },
-];
+// The brand's main markets, pinned above the alphabetical world list. Named
+// statically so the server render (Node ICU) and the first client render
+// agree — the full Intl-named list only comes in after hydration.
+const PINNED: CountryOption[] = (
+  [
+    ["US", "+1", "United States"],
+    ["CA", "+1", "Canada"],
+    ["GB", "+44", "United Kingdom"],
+    ["AU", "+61", "Australia"],
+  ] as const
+).map(([iso, dial, name]) => ({ iso, dial, name, flag: flagEmoji(iso) }));
+
+const subscribeNoop = () => () => {};
+/** false during SSR/hydration, true once mounted — hydration-safe "is client" flag. */
+const useMounted = () => useSyncExternalStore(subscribeNoop, () => true, () => false);
+
+const CODE_LENGTH = 4;
 
 const DEMO_EMAIL = "demo@neonature.com";
 
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<"phone" | "code">("phone");
-  const [countryCode, setCountryCode] = useState("US");
+  const [countryCode, setCountryCode] = useState<CountryCode>("US");
   const [localNumber, setLocalNumber] = useState("");
   const [phoneE164, setPhoneE164] = useState("");
   const [code, setCode] = useState("");
@@ -39,7 +39,13 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const country = COUNTRIES.find((c) => c.code === countryCode) ?? COUNTRIES[0];
+  // Every country in the world (libphonenumber metadata + Intl names). Built
+  // after mount: country names/sort order come from the browser's ICU, which
+  // need not match the server's, so SSR only knows the pinned four.
+  const mounted = useMounted();
+  const countries = useMemo(() => (mounted ? countryOptions() : PINNED), [mounted]);
+  const pinned = PINNED;
+  const country = countries.find((c) => c.iso === countryCode) ?? pinned[0];
 
   const requestCode = async () => {
     setError(null);
@@ -59,8 +65,8 @@ export default function LoginPage() {
       return;
     }
 
-    const phone = normalizePhone(country.dial, localNumber);
-    if (!phone) return setError("Enter a valid phone number");
+    const phone = normalizePhone(country.iso, localNumber);
+    if (!phone) return setError(`That doesn't look like a valid ${country.name} number — check it and try again`);
 
     setBusy(true);
     const res = await fetch("/api/auth/request-code", {
@@ -68,15 +74,27 @@ export default function LoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone }),
     });
+    const data = (await res.json().catch(() => ({}))) as { phone?: string; devCode?: string; error?: string; twilioCode?: number | null };
     setBusy(false);
-    if (!res.ok) return setError("Something went wrong — try again");
-    const data = await res.json();
-    setPhoneE164(phone);
+    if (!res.ok) {
+      if (data.error === "invalid_phone") return setError("That doesn't look like a valid phone number — check it and try again");
+      if (data.error === "sms_failed") {
+        return setError(
+          data.twilioCode === 21211 || data.twilioCode === 21614
+            ? "We couldn't text that number — double-check it (mobile numbers only)"
+            : "We couldn't text that number right now — try again in a minute or contact support"
+        );
+      }
+      return setError("Something went wrong — try again");
+    }
+    setPhoneE164(data.phone ?? phone);
     setDevCode(data.devCode ?? null);
+    setCode("");
     setStep("code");
   };
 
   const verify = async () => {
+    if (code.length < CODE_LENGTH) return setError(`Enter the ${CODE_LENGTH}-digit code`);
     setBusy(true);
     setError(null);
     const res = await fetch("/api/auth/verify", {
@@ -108,30 +126,56 @@ export default function LoginPage() {
                   <Phone className="h-4 w-4" /> Sign in with your phone — we&apos;ll text you a code
                 </label>
                 <div className="flex gap-2">
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    aria-label="Country code"
-                    className="card min-h-[52px] shrink-0 rounded-2xl px-2 text-base"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.dial}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Country picker: a compact "flag + dial" control with the
+                      native <select> laid invisibly on top, so tapping opens the
+                      phone's own picker listing every country by name. */}
+                  <div className="relative shrink-0">
+                    <div
+                      aria-hidden
+                      className="card flex min-h-[52px] items-center gap-1 rounded-2xl pl-3 pr-2 text-base font-semibold text-[var(--text)]"
+                    >
+                      <span className="text-xl leading-none">{country.flag}</span>
+                      <span>{country.dial}</span>
+                      <ChevronDown className="h-4 w-4 text-muted" />
+                    </div>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value as CountryCode)}
+                      aria-label="Country"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    >
+                      <optgroup label="Popular">
+                        {pinned.map((c) => (
+                          <option key={`p-${c.iso}`} value={c.iso}>
+                            {c.flag} {c.name} ({c.dial})
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="All countries">
+                        {countries.map((c) => (
+                          <option key={c.iso} value={c.iso}>
+                            {c.flag} {c.name} ({c.dial})
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
                   <input
                     type="tel"
                     inputMode="tel"
+                    autoComplete="tel-national"
                     value={localNumber}
-                    onChange={(e) => setLocalNumber(e.target.value.replace(/[^\d\s-]/g, ""))}
+                    onChange={(e) => setLocalNumber(e.target.value.replace(/[^\d\s\-+()]/g, ""))}
                     onKeyDown={(e) => e.key === "Enter" && requestCode()}
-                    placeholder="(555) 123-4567"
+                    placeholder={country.iso === "US" || country.iso === "CA" ? "(555) 123-4567" : "Phone number"}
                     className="card min-h-[52px] w-full flex-1 rounded-2xl px-4 text-base placeholder:text-muted"
                   />
                 </div>
+                <p className="mt-2 text-xs text-muted">
+                  {country.name} · type it the way you&apos;d dial it locally
+                </p>
                 <div className="mt-3">
-                  <CTA onClick={requestCode}>
+                  <CTA onClick={requestCode} disabled={busy}>
                     {busy ? "Sending…" : "Send login code"} <ArrowRight className="h-4 w-4" />
                   </CTA>
                 </div>
@@ -139,7 +183,7 @@ export default function LoginPage() {
             ) : (
               <motion.div key="code" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
                 <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-muted">
-                  <KeyRound className="h-4 w-4" /> Enter the 6-digit code we texted to {phoneE164}
+                  <KeyRound className="h-4 w-4" /> Enter the {CODE_LENGTH}-digit code we texted to {phoneE164}
                 </label>
                 {devCode && (
                   <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-800">
@@ -148,16 +192,17 @@ export default function LoginPage() {
                 )}
                 <input
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))}
                   onKeyDown={(e) => e.key === "Enter" && verify()}
-                  placeholder="••••••"
-                  className="card w-full min-h-[52px] rounded-2xl px-4 text-center font-mono text-2xl tracking-[0.4em] placeholder:text-muted"
+                  placeholder={"•".repeat(CODE_LENGTH)}
+                  className="card w-full min-h-[52px] rounded-2xl px-4 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-muted"
                 />
                 <div className="mt-3">
-                  <CTA onClick={verify}>{busy ? "Verifying…" : "Sign in"}</CTA>
+                  <CTA onClick={verify} disabled={busy}>{busy ? "Verifying…" : "Sign in"}</CTA>
                 </div>
-                <button onClick={() => setStep("phone")} className="mt-3 w-full text-center text-sm text-muted">
+                <button onClick={() => { setStep("phone"); setError(null); }} className="mt-3 w-full text-center text-sm text-muted">
                   Use a different phone number
                 </button>
               </motion.div>
