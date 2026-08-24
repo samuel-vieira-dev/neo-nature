@@ -16,6 +16,15 @@ const FAMILIES: { url: string; codename: RegExp; name: RegExp }[] = [
   { url: "/products/heroup.png", codename: /her(o|\d)/i, name: /hero\s*up/i },
   { url: "/products/burn-boost.png", codename: /burn/i, name: /burn\s*boost/i },
   { url: "/products/blood-balance.png", codename: /blood/i, name: /blood\s*balance/i },
+  { url: "/products/slimforce.png", codename: /sli/i, name: /slim\s*force/i },
+  { url: "/products/nervecalm.png", codename: /ncal|nerve/i, name: /nerve\s*calm/i },
+  { url: "/products/gut-renew.png", codename: /gut/i, name: /gut\s*renew/i },
+  { url: "/products/synovitta.png", codename: /synov/i, name: /synovitta/i },
+  // "Testo" before "Prostate": both bottles are EliteXtreme-branded, so the
+  // generic elite/pro match must only see what testo didn't claim.
+  { url: "/products/testo-booster.png", codename: /testo/i, name: /testo(sterone)?\s*booster/i },
+  { url: "/products/prostate.png", codename: /pro\d|prostat|elite/i, name: /prostate/i },
+  { url: "/products/vigor-fuel.png", codename: /vigor/i, name: /vigor\s*fuel/i },
 ];
 
 /** Path of the single-unit packshot for this product, or null when we have none. */
