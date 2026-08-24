@@ -44,10 +44,7 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-display text-base font-bold text-[var(--text)]">Order {o.number}</p>
-                      <p className="text-sm text-muted">
-                        {o.date}
-                        {o.items.length > 1 && ` · ${o.items.length} items`}
-                      </p>
+                      <p className="text-sm text-muted">{o.date}</p>
                     </div>
                     <Chip tone={chip.tone}>{chip.label}</Chip>
                   </div>
@@ -83,7 +80,11 @@ export default function OrdersPage() {
                       {o.shippingStatus && <p className="truncate text-xs text-muted">{humanizeStatus(o.shippingStatus)}</p>}
                     </div>
                     <div className="text-right">
-                      <p className="font-display text-lg font-bold text-[var(--text)]">${o.total}</p>
+                      {/* No money on the list — the item count; amounts live in
+                          the order's expandable Items section. */}
+                      <p className="font-display text-base font-bold text-[var(--text)]">
+                        {o.items.length} item{o.items.length === 1 ? "" : "s"}
+                      </p>
                       <p className="flex items-center justify-end gap-1 text-sm font-semibold text-[var(--accent)]">
                         Details <ChevronRight className="h-3.5 w-3.5" />
                       </p>
