@@ -53,7 +53,16 @@ export default function OrdersPage() {
                   </div>
 
                   <div className="mt-4 flex items-center gap-3">
-                    {o.items[0]?.thumbnailUrl ? (
+                    {o.items[0]?.imageUrl ? (
+                      <Image
+                        src={o.items[0].imageUrl}
+                        alt={o.items[0].productName}
+                        width={48}
+                        height={48}
+                        unoptimized
+                        className="h-12 w-12 shrink-0 object-contain"
+                      />
+                    ) : o.items[0]?.thumbnailUrl ? (
                       <Image
                         src={o.items[0].thumbnailUrl}
                         alt={o.items[0].productName}

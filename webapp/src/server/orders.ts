@@ -2,6 +2,7 @@ import { desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, type Order, type User } from "@/db/schema";
 import { buildTrackingUrl } from "@/lib/tracking";
+import { productImageFor } from "@/lib/product-images";
 import { groupOrders, groupStatus, groupTotal, groupTrackingId, isAddOn, isAddOnCodename, type OrderGroup } from "@/server/order-groups";
 
 type Item = typeof orderItems.$inferSelect;
@@ -91,6 +92,9 @@ export function serializeOrderGroup(group: OrderGroup<Order>, items: Item[], now
             productName: i.productName,
             sku: i.sku,
             thumbnailUrl: i.thumbnailUrl,
+            // Single-bottle packshot for the compact order line (null → the
+            // caller falls back to the feed's offer thumbnail).
+            imageUrl: productImageFor(i.productCodename || m.productCodename, i.productName),
             qty: i.qty,
             price: Number(i.price),
             // Konnektive has no flag; its upsell lines are named "… - Upsell 1" / "… - Downsell".
@@ -99,7 +103,7 @@ export function serializeOrderGroup(group: OrderGroup<Order>, items: Item[], now
         : // Some feeds (Konnektive direct) carry no line items — fall back to
           // the headline product so the purchase still shows what was bought.
           m.productName
-          ? [{ productName: m.productName, sku: null, thumbnailUrl: null, qty: 1, price: Number(m.total), addOn: isAddOn(m) }]
+          ? [{ productName: m.productName, sku: null, thumbnailUrl: null, imageUrl: productImageFor(m.productCodename, m.productName), qty: 1, price: Number(m.total), addOn: isAddOn(m) }]
           : [];
       return rows.map((r) => ({
         ...r,

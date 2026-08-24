@@ -146,6 +146,8 @@ export type OrderItemDto = {
   productName: string;
   sku: string | null;
   thumbnailUrl: string | null;
+  /** Single-bottle packshot from public/products (null when we have no mockup yet). */
+  imageUrl: string | null;
   qty: number;
   price: number;
   /** Came from an upsell/downsell order folded into this purchase. */

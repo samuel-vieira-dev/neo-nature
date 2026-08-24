@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { LifeBuoy, MapPin, Package, Truck, Check, XCircle, ExternalLink } from "lucide-react";
+import { ChevronRight, LifeBuoy, MapPin, Package, Truck, Check, XCircle, ExternalLink } from "lucide-react";
 import { useOrder } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip } from "@/components/ui";
 import { humanizeStatus } from "@/lib/tracking";
@@ -19,6 +20,9 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useOrder(id);
   const order = data?.order;
+  // Items start folded to one line (photo · name · count ·  chevron) — prices
+  // and the per-line breakdown only show once the customer asks for them.
+  const [itemsOpen, setItemsOpen] = useState(false);
 
   if (isLoading) return <PageHeader title="Loading…" backHref="/orders" />;
   if (!order) return <PageHeader title="Order not found" backHref="/orders" />;
@@ -101,10 +105,50 @@ export default function OrderDetailPage() {
         </div>
       </FadeUp>
 
-      {/* items */}
+      {/* items — one compact line; tap to open the full breakdown */}
       <FadeUp delay={0.1} className="mt-4 px-5">
         <div className="card rounded-3xl p-5">
-          <h3 className="mb-3 font-display text-base font-bold text-[var(--text)]">Items</h3>
+          <button
+            onClick={() => setItemsOpen((v) => !v)}
+            aria-expanded={itemsOpen}
+            className="flex w-full items-center gap-3 text-left"
+          >
+            {order.items[0]?.imageUrl ? (
+              <Image
+                src={order.items[0].imageUrl}
+                alt={order.items[0].productName}
+                width={56}
+                height={56}
+                unoptimized
+                className="h-14 w-14 shrink-0 object-contain"
+              />
+            ) : order.items[0]?.thumbnailUrl ? (
+              <Image
+                src={order.items[0].thumbnailUrl}
+                alt={order.items[0].productName}
+                width={56}
+                height={56}
+                unoptimized
+                className="h-14 w-14 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)]">
+                <Package className="h-7 w-7 text-muted" />
+              </div>
+            )}
+            <p className="min-w-0 flex-1 truncate text-base font-semibold text-[var(--text)]">
+              {order.items[0]?.productName ?? "Items"}
+            </p>
+            <span className="shrink-0 text-sm font-semibold text-muted">
+              {order.items.length} item{order.items.length === 1 ? "" : "s"}
+            </span>
+            <ChevronRight
+              className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${itemsOpen ? "rotate-90" : ""}`}
+            />
+          </button>
+
+          {itemsOpen && (
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
           <div className="space-y-3">
             {order.items.map((it, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -140,6 +184,8 @@ export default function OrderDetailPage() {
               Items added at checkout ship together with this order. If support asks, they&apos;re filed under{" "}
               {order.bundledNumbers.join(", ")}.
             </p>
+          )}
+            </div>
           )}
         </div>
       </FadeUp>
