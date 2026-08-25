@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown, LogIn } from "lucide-react";
+import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown, LogIn, Store } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
 
 type CustomerOrder = {
@@ -20,6 +20,8 @@ type CustomerOrder = {
   refundAmount: number | null;
   chargebackAmount: number | null;
   saleOrigin: string;
+  platform: string;
+  platformKey: string;
   paymentMethod: string | null;
   address: string;
   items: { productName: string; sku: string | null; qty: number; price: number }[];
@@ -33,6 +35,8 @@ type CustomerRow = {
   firstOrderAt: string | null;
   lastOrderAt: string | null;
   saleOrigin: string;
+  platforms: string[];
+  platformKeys: string[];
   products: string[];
   hasApp: boolean;
   onboarded: boolean;
@@ -52,10 +56,11 @@ type Stats = {
   totalOrders: number;
   totalRevenue: number;
   revenueByOrigin: { origin: string; revenue: number }[];
+  revenueByPlatform: { platform: string; revenue: number }[];
 };
 type Resp = {
   stats: Stats;
-  facets: { origins: string[]; products: string[] };
+  facets: { origins: string[]; products: string[]; platforms: { key: string; label: string }[] };
   filteredCount: number;
   customers: CustomerRow[];
 };
@@ -87,6 +92,7 @@ function StatCard({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: {
 export default function AdminCustomersPage() {
   const [q, setQ] = useState("");
   const [origin, setOrigin] = useState("");
+  const [platform, setPlatform] = useState("");
   const [product, setProduct] = useState("");
   const [status, setStatus] = useState("");
   const [reachable, setReachable] = useState(false);
@@ -104,6 +110,7 @@ export default function AdminCustomersPage() {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (origin) params.set("origin", origin);
+  if (platform) params.set("platform", platform);
   if (product) params.set("product", product);
   if (status) params.set("status", status);
   if (reachable) params.set("reachable", "1");
@@ -136,7 +143,9 @@ export default function AdminCustomersPage() {
   return (
     <div>
       <h1 className="font-display text-2xl font-bold text-[var(--text)]">Customers</h1>
-      <p className="mt-1 text-sm text-muted">Lifecycle across BuyGoods orders and app accounts.</p>
+      <p className="mt-1 text-sm text-muted">
+        Lifecycle across every sales platform (BuyGoods merchant accounts, Konnektive) and app accounts.
+      </p>
 
       {/* stats */}
       {stats && (
@@ -150,10 +159,27 @@ export default function AdminCustomersPage() {
         </div>
       )}
 
-      {/* revenue by origin */}
+      {/* revenue by platform / merchant account */}
+      {stats && stats.revenueByPlatform.length > 0 && (
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+            <Store className="h-3.5 w-3.5" /> Revenue by platform &amp; merchant account
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {stats.revenueByPlatform.map((r) => (
+              <span key={r.platform} className="rounded-full bg-[var(--surface)] px-3 py-1 text-sm">
+                <span className="font-semibold text-[var(--text)]">{r.platform}</span>{" "}
+                <span className="text-[var(--accent)]">{money(r.revenue)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* revenue by attribution (who sent the traffic) */}
       {stats && stats.revenueByOrigin.length > 0 && (
         <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
-          <p className="text-xs font-semibold text-muted">Revenue by sale origin</p>
+          <p className="text-xs font-semibold text-muted">Revenue by traffic attribution</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {stats.revenueByOrigin.slice(0, 8).map((r) => (
               <span key={r.origin} className="rounded-full bg-[var(--surface)] px-3 py-1 text-sm">
@@ -176,8 +202,12 @@ export default function AdminCustomersPage() {
             className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
           />
         </div>
+        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <option value="">All platforms</option>
+          {data?.facets.platforms.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+        </select>
         <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
-          <option value="">All origins</option>
+          <option value="">All attributions</option>
           {data?.facets.origins.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
         <select value={product} onChange={(e) => setProduct(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
@@ -203,7 +233,8 @@ export default function AdminCustomersPage() {
             <tr>
               <th className="w-8 px-2 py-3"></th>
               <th className="px-4 py-3 font-semibold">Customer</th>
-              <th className="px-4 py-3 font-semibold">Origin</th>
+              <th className="px-4 py-3 font-semibold">Bought via</th>
+              <th className="px-4 py-3 font-semibold">Attribution</th>
               <th className="px-4 py-3 font-semibold">Orders</th>
               <th className="px-4 py-3 font-semibold">LTV</th>
               <th className="px-4 py-3 font-semibold">First</th>
@@ -243,6 +274,19 @@ export default function AdminCustomersPage() {
                         </button>
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      {r.platforms.length === 0 ? (
+                        <span className="text-muted">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {r.platforms.map((p) => (
+                            <span key={p} className="rounded bg-[var(--surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text)]">
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>
                     <td className="px-4 py-3 text-[var(--text)]">{r.ordersCount}</td>
                     <td className="px-4 py-3 font-semibold text-[var(--text)]">{money(r.totalSpent)}</td>
@@ -260,7 +304,7 @@ export default function AdminCustomersPage() {
                   </tr>
                   {isOpen && (
                     <tr>
-                      <td colSpan={8} className="bg-[var(--surface)] px-4 py-3">
+                      <td colSpan={9} className="bg-[var(--surface)] px-4 py-3">
                         {r.orders.length === 0 ? (
                           <p className="py-2 text-sm text-muted">No orders yet.</p>
                         ) : (
@@ -278,7 +322,8 @@ export default function AdminCustomersPage() {
                                 </div>
                                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-4">
                                   <span>Placed: {shortDate(o.placedAt)}</span>
-                                  <span>Origin: {o.saleOrigin}</span>
+                                  <span>Bought via: {o.platform}</span>
+                                  <span>Attribution: {o.saleOrigin}</span>
                                   <span>Payment: {o.paymentMethod || "—"}</span>
                                   <span>
                                     Fulfillment: {o.shippingStatus || "—"}
@@ -337,7 +382,7 @@ export default function AdminCustomersPage() {
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted">No customers match these filters.</td>
+                <td colSpan={9} className="px-4 py-10 text-center text-muted">No customers match these filters.</td>
               </tr>
             )}
           </tbody>

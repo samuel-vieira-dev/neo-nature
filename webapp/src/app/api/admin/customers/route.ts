@@ -8,6 +8,7 @@ export const GET = withAdmin(async (_admin, req: Request) => {
   const status = url.searchParams.get("status");
   const filters: CustomerFilters = {
     origin: url.searchParams.get("origin") || undefined,
+    platform: url.searchParams.get("platform") || undefined,
     product: url.searchParams.get("product") || undefined,
     status: status === "active" || status === "churned" ? status : undefined,
     reachable: url.searchParams.get("reachable") === "1",

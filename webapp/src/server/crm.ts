@@ -1,5 +1,6 @@
 import { db, rawSql } from "@/db";
 import { buildTrackingUrl } from "@/lib/tracking";
+import { purchaseOriginOf } from "@/server/sales-platform";
 
 // ---------------------------------------------------------------------------
 // CRM aggregation. A "customer" is keyed by email and unifies BuyGoods orders
@@ -22,6 +23,10 @@ export type CustomerOrder = {
   refundAmount: number | null;
   chargebackAmount: number | null;
   saleOrigin: string;
+  /** Where the money was processed: "BuyGoods · Zensulin", "Konnektive", … */
+  platform: string;
+  /** Filter key for the same thing ("buygoods:11227"). */
+  platformKey: string;
   paymentMethod: string | null;
   address: string;
   items: { productName: string; sku: string | null; qty: number; price: number }[];
@@ -36,6 +41,10 @@ export type CustomerRow = {
   firstOrderAt: string | null;
   lastOrderAt: string | null;
   saleOrigin: string;
+  /** Every platform/merchant account this customer has bought through — a
+      cross-sell customer legitimately appears under more than one. */
+  platforms: string[];
+  platformKeys: string[];
   products: string[];
   hasApp: boolean;
   onboarded: boolean;
@@ -49,6 +58,7 @@ export type CustomerRow = {
 
 export type CustomerFilters = {
   origin?: string;
+  platform?: string;
   product?: string;
   status?: "active" | "churned" | "all";
   reachable?: boolean;
@@ -84,7 +94,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     if (!row) {
       row = {
         email: key, name: "", phone: null, ordersCount: 0, totalSpent: 0,
-        firstOrderAt: null, lastOrderAt: null, saleOrigin: "Direct", products: [],
+        firstOrderAt: null, lastOrderAt: null, saleOrigin: "Direct", platforms: [], platformKeys: [], products: [],
         hasApp: false, onboarded: false, lastDoseDay: null, totalDoses: 0,
         churnFlag: false, reachable: false, userId: null, orders: [],
       };
@@ -96,6 +106,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
   // fold in orders (sorted so lastOrder wins for saleOrigin/name)
   const sorted = [...allOrders].sort((a, b) => a.placedAt.getTime() - b.placedAt.getTime());
   const productSet = new Map<string, Set<string>>();
+  const platformSet = new Map<string, Map<string, string>>(); // email -> key -> label
   for (const o of sorted) {
     if (!o.email) continue;
     const row = get(o.email);
@@ -107,6 +118,10 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
     if (o.customerName) row.name = o.customerName;
     if (o.customerPhone) row.phone = o.customerPhone;
     row.saleOrigin = o.saleOrigin || row.saleOrigin;
+    const origin = purchaseOriginOf(o);
+    const platforms = platformSet.get(row.email) ?? new Map<string, string>();
+    platforms.set(origin.key, origin.label);
+    platformSet.set(row.email, platforms);
     const items = itemsByOrder.get(o.id) ?? [];
     const set = productSet.get(row.email) ?? new Set<string>();
     for (const it of items) if (it.productName) set.add(it.productName);
@@ -126,6 +141,8 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
       refundAmount: o.refundAmount != null ? Number(o.refundAmount) : null,
       chargebackAmount: o.chargebackAmount != null ? Number(o.chargebackAmount) : null,
       saleOrigin: o.saleOrigin,
+      platform: origin.label,
+      platformKey: origin.key,
       paymentMethod: o.paymentMethod,
       address: o.address,
       items,
@@ -134,6 +151,13 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
   for (const [email, set] of productSet) {
     const row = map.get(email);
     if (row) row.products = [...set];
+  }
+  for (const [email, plats] of platformSet) {
+    const row = map.get(email);
+    if (row) {
+      row.platforms = [...plats.values()].sort();
+      row.platformKeys = [...plats.keys()];
+    }
   }
   for (const row of map.values()) {
     row.orders.sort((a, b) => b.placedAt.localeCompare(a.placedAt));
@@ -175,6 +199,7 @@ export async function loadCustomers(): Promise<CustomerRow[]> {
 export function applyFilters(rows: CustomerRow[], f: CustomerFilters): CustomerRow[] {
   return rows.filter((r) => {
     if (f.origin && r.saleOrigin !== f.origin) return false;
+    if (f.platform && !r.platformKeys.includes(f.platform)) return false;
     if (f.product && !r.products.includes(f.product)) return false;
     if (f.reachable && !r.reachable) return false;
     if (f.hasApp && !r.hasApp) return false;
@@ -196,6 +221,10 @@ export function applyFilters(rows: CustomerRow[], f: CustomerFilters): CustomerR
 export function computeStats(rows: CustomerRow[]) {
   const cutoff = Date.now() - 30 * 86400000;
   const byOrigin = new Map<string, number>();
+  // Revenue per platform comes off the ORDERS, not the customer: one customer
+  // can buy through two merchant accounts and their LTV must not be counted
+  // twice (or pinned to whichever account happened to be last).
+  const byPlatform = new Map<string, number>();
   let totalRevenue = 0;
   let newCustomers = 0;
   let churned = 0;
@@ -211,6 +240,10 @@ export function computeStats(rows: CustomerRow[]) {
     if (r.churnFlag) churned++;
     if (r.firstOrderAt && new Date(r.firstOrderAt).getTime() >= cutoff) newCustomers++;
     byOrigin.set(r.saleOrigin, (byOrigin.get(r.saleOrigin) ?? 0) + r.totalSpent);
+    for (const o of r.orders) {
+      if (!REVENUE_STATUSES.has(o.status)) continue;
+      byPlatform.set(o.platform, (byPlatform.get(o.platform) ?? 0) + o.total);
+    }
   }
 
   return {
@@ -224,6 +257,9 @@ export function computeStats(rows: CustomerRow[]) {
     revenueByOrigin: [...byOrigin.entries()]
       .map(([origin, revenue]) => ({ origin, revenue: Math.round(revenue * 100) / 100 }))
       .sort((a, b) => b.revenue - a.revenue),
+    revenueByPlatform: [...byPlatform.entries()]
+      .map(([platform, revenue]) => ({ platform, revenue: Math.round(revenue * 100) / 100 }))
+      .sort((a, b) => b.revenue - a.revenue),
   };
 }
 
@@ -231,9 +267,17 @@ export function computeStats(rows: CustomerRow[]) {
 export function facets(rows: CustomerRow[]) {
   const origins = new Set<string>();
   const products = new Set<string>();
+  const platforms = new Map<string, string>(); // key -> label
   for (const r of rows) {
     origins.add(r.saleOrigin);
     r.products.forEach((p) => products.add(p));
+    r.orders.forEach((o) => platforms.set(o.platformKey, o.platform));
   }
-  return { origins: [...origins].sort(), products: [...products].sort() };
+  return {
+    origins: [...origins].sort(),
+    products: [...products].sort(),
+    platforms: [...platforms.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  };
 }
