@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { orders, orderItems, users } from "@/db/schema";
 import { notifyUser } from "@/server/push";
 import { hydrateUserFromOrders } from "@/server/buygoods";
+import { resolveCustomerForOrder } from "@/server/customer-identity";
+import { invalidateCustomersCache } from "@/server/crm";
 import type { NormalizedOrder, KonnektiveItem, OrderStatus } from "@/server/konnektive-parse";
 
 // Ingestion half of the Konnektive integration. The payload parsing lives in
@@ -126,6 +128,19 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
       }
     }
 
+    // Canonical customer (sticky) — never fails the webhook.
+    if (!existing.customerId) {
+      try {
+        await resolveCustomerForOrder(
+          existing.id,
+          { email: o.email || null, phoneE164: o.customerPhoneE164, bgPair: null },
+          { name: o.customerName }
+        );
+      } catch (e) {
+        console.error(`[identity] resolve failed for ${existing.id}:`, e);
+      }
+    }
+
     const ownerId = existing.userId ?? user?.id;
     if (ownerId) await hydrateUserFromOrders(ownerId);
 
@@ -140,6 +155,7 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
         url: `/orders/${existing.id}`,
       });
     }
+    invalidateCustomersCache();
     return { ok: true, status: "updated", orderId: existing.id };
   }
 
@@ -173,6 +189,17 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
     await db.insert(orderItems).values(o.items.map((it) => itemRow(id, it)));
   }
 
+  // Canonical customer for the fresh row — never fails the webhook.
+  try {
+    await resolveCustomerForOrder(
+      id,
+      { email: o.email || null, phoneE164: o.customerPhoneE164, bgPair: null },
+      { name: o.customerName }
+    );
+  } catch (e) {
+    console.error(`[identity] resolve failed for ${id}:`, e);
+  }
+
   if (user?.id) await hydrateUserFromOrders(user.id);
 
   if (o.status === "shipped" && user?.id && !o.isReplay) {
@@ -184,6 +211,7 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
     });
   }
 
+  invalidateCustomersCache();
   return { ok: true, status: "created", orderId: id };
 }
 

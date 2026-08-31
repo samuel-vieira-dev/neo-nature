@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { buildTicketPayload, createFreshdeskTicket } from "./freshdesk";
+import { buildTicketListUrl, buildTicketPayload, createFreshdeskTicket, parseTicketList } from "./freshdesk";
 
 describe("buildTicketPayload", () => {
   it("maps kind to Freshdesk priority and always opens the ticket", () => {
@@ -111,5 +111,35 @@ describe("createFreshdeskTicket", () => {
 
     expect(await createFreshdeskTicket(input)).toEqual({ ok: true, freshdeskId: 7 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("buildTicketListUrl", () => {
+  it("encodes the email and pins ordering/paging", () => {
+    expect(buildTicketListUrl("beneonature", "a+b@x.com")).toBe(
+      "https://beneonature.freshdesk.com/api/v2/tickets?email=a%2Bb%40x.com&order_by=updated_at&per_page=30"
+    );
+  });
+});
+
+describe("parseTicketList", () => {
+  it("maps enums to labels and builds agent deep links", () => {
+    const [t] = parseTicketList("beneonature", [
+      { id: 7, subject: "Where is my order", status: 2, priority: 3, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-02T00:00:00Z" },
+    ]);
+    expect(t).toEqual({
+      id: 7,
+      subject: "Where is my order",
+      status: "Open",
+      priority: "High",
+      createdAt: "2026-08-01T00:00:00Z",
+      updatedAt: "2026-08-02T00:00:00Z",
+      url: "https://beneonature.freshdesk.com/a/tickets/7",
+    });
+  });
+
+  it("tolerates junk rows and non-array payloads", () => {
+    expect(parseTicketList("d", { error: "nope" })).toEqual([]);
+    expect(parseTicketList("d", [null, "x", { subject: "no id" }])).toEqual([]);
   });
 });

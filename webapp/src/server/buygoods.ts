@@ -4,6 +4,8 @@ import { orders, orderItems, users } from "@/db/schema";
 import { notifyUser } from "@/server/push";
 import { normalizeIngestPhone } from "@/lib/phone-format";
 import { firstNameOf } from "@/lib/name";
+import { resolveCustomerForOrder, resolveCustomerForUser } from "@/server/customer-identity";
+import { invalidateCustomersCache } from "@/server/crm";
 
 // ---------------------------------------------------------------------------
 // BuyGoods IPN ingestion. BuyGoods POSTs form-urlencoded order events to
@@ -262,6 +264,24 @@ export async function ingestBuyGoodsEvent(
       })
       .where(eq(orders.id, existing.id));
 
+    // Canonical customer (sticky — only when the row doesn't have one yet).
+    // Identity resolution must never fail the webhook.
+    if (!existing.customerId) {
+      try {
+        await resolveCustomerForOrder(
+          existing.id,
+          {
+            email: email || null,
+            phoneE164: customerPhoneE164,
+            bgPair: bgIdentity ? { accountId: bgIdentity.bgAccountId, userId: bgIdentity.bgUserId } : null,
+          },
+          { name: customerName }
+        );
+      } catch (e) {
+        console.error(`[identity] resolve failed for ${existing.id}:`, e);
+      }
+    }
+
     const ownerId = existing.userId ?? user?.id;
     if (ownerId) await hydrateUserFromOrders(ownerId);
 
@@ -274,6 +294,7 @@ export async function ingestBuyGoodsEvent(
         url: `/orders/${existing.id}`,
       });
     }
+    invalidateCustomersCache();
     return { ok: true, status: "updated", orderId: existing.id };
   }
 
@@ -315,6 +336,21 @@ export async function ingestBuyGoodsEvent(
     price: num(p.product_price || p.total_clean).toFixed(2),
   });
 
+  // Canonical customer for the fresh row — never fails the webhook.
+  try {
+    await resolveCustomerForOrder(
+      id,
+      {
+        email: email || null,
+        phoneE164: customerPhoneE164,
+        bgPair: bgIdentity ? { accountId: bgIdentity.bgAccountId, userId: bgIdentity.bgUserId } : null,
+      },
+      { name: customerName }
+    );
+  } catch (e) {
+    console.error(`[identity] resolve failed for ${id}:`, e);
+  }
+
   if (user?.id) await hydrateUserFromOrders(user.id);
 
   if (status === "shipped" && user?.id && !isReplay) {
@@ -326,6 +362,7 @@ export async function ingestBuyGoodsEvent(
     });
   }
 
+  invalidateCustomersCache();
   return { ok: true, status: "created", orderId: id };
 }
 
@@ -367,6 +404,16 @@ export async function linkOrdersToUser(userId: string, ids: { email?: string | n
   }
 
   await hydrateUserFromOrders(userId);
+
+  // Canonical customer for the account (covers SMS-only signups with no
+  // orders: they become a phone-only customer). Never fails the login flow.
+  try {
+    const u = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (u) await resolveCustomerForUser(u);
+  } catch (e) {
+    console.error(`[identity] resolve failed for user ${userId}:`, e);
+  }
+  invalidateCustomersCache();
 }
 
 /**

@@ -1,6 +1,9 @@
 import { withAdmin } from "@/server/admin";
 import { loadCustomers, applyFilters, computeStats, facets, type CustomerFilters } from "@/server/crm";
 
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
 export const GET = withAdmin(async (_admin, req: Request) => {
   const url = new URL(req.url);
   const rows = await loadCustomers();
@@ -16,11 +19,16 @@ export const GET = withAdmin(async (_admin, req: Request) => {
     q: url.searchParams.get("q") || undefined,
   };
 
+  const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get("limit") || "", 10) || DEFAULT_LIMIT));
+
   const filtered = applyFilters(rows, filters);
   return Response.json({
     stats: computeStats(rows), // top-line stats are global (unfiltered)
     facets: facets(rows),
     filteredCount: filtered.length,
-    customers: filtered.slice(0, 500),
+    customers: filtered.slice(offset, offset + limit),
+    offset,
+    limit,
   });
 });

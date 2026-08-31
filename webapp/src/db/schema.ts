@@ -19,12 +19,39 @@ import {
 // here. All "money" flows are simulated (BuyGoods integration is Phase 2).
 // ---------------------------------------------------------------------------
 
+// -------- canonical customer identity (Customer 360) --------
+// One row per real-world customer, unifying BuyGoods/Konnektive orders and the
+// app account. Only IDENTITY is materialized here — aggregates (LTV, counts,
+// platforms) stay derived at read time in crm.ts, so there is a single source
+// of truth for them. `customer_id` on orders/users is sticky: set once by
+// src/server/customer-identity.ts and never reassigned automatically; fixing a
+// bad link is a manual operation via `merged_into_id` (tombstone: readers
+// follow the pointer, writers keep appending to the surviving row).
+export const customers = pgTable(
+  "customers",
+  {
+    id: text("id").primaryKey(), // uuid
+    // Lowercased. Null for phone-only clusters (SMS signup, no order email).
+    primaryEmail: text("primary_email").unique(),
+    // E.164. NOT unique — two email-keyed customers can legitimately share a
+    // phone today (family orders); email is the strong key, phone the weak one.
+    primaryPhone: text("primary_phone"),
+    name: text("name").notNull().default(""), // snapshot of the latest customerName seen
+    mergedIntoId: text("merged_into_id"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("customers_phone").on(t.primaryPhone)]
+);
+
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // slug for personas ("michael"), uuid otherwise
   // Customers now sign in with a phone (SMS OTP); email is kept for legacy
   // accounts + Freshdesk/CRM lookups but is nullable for phone-only signups.
   email: text("email").unique(),
   phone: text("phone").unique(), // E.164, e.g. "+15551234567"
+  // Canonical customer — see the customers table above. Sticky once set.
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
   name: text("name").notNull().default(""),
   fullName: text("full_name").notNull().default(""),
   niche: text("niche"), // mens_health | weight_loss | diabetes
@@ -116,6 +143,8 @@ export const orders = pgTable(
     konnektiveOrderId: text("konnektive_order_id").unique(),
     // orders can arrive before the customer signs up — matched by email at read time
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // Canonical customer — see the customers table above. Sticky once set.
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
     // BuyGoods' own customer identity, used as a third linking key beside
     // phone/email (survives a mistyped checkout email). The numeric user_id is
     // scoped PER BuyGoods account and ranges overlap between accounts, so only
@@ -187,6 +216,7 @@ export const orders = pgTable(
     index("orders_origin").on(t.saleOrigin),
     index("orders_phone").on(t.customerPhoneE164),
     index("orders_bg_user").on(t.buygoodsAccountId, t.buygoodsUserId),
+    index("orders_customer").on(t.customerId),
   ]
 );
 
@@ -317,6 +347,7 @@ export const adminActionLogs = pgTable("admin_action_logs", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+export type Customer = typeof customers.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type DoseLog = typeof doseLogs.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;

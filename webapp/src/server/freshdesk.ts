@@ -66,6 +66,90 @@ export function isFreshdeskConfigured(): boolean {
   return !!process.env.FRESHDESK_DOMAIN && !!process.env.FRESHDESK_API_KEY;
 }
 
+// ------------------------- read-side (Customer 360) -------------------------
+
+/** Live Freshdesk ticket, as shown on the admin customer page. */
+export type FreshdeskTicket = {
+  id: number;
+  subject: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Deep link into the agent UI. */
+  url: string;
+};
+
+// Freshdesk numeric enums (docs) → labels
+const STATUS_LABELS: Record<number, string> = { 2: "Open", 3: "Pending", 4: "Resolved", 5: "Closed" };
+const PRIORITY_LABELS: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High", 4: "Urgent" };
+
+/** Pure + unit-tested: list URL for one requester email. */
+export function buildTicketListUrl(domain: string, email: string): string {
+  return `https://${domain}.freshdesk.com/api/v2/tickets?email=${encodeURIComponent(email)}&order_by=updated_at&per_page=30`;
+}
+
+/** Pure + unit-tested: API rows → FreshdeskTicket[], tolerant of junk. */
+export function parseTicketList(domain: string, data: unknown): FreshdeskTicket[] {
+  if (!Array.isArray(data)) return [];
+  const out: FreshdeskTicket[] = [];
+  for (const row of data) {
+    if (typeof row !== "object" || row === null) continue;
+    const t = row as Record<string, unknown>;
+    if (typeof t.id !== "number") continue;
+    out.push({
+      id: t.id,
+      subject: typeof t.subject === "string" ? t.subject : "(no subject)",
+      status: STATUS_LABELS[t.status as number] ?? String(t.status ?? "?"),
+      priority: PRIORITY_LABELS[t.priority as number] ?? String(t.priority ?? "?"),
+      createdAt: typeof t.created_at === "string" ? t.created_at : "",
+      updatedAt: typeof t.updated_at === "string" ? t.updated_at : "",
+      url: `https://${domain}.freshdesk.com/a/tickets/${t.id}`,
+    });
+  }
+  return out;
+}
+
+export type FreshdeskListResult =
+  | { ok: true; tickets: FreshdeskTicket[] }
+  | { ok: false; reason: "not_configured" | "api_error"; detail?: string };
+
+/**
+ * Lists a customer's live tickets across every email we know for them.
+ * Read-only, never throws, bounded by a 5s timeout per request — the customer
+ * page must render even when Freshdesk is down.
+ */
+export async function listFreshdeskTickets(emails: string[]): Promise<FreshdeskListResult> {
+  if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
+  const domain = process.env.FRESHDESK_DOMAIN!;
+  const apiKey = process.env.FRESHDESK_API_KEY!;
+  const auth = Buffer.from(`${apiKey}:X`).toString("base64");
+
+  const byId = new Map<number, FreshdeskTicket>();
+  try {
+    for (const email of [...new Set(emails.filter(Boolean).map((e) => e.toLowerCase()))]) {
+      const res = await fetch(buildTicketListUrl(domain, email), {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        console.error(`[freshdesk] list failed ${res.status}: ${detail.slice(0, 200)}`);
+        return { ok: false, reason: "api_error", detail: `${res.status}` };
+      }
+      for (const t of parseTicketList(domain, await res.json())) byId.set(t.id, t);
+    }
+  } catch (e) {
+    console.error("[freshdesk] list threw:", e);
+    return { ok: false, reason: "api_error", detail: "network" };
+  }
+
+  return {
+    ok: true,
+    tickets: [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  };
+}
+
 export type FreshdeskResult =
   | { ok: true; freshdeskId: number }
   | { ok: false; reason: "not_configured" | "api_error"; detail?: string };
