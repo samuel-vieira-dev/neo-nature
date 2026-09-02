@@ -56,7 +56,58 @@ export type TicketQueueResult = {
   source: "freshdesk" | "local";
   warning: string | null;
   tickets: SupportTicket[];
+  truncated: boolean;
 };
+
+export type TicketQueueFilters = {
+  status?: string;
+  q?: string;
+  kind?: "support" | "refund" | "billing";
+  priority?: string;
+  /** Inclusive, YYYY-MM-DD, compared against updatedAt from 00:00:00.000 UTC that day. */
+  updatedFrom?: string;
+  /** Inclusive, YYYY-MM-DD, compared against updatedAt up to 23:59:59.999 UTC that day. */
+  updatedTo?: string;
+};
+
+/**
+ * Pure — filters an already-loaded ticket queue in memory. All date filters
+ * operate on `updatedAt`, compared in UTC. Extracted so the filtering logic
+ * (used by getTicketQueue) is unit-testable without the Freshdesk/db calls.
+ */
+export function filterTicketQueue(list: SupportTicket[], opts: TicketQueueFilters): SupportTicket[] {
+  let out = list;
+  if (opts.status) {
+    const s = opts.status.toLowerCase();
+    out = out.filter((t) => t.status.toLowerCase() === s);
+  }
+  if (opts.kind) {
+    out = out.filter((t) => t.kind === opts.kind);
+  }
+  if (opts.priority) {
+    const p = opts.priority.toLowerCase();
+    out = out.filter((t) => t.priority.toLowerCase() === p);
+  }
+  if (opts.updatedFrom) {
+    const from = new Date(`${opts.updatedFrom}T00:00:00.000Z`).getTime();
+    if (!Number.isNaN(from)) out = out.filter((t) => new Date(t.updatedAt).getTime() >= from);
+  }
+  if (opts.updatedTo) {
+    const to = new Date(`${opts.updatedTo}T23:59:59.999Z`).getTime();
+    if (!Number.isNaN(to)) out = out.filter((t) => new Date(t.updatedAt).getTime() <= to);
+  }
+  if (opts.q) {
+    const needle = opts.q.toLowerCase();
+    out = out.filter(
+      (t) =>
+        t.subject.toLowerCase().includes(needle) ||
+        (t.requester.email ?? "").toLowerCase().includes(needle) ||
+        (t.requester.name ?? "").toLowerCase().includes(needle) ||
+        (t.customerName ?? "").toLowerCase().includes(needle)
+    );
+  }
+  return out;
+}
 
 /** Pure — indexes the customer list for O(1) requester→customer matching. */
 export function buildCustomerIndexes(rows: CustomerRow[]): {
@@ -89,15 +140,27 @@ export function matchCustomerForRequester(
   return null;
 }
 
-// In-process cache of the raw Freshdesk recent-tickets result — 60s, matches
-// the plan. Single-instance deployment (Railway); best-effort only.
-const TICKET_CACHE_TTL_MS = 60_000;
-let ticketCache: { at: number; result: Awaited<ReturnType<typeof listRecentFreshdeskTickets>> } | null = null;
+// In-process cache of the raw Freshdesk recent-tickets result. Five minutes,
+// not seconds: a support queue does not need to be real-time, and each miss
+// costs up to ten calls against the client's live helpdesk, which rate-limits
+// (429) per minute. Single-instance deployment (Railway); best-effort only.
+const TICKET_CACHE_TTL_MS = 5 * 60_000;
+type RecentTicketsResult = Awaited<ReturnType<typeof listRecentFreshdeskTickets>>;
+let ticketCache: { at: number; result: RecentTicketsResult } | null = null;
+/** Last result that actually carried tickets — served when a refresh fails. */
+let lastGoodTickets: { at: number; result: Extract<RecentTicketsResult, { ok: true }> } | null = null;
 
-async function getRecentTicketsCached() {
+async function getRecentTicketsCached(): Promise<RecentTicketsResult> {
   if (ticketCache && Date.now() - ticketCache.at < TICKET_CACHE_TTL_MS) return ticketCache.result;
   const result = await listRecentFreshdeskTickets({ sinceDays: 90 });
   ticketCache = { at: Date.now(), result };
+  if (result.ok) {
+    lastGoodTickets = { at: Date.now(), result };
+    return result;
+  }
+  // A transient failure (rate limit, blip) should not blank the queue while a
+  // recent good copy is still in memory.
+  if (lastGoodTickets && Date.now() - lastGoodTickets.at < 30 * 60_000) return lastGoodTickets.result;
   return result;
 }
 
@@ -110,7 +173,7 @@ const LOCAL_STATUS_LABELS: Record<string, string> = { open: "Open", in_review: "
  * badge + ticket kind. Falls back to the local mirror when Freshdesk isn't
  * configured or the live call fails.
  */
-export async function getTicketQueue(opts: { status?: string; q?: string } = {}): Promise<TicketQueueResult> {
+export async function getTicketQueue(opts: TicketQueueFilters = {}): Promise<TicketQueueResult> {
   const [fd, customerRows, localTicketRows] = await Promise.all([
     getRecentTicketsCached(),
     loadCustomers(),
@@ -120,6 +183,7 @@ export async function getTicketQueue(opts: { status?: string; q?: string } = {})
   let source: "freshdesk" | "local";
   let warning: string | null = null;
   let list: SupportTicket[];
+  const truncated = fd.ok ? fd.truncated : false;
 
   if (fd.ok) {
     source = "freshdesk";
@@ -170,23 +234,10 @@ export async function getTicketQueue(opts: { status?: string; q?: string } = {})
     });
   }
 
-  if (opts.status) {
-    const s = opts.status.toLowerCase();
-    list = list.filter((t) => t.status.toLowerCase() === s);
-  }
-  if (opts.q) {
-    const needle = opts.q.toLowerCase();
-    list = list.filter(
-      (t) =>
-        t.subject.toLowerCase().includes(needle) ||
-        (t.requester.email ?? "").toLowerCase().includes(needle) ||
-        (t.requester.name ?? "").toLowerCase().includes(needle) ||
-        (t.customerName ?? "").toLowerCase().includes(needle)
-    );
-  }
+  list = filterTicketQueue(list, opts);
   list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  return { source, warning, tickets: list };
+  return { source, warning, tickets: list, truncated };
 }
 
 // ---------------------------------- orders ----------------------------------
@@ -378,11 +429,18 @@ export type SupportStats = {
   refundRequests: number;
   chargebacks7d: number;
   source: "freshdesk" | "local";
+  ticketsTruncated: boolean;
 };
 
+/**
+ * openTickets and refundRequests are derived from the SAME ticket queue the
+ * Tickets tab shows (getTicketQueue), so the stat card and the list never
+ * disagree. In the local fallback (Freshdesk unavailable) they instead count
+ * straight from the local `tickets` table mirror, same as before.
+ */
 export async function getSupportStats(): Promise<SupportStats> {
-  const [fd, refundRequestsRows, awaitingRows, chargebackRows] = await Promise.all([
-    getRecentTicketsCached(),
+  const [queue, refundRequestsLocalRows, awaitingRows, chargebackRows] = await Promise.all([
+    getTicketQueue(),
     db
       .select({ n: count() })
       .from(tickets)
@@ -398,21 +456,22 @@ export async function getSupportStats(): Promise<SupportStats> {
   ]);
 
   let openTickets: number;
-  let source: "freshdesk" | "local";
-  if (fd.ok) {
-    source = "freshdesk";
-    openTickets = fd.tickets.filter((t) => t.status === "Open" || t.status === "Pending").length;
+  let refundRequests: number;
+  if (queue.source === "freshdesk") {
+    openTickets = queue.tickets.filter((t) => t.status === "Open" || t.status === "Pending").length;
+    refundRequests = queue.tickets.filter((t) => t.kind === "refund" && t.status !== "Resolved" && t.status !== "Closed").length;
   } else {
-    source = "local";
     const localOpenRows = await db.select({ n: count() }).from(tickets).where(ne(tickets.status, "resolved"));
     openTickets = localOpenRows[0]?.n ?? 0;
+    refundRequests = refundRequestsLocalRows[0]?.n ?? 0;
   }
 
   return {
     openTickets,
     awaitingShipment: awaitingRows[0]?.n ?? 0,
-    refundRequests: refundRequestsRows[0]?.n ?? 0,
+    refundRequests,
     chargebacks7d: chargebackRows[0]?.n ?? 0,
-    source,
+    source: queue.source,
+    ticketsTruncated: queue.truncated,
   };
 }

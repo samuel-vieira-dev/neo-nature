@@ -38,6 +38,9 @@ type StatsResp = {
   refundRequests: number;
   chargebacks7d: number;
   source: "freshdesk" | "local";
+  /** The live queue was cut short (rate limit or page cap), so the ticket
+      counters are a floor, not an exact total — shown as "400+". */
+  ticketsTruncated?: boolean;
 };
 
 type TicketRow = {
@@ -54,7 +57,7 @@ type TicketRow = {
   fromApp: boolean;
   kind: string | null;
 };
-type TicketsResp = { source: "freshdesk" | "local"; warning: string | null; tickets: TicketRow[] };
+type TicketsResp = { source: "freshdesk" | "local"; warning: string | null; truncated: boolean; tickets: TicketRow[] };
 
 type OrderRow = {
   id: string;
@@ -104,15 +107,31 @@ function useDebounced(value: string, ms = 300) {
   return d;
 }
 
-function StatCard({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: number | string; tone?: string }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tone = "text-[var(--accent)]",
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string;
+  tone?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      className="cursor-pointer rounded-2xl border border-[var(--border)] bg-white p-4 text-left transition hover:border-[var(--accent)]"
+    >
       <div className="flex items-center gap-2 text-muted">
         <Icon className={`h-4 w-4 ${tone}`} />
         <span className="text-xs font-semibold">{label}</span>
       </div>
       <p className="mt-1 font-display text-2xl font-bold text-[var(--text)]">{value}</p>
-    </div>
+    </button>
   );
 }
 
@@ -138,20 +157,53 @@ function CustomerLink({ id, name, email }: { id: string | null; name: string | n
 // ---------------------------------------------------------------------------
 
 const TICKET_STATUSES = ["", "Open", "Pending", "Resolved", "Closed"];
+const TICKET_KINDS: { value: string; label: string }[] = [
+  { value: "", label: "Any kind" },
+  { value: "support", label: "Support" },
+  { value: "refund", label: "Refund" },
+  { value: "billing", label: "Billing" },
+];
+const TICKET_PRIORITIES: { value: string; label: string }[] = [
+  { value: "", label: "Any priority" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+];
 
-function TicketsPanel() {
-  const [status, setStatus] = useState("");
+type TicketsInitial = { status?: string; kind?: string; priority?: string; updatedFrom?: string; updatedTo?: string };
+
+function TicketsPanel({ initial }: { initial: TicketsInitial }) {
+  const [status, setStatus] = useState(initial.status ?? "");
+  const [kind, setKind] = useState(initial.kind ?? "");
+  const [priority, setPriority] = useState(initial.priority ?? "");
+  const [updatedFrom, setUpdatedFrom] = useState(initial.updatedFrom ?? "");
+  const [updatedTo, setUpdatedTo] = useState(initial.updatedTo ?? "");
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
 
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (kind) params.set("kind", kind);
+  if (priority) params.set("priority", priority);
+  if (updatedFrom) params.set("updatedFrom", updatedFrom);
+  if (updatedTo) params.set("updatedTo", updatedTo);
   if (dq) params.set("q", dq);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["support-tickets", params.toString()],
     queryFn: () => adminApi<TicketsResp>(`/api/admin/support/tickets?${params.toString()}`),
   });
+
+  const hasFilters = !!(status || kind || priority || updatedFrom || updatedTo || q);
+  const clearFilters = () => {
+    setStatus("");
+    setKind("");
+    setPriority("");
+    setUpdatedFrom("");
+    setUpdatedTo("");
+    setQ("");
+  };
 
   return (
     <div>
@@ -170,7 +222,50 @@ function TicketsPanel() {
             <option key={s} value={s}>{s || "All statuses"}</option>
           ))}
         </select>
+        <select value={kind} onChange={(e) => setKind(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          {TICKET_KINDS.map((k) => (
+            <option key={k.value} value={k.value}>{k.label}</option>
+          ))}
+        </select>
+        <select value={priority} onChange={(e) => setPriority(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          {TICKET_PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-muted">
+          Updated from
+          <input
+            type="date"
+            value={updatedFrom}
+            onChange={(e) => setUpdatedFrom(e.target.value)}
+            className="bg-transparent text-sm text-[var(--text)] focus:outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-muted">
+          Updated to
+          <input
+            type="date"
+            value={updatedTo}
+            onChange={(e) => setUpdatedTo(e.target.value)}
+            className="bg-transparent text-sm text-[var(--text)] focus:outline-none"
+          />
+        </label>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold text-muted hover:text-[var(--text)]"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
+
+      {data?.truncated && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          Showing the most recent tickets only — narrow the date range to see older ones.
+        </p>
+      )}
 
       {data?.warning && (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{data.warning}</p>
@@ -324,11 +419,13 @@ function EditAddressForm({ order, onDone }: { order: OrderRow; onDone: () => voi
   );
 }
 
-function OrdersPanel() {
+type OrdersInitial = { status?: string; problem?: string };
+
+function OrdersPanel({ initial }: { initial: OrdersInitial }) {
   const { role } = useAdmin();
   const canEditAddress = editableOrderFields(role).includes("address");
-  const [status, setStatus] = useState("");
-  const [problem, setProblem] = useState("");
+  const [status, setStatus] = useState(initial.status ?? "");
+  const [problem, setProblem] = useState(initial.problem ?? "");
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const [offset, setOffset] = useState(0);
@@ -615,18 +712,36 @@ function SupportPageInner() {
   const tabParam = searchParams.get("tab");
   const tab: Tab = tabParam === "orders" || tabParam === "customers" ? tabParam : "tickets";
 
+  // Switching tabs by hand starts that tab with no filters — filters only
+  // carry over when arriving via a stat card's own link (goTo below).
   const setTab = (next: Tab) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === "tickets") params.delete("tab");
-    else params.set("tab", next);
-    const qs = params.toString();
+    const qs = next === "tickets" ? "" : `tab=${next}`;
     router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
+
+  const goTo = (next: Tab, filters: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (next !== "tickets") params.set("tab", next);
+    for (const [k, v] of Object.entries(filters)) params.set(k, v);
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const { data: stats, error: statsError } = useQuery({
     queryKey: ["support-stats"],
     queryFn: () => adminApi<StatsResp>("/api/admin/support/stats"),
   });
+
+  const ticketsInitial: TicketsInitial = {
+    status: searchParams.get("status") ?? "",
+    kind: searchParams.get("kind") ?? "",
+    priority: searchParams.get("priority") ?? "",
+    updatedFrom: searchParams.get("updatedFrom") ?? "",
+    updatedTo: searchParams.get("updatedTo") ?? "",
+  };
+  const ordersInitial: OrdersInitial = {
+    status: searchParams.get("status") ?? "",
+    problem: searchParams.get("problem") ?? "",
+  };
 
   return (
     <div>
@@ -637,10 +752,33 @@ function SupportPageInner() {
         <p className="mt-4 text-sm text-rose-600">Couldn&apos;t load the counters — try again.</p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={LifeBuoy} label="Open tickets" value={stats ? stats.openTickets : "…"} />
-          <StatCard icon={PackageX} label="Awaiting shipment (5d+)" value={stats ? stats.awaitingShipment : "…"} tone="text-sky-600" />
-          <StatCard icon={RotateCcw} label="Refund requests" value={stats ? stats.refundRequests : "…"} tone="text-amber-600" />
-          <StatCard icon={ShieldAlert} label="Chargebacks (7d)" value={stats ? stats.chargebacks7d : "…"} tone="text-rose-600" />
+          <StatCard
+            icon={LifeBuoy}
+            label="Open tickets"
+            value={stats ? `${stats.openTickets}${stats.ticketsTruncated ? "+" : ""}` : "…"}
+            onClick={() => goTo("tickets", { status: "Open" })}
+          />
+          <StatCard
+            icon={PackageX}
+            label="Awaiting shipment (5d+)"
+            value={stats ? stats.awaitingShipment : "…"}
+            tone="text-sky-600"
+            onClick={() => goTo("orders", { problem: "awaiting" })}
+          />
+          <StatCard
+            icon={RotateCcw}
+            label="Refund requests"
+            value={stats ? `${stats.refundRequests}${stats.ticketsTruncated ? "+" : ""}` : "…"}
+            tone="text-amber-600"
+            onClick={() => goTo("tickets", { kind: "refund" })}
+          />
+          <StatCard
+            icon={ShieldAlert}
+            label="Chargebacks (7d)"
+            value={stats ? stats.chargebacks7d : "…"}
+            tone="text-rose-600"
+            onClick={() => goTo("orders", { problem: "chargeback" })}
+          />
         </div>
       )}
 
@@ -660,8 +798,8 @@ function SupportPageInner() {
       </div>
 
       <div className="mt-4">
-        {tab === "tickets" && <TicketsPanel />}
-        {tab === "orders" && <OrdersPanel />}
+        {tab === "tickets" && <TicketsPanel key={searchParams.toString()} initial={ticketsInitial} />}
+        {tab === "orders" && <OrdersPanel key={searchParams.toString()} initial={ordersInitial} />}
         {tab === "customers" && <CustomersPanel />}
       </div>
     </div>

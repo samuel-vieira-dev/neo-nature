@@ -186,19 +186,22 @@ export async function listFreshdeskTickets(emails: string[]): Promise<FreshdeskL
 }
 
 export type FreshdeskRecentListResult =
-  | { ok: true; tickets: FreshdeskTicketWithRequester[] }
+  | { ok: true; tickets: FreshdeskTicketWithRequester[]; truncated: boolean }
   | { ok: false; reason: "not_configured" | "api_error"; detail?: string };
 
 /**
  * Lists tickets updated in the last `sinceDays` days, across ALL requesters —
  * powers the support desk's unified ticket queue (src/server/support-desk.ts),
  * unlike listFreshdeskTickets above which is scoped to one customer's emails.
- * Paginates up to 3 pages (300 tickets) while a page comes back full (100
- * rows); bounded by a 5s timeout per request; never throws.
+ * Paginates up to `maxPages` pages (100 rows each) while a page comes back
+ * full; bounded by a 5s timeout per request; never throws. `truncated` is
+ * true when the fetch stopped only because it hit `maxPages` and the last
+ * page fetched was still full — i.e. there may be more tickets we didn't get.
  */
 export async function listRecentFreshdeskTickets({
   sinceDays = 90,
-}: { sinceDays?: number } = {}): Promise<FreshdeskRecentListResult> {
+  maxPages = 10,
+}: { sinceDays?: number; maxPages?: number } = {}): Promise<FreshdeskRecentListResult> {
   if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
   const domain = process.env.FRESHDESK_DOMAIN!;
   const apiKey = process.env.FRESHDESK_API_KEY!;
@@ -206,8 +209,9 @@ export async function listRecentFreshdeskTickets({
   const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
 
   const tickets: FreshdeskTicketWithRequester[] = [];
+  let truncated = false;
   try {
-    for (let page = 1; page <= 3; page++) {
+    for (let page = 1; page <= maxPages; page++) {
       const url = `https://${domain}.freshdesk.com/api/v2/tickets?include=requester&order_by=updated_at&per_page=100&updated_since=${encodeURIComponent(since)}&page=${page}`;
       const res = await fetch(url, {
         headers: { Authorization: `Basic ${auth}` },
@@ -215,19 +219,27 @@ export async function listRecentFreshdeskTickets({
       });
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
-        console.error(`[freshdesk] recent list failed ${res.status}: ${detail.slice(0, 200)}`);
-        return { ok: false, reason: "api_error", detail: `${res.status}` };
+        console.error(`[freshdesk] recent list failed ${res.status} on page ${page}: ${detail.slice(0, 200)}`);
+        // Rate limits (429) and hiccups mid-pagination must not throw away the
+        // pages we already have — the desk shows a partial, honestly-flagged
+        // queue instead of collapsing to the local mirror. Only a failure on
+        // the very first page is a real failure.
+        if (page === 1) return { ok: false, reason: "api_error", detail: `${res.status}` };
+        truncated = true;
+        break;
       }
       const pageTickets = parseTicketListWithRequester(domain, await res.json());
       tickets.push(...pageTickets);
       if (pageTickets.length < 100) break;
+      if (page === maxPages) truncated = true;
     }
   } catch (e) {
     console.error("[freshdesk] recent list threw:", e);
-    return { ok: false, reason: "api_error", detail: "network" };
+    if (tickets.length === 0) return { ok: false, reason: "api_error", detail: "network" };
+    truncated = true;
   }
 
-  return { ok: true, tickets };
+  return { ok: true, tickets, truncated };
 }
 
 export type FreshdeskResult =

@@ -31,7 +31,9 @@ export default function AdminNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
-        <Image src="/logo.svg" alt="Neo Nature" width={130} height={21} className="h-5 w-auto" priority />
+        <Link href="/admin" aria-label="Go to home">
+          <Image src="/logo.svg" alt="Neo Nature" width={130} height={21} className="h-5 w-auto" priority />
+        </Link>
         <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--accent)]">Admin</span>
         <nav className="ml-auto flex items-center gap-1">
           {visibleLinks.map((l) => {

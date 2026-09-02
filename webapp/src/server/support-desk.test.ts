@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildCustomerIndexes,
+  filterTicketQueue,
   isAwaitingShipment,
   matchCustomerForRequester,
   projectSupportCustomer,
+  type SupportTicket,
 } from "./support-desk";
 import type { CustomerOrder, CustomerRow } from "./crm";
 
@@ -122,6 +124,85 @@ describe("matchCustomerForRequester", () => {
 
   it("ignores short/junk phone numbers rather than false-matching", () => {
     expect(matchCustomerForRequester({ phone: "123" }, byEmail, byPhoneDigits)).toBeNull();
+  });
+});
+
+describe("filterTicketQueue", () => {
+  function makeTicket(overrides: Partial<SupportTicket> = {}): SupportTicket {
+    return {
+      id: 1,
+      subject: "Where is my order",
+      status: "Open",
+      priority: "High",
+      createdAt: "2026-08-10T12:00:00.000Z",
+      updatedAt: "2026-08-10T12:00:00.000Z",
+      url: "https://neonature.freshdesk.com/a/tickets/1",
+      requester: { name: "Jane Doe", email: "jane@x.com", phone: null },
+      customerId: "cust-1",
+      customerName: "Jane Doe",
+      fromApp: false,
+      kind: "support",
+      ...overrides,
+    };
+  }
+
+  it("returns the list unchanged when no filters are given", () => {
+    const list = [makeTicket(), makeTicket({ id: 2 })];
+    expect(filterTicketQueue(list, {})).toEqual(list);
+  });
+
+  it("returns an empty list unchanged", () => {
+    expect(filterTicketQueue([], { status: "Open", kind: "refund" })).toEqual([]);
+  });
+
+  it("filters by kind", () => {
+    const list = [makeTicket({ id: 1, kind: "refund" }), makeTicket({ id: 2, kind: "support" }), makeTicket({ id: 3, kind: null })];
+    expect(filterTicketQueue(list, { kind: "refund" }).map((t) => t.id)).toEqual([1]);
+  });
+
+  it("filters by priority, case-insensitively", () => {
+    const list = [makeTicket({ id: 1, priority: "High" }), makeTicket({ id: 2, priority: "Low" })];
+    expect(filterTicketQueue(list, { priority: "high" }).map((t) => t.id)).toEqual([1]);
+  });
+
+  it("filters by updatedFrom/updatedTo inclusively on both ends", () => {
+    const list = [
+      makeTicket({ id: 1, updatedAt: "2026-08-09T23:59:59.999Z" }), // just before window
+      makeTicket({ id: 2, updatedAt: "2026-08-10T00:00:00.000Z" }), // start of window, inclusive
+      makeTicket({ id: 3, updatedAt: "2026-08-12T15:30:00.000Z" }), // inside window
+      makeTicket({ id: 4, updatedAt: "2026-08-13T23:59:59.999Z" }), // end of window, inclusive
+      makeTicket({ id: 5, updatedAt: "2026-08-14T00:00:00.000Z" }), // just after window
+    ];
+    const result = filterTicketQueue(list, { updatedFrom: "2026-08-10", updatedTo: "2026-08-13" });
+    expect(result.map((t) => t.id)).toEqual([2, 3, 4]);
+  });
+
+  it("applies updatedFrom alone (open-ended upper bound)", () => {
+    const list = [makeTicket({ id: 1, updatedAt: "2026-08-01T00:00:00.000Z" }), makeTicket({ id: 2, updatedAt: "2026-08-20T00:00:00.000Z" })];
+    expect(filterTicketQueue(list, { updatedFrom: "2026-08-10" }).map((t) => t.id)).toEqual([2]);
+  });
+
+  it("combines status, kind, priority and date range filters together", () => {
+    const list = [
+      makeTicket({ id: 1, status: "Open", kind: "refund", priority: "High", updatedAt: "2026-08-11T00:00:00.000Z" }),
+      makeTicket({ id: 2, status: "Pending", kind: "refund", priority: "High", updatedAt: "2026-08-11T00:00:00.000Z" }), // wrong status
+      makeTicket({ id: 3, status: "Open", kind: "support", priority: "High", updatedAt: "2026-08-11T00:00:00.000Z" }), // wrong kind
+      makeTicket({ id: 4, status: "Open", kind: "refund", priority: "Low", updatedAt: "2026-08-11T00:00:00.000Z" }), // wrong priority
+      makeTicket({ id: 5, status: "Open", kind: "refund", priority: "High", updatedAt: "2026-07-01T00:00:00.000Z" }), // outside date range
+    ];
+    const result = filterTicketQueue(list, {
+      status: "Open",
+      kind: "refund",
+      priority: "High",
+      updatedFrom: "2026-08-01",
+      updatedTo: "2026-08-31",
+    });
+    expect(result.map((t) => t.id)).toEqual([1]);
+  });
+
+  it("still applies the free-text q filter alongside the new filters", () => {
+    const list = [makeTicket({ id: 1, subject: "Refund please" }), makeTicket({ id: 2, subject: "Where is my order" })];
+    expect(filterTicketQueue(list, { q: "refund" }).map((t) => t.id)).toEqual([1]);
   });
 });
 

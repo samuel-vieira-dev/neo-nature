@@ -256,6 +256,16 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
             Track package →
           </a>
         )}
+        {o.address && (
+          <span className="col-span-2 flex items-center gap-1 sm:col-span-4">
+            Address: {o.address}
+            {o.lockedFields.includes("address") && (
+              <span title="Edited in admin — the platform feed won't overwrite this">
+                <Lock className="h-3 w-3 text-amber-700" />
+              </span>
+            )}
+          </span>
+        )}
         {o.chargebackAt && (
           <span className="font-semibold text-rose-700">
             Chargeback: {o.chargebackAmount != null ? money2(o.chargebackAmount) : "amount unknown"}

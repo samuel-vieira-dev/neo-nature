@@ -210,7 +210,7 @@ describe("listRecentFreshdeskTickets", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await listRecentFreshdeskTickets({ sinceDays: 90 });
-    expect(result).toEqual({ ok: true, tickets: expect.any(Array) });
+    expect(result).toEqual({ ok: true, tickets: expect.any(Array), truncated: false });
     if (result.ok) expect(result.tickets).toHaveLength(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0][0] as string;
@@ -220,15 +220,51 @@ describe("listRecentFreshdeskTickets", () => {
     expect(url).toContain("page=1");
   });
 
-  it("paginates while a page comes back full, capped at 3 pages", async () => {
+  it("paginates while a page comes back full, capped at a custom maxPages", async () => {
+    configure();
+    const fullPage = () => Array.from({ length: 100 }, (_, i) => ({ id: i + 1, subject: "t", status: 2, priority: 1 }));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => fullPage() });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listRecentFreshdeskTickets({ maxPages: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    if (result.ok) {
+      expect(result.tickets).toHaveLength(300);
+      expect(result.truncated).toBe(true);
+    }
+  });
+
+  it("defaults to maxPages 10 when not given", async () => {
     configure();
     const fullPage = () => Array.from({ length: 100 }, (_, i) => ({ id: i + 1, subject: "t", status: 2, priority: 1 }));
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => fullPage() });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await listRecentFreshdeskTickets();
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    if (result.ok) {
+      expect(result.tickets).toHaveLength(1000);
+      expect(result.truncated).toBe(true);
+    }
+  });
+
+  it("is not truncated when the last page under maxPages comes back partial", async () => {
+    configure();
+    const fullPage = () => Array.from({ length: 100 }, (_, i) => ({ id: i + 1, subject: "t", status: 2, priority: 1 }));
+    const partialPage = () => Array.from({ length: 40 }, (_, i) => ({ id: i + 1, subject: "t", status: 2, priority: 1 }));
+    let calls = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => ({
+      ok: true,
+      json: async () => (++calls < 3 ? fullPage() : partialPage()),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listRecentFreshdeskTickets({ maxPages: 5 });
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    if (result.ok) expect(result.tickets).toHaveLength(300);
+    if (result.ok) {
+      expect(result.tickets).toHaveLength(240);
+      expect(result.truncated).toBe(false);
+    }
   });
 
   it("returns api_error on a failed request without throwing", async () => {
