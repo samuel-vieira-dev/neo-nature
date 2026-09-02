@@ -1,46 +1,115 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { adminUsers } from "@/db/schema";
 import { createAdminSession } from "@/server/session";
+import { hashPassword, verifyPassword, passwordPolicyError } from "@/server/password";
+import { makeLimiter } from "@/server/rate-limit";
+import { logAdminAction, type AdminContext } from "@/server/admin";
+import { permissionsFor, type Role } from "@/server/permissions";
 
-// Fixed admin email — the account gate is the password, not the email address.
-const ADMIN_EMAIL = "admin@neonature.com";
+// Individual staff accounts (admin_users) replace the old single shared
+// ADMIN_PASSWORD login. While admin_users is empty, ADMIN_PASSWORD still
+// serves one purpose: it's the "setup key" that proves you're allowed to
+// bootstrap the first (admin) account — see PUT below. Once that account
+// exists, ADMIN_PASSWORD is inert.
 
-const bodySchema = z.object({ password: z.string().min(1) });
+const limiter = makeLimiter({ max: 5, windowMs: 15 * 60 * 1000 });
 
-// Password-only admin login (no OTP). Finds or creates the admin@neonature.com
-// user (already onboarded) and opens the SEPARATE admin session (nn_admin
-// cookie) — independent from the customer app session.
+function limiterKey(req: Request, email: string): string {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  return `${ip}|${email}`;
+}
+
+async function isBootstrapped(): Promise<boolean> {
+  const row = await db.query.adminUsers.findFirst();
+  return !!row;
+}
+
+// GET → tells the login page whether to render "first access" (no accounts
+// yet) or the normal email+password form.
+export async function GET() {
+  return Response.json({ bootstrap: !(await isBootstrapped()) });
+}
+
+const loginSchema = z.object({ email: z.string().min(1), password: z.string().min(1) });
+
 export async function POST(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  const parsed = loginSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 
-  // The password lives ONLY in the environment — never hardcoded, so it can be
-  // rotated without a deploy and never lands in the repo.
+  const email = parsed.data.email.toLowerCase().trim();
+  const key = limiterKey(request, email);
+  const limit = limiter.hit(key);
+  if (!limit.allowed) {
+    return Response.json({ error: "too_many_attempts", retryAfterSec: limit.retryAfterSec }, { status: 429 });
+  }
+
+  const row = await db.query.adminUsers.findFirst({ where: eq(adminUsers.email, email) });
+  // Same response whether the email doesn't exist, the account is deactivated,
+  // or the password is wrong — never reveal which one it was.
+  if (!row || !row.active || !verifyPassword(parsed.data.password, row.passwordHash)) {
+    return Response.json({ error: "invalid_credentials" }, { status: 401 });
+  }
+
+  limiter.reset(key);
+  await db.update(adminUsers).set({ lastLoginAt: new Date() }).where(eq(adminUsers.id, row.id));
+  await createAdminSession(row.id);
+
+  const role = row.role as Role;
+  const admin: AdminContext = { ...row, role, permissions: permissionsFor(role) };
+  await logAdminAction(admin, "login");
+
+  return Response.json({ ok: true });
+}
+
+const bootstrapSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().min(1),
+  password: z.string().min(1),
+  setupKey: z.string().min(1),
+});
+
+// PUT → bootstrap: creates the very first admin_users row (always role "admin").
+// Dead once any account exists — see isBootstrapped().
+export async function PUT(request: Request) {
+  const parsed = bootstrapSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
+
+  if (await isBootstrapped()) {
+    return Response.json({ error: "already_bootstrapped" }, { status: 409 });
+  }
+
   const expected = process.env.ADMIN_PASSWORD;
   if (!expected) {
-    console.error("[admin-login] ADMIN_PASSWORD is not set — admin login disabled");
+    console.error("[admin-login] ADMIN_PASSWORD is not set — bootstrap disabled");
     return Response.json({ error: "not_configured" }, { status: 503 });
   }
-  if (parsed.data.password !== expected) {
-    return Response.json({ error: "wrong_password" }, { status: 401 });
+  if (parsed.data.setupKey !== expected) {
+    return Response.json({ error: "invalid_setup_key" }, { status: 401 });
   }
 
-  let user = await db.query.users.findFirst({ where: eq(users.email, ADMIN_EMAIL) });
-  if (!user) {
-    [user] = await db
-      .insert(users)
-      .values({
-        id: crypto.randomUUID(),
-        email: ADMIN_EMAIL,
-        name: "Admin",
-        fullName: "Admin",
-        onboardedAt: new Date(),
-      })
-      .returning();
-  }
+  const policyError = passwordPolicyError(parsed.data.password);
+  if (policyError) return Response.json({ error: policyError }, { status: 400 });
 
-  await createAdminSession(user.id);
+  const email = parsed.data.email.toLowerCase().trim();
+  const [row] = await db
+    .insert(adminUsers)
+    .values({
+      id: crypto.randomUUID(),
+      email,
+      name: parsed.data.name,
+      role: "admin",
+      passwordHash: hashPassword(parsed.data.password),
+      active: true,
+      createdBy: null,
+    })
+    .returning();
+
+  await createAdminSession(row.id);
+  const role = row.role as Role;
+  const admin: AdminContext = { ...row, role, permissions: permissionsFor(role) };
+  await logAdminAction(admin, "bootstrap");
+
   return Response.json({ ok: true });
 }

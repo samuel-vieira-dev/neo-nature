@@ -31,6 +31,7 @@ import { randomUUID } from "crypto";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, orders, users, type Order, type User } from "@/db/schema";
+import { stripLockedFields } from "@/server/field-locks";
 
 // -------------------------------- pure core --------------------------------
 
@@ -217,9 +218,12 @@ async function findOrCreateCustomer(keys: IdentityKeys, snapshot: { name: string
       // primaryEmail is never overwritten; a second email stays discoverable
       // through the order rows themselves (findCandidates reads those too).
       if (!row.primaryEmail && keys.email) patch.primaryEmail = keys.email;
-      if (Object.keys(patch).length > 0) {
-        patch.updatedAt = new Date();
-        await db.update(customers).set(patch).where(eq(customers.id, row.id));
+      // Fields the admin panel has locked (see field-locks.ts) are dropped
+      // here so a manual correction is never clobbered by identity resolution.
+      const safePatch = stripLockedFields(patch, row.lockedFields);
+      if (Object.keys(safePatch).length > 0) {
+        safePatch.updatedAt = new Date();
+        await db.update(customers).set(safePatch).where(eq(customers.id, row.id));
       }
     }
     return decision.customerId;

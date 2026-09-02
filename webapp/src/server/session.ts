@@ -47,7 +47,10 @@ async function userIdFromCookie(name: string): Promise<string | null> {
 }
 
 export const createSession = (userId: string) => setSessionCookie(APP_COOKIE, userId);
-export const createAdminSession = (userId: string) => setSessionCookie(ADMIN_COOKIE, userId);
+// Admin sessions are short-lived (12h, renewed on each login) — unlike the
+// 30-day customer app session. Staff are on shared machines more often, and a
+// deactivated admin_users row shouldn't stay "logged in" for a month.
+export const createAdminSession = (userId: string) => setSessionCookie(ADMIN_COOKIE, userId, { expiresIn: "12h", maxAgeSec: 60 * 60 * 12 });
 export const sessionUserId = () => userIdFromCookie(APP_COOKIE);
 export const adminSessionUserId = () => userIdFromCookie(ADMIN_COOKIE);
 

@@ -7,7 +7,7 @@ import { withAdmin } from "@/server/admin";
 export const GET = withAdmin(async () => {
   const rows = await db.query.banners.findMany({ orderBy: [desc(banners.id)] });
   return Response.json({ banners: rows });
-});
+}, "banners:write");
 
 const createSchema = z.object({
   title: z.string().min(1).max(120),
@@ -24,7 +24,7 @@ export const POST = withAdmin(async (_admin, req: Request) => {
   const [row] = await db.insert(banners).values(parsed.data).returning();
   if (row.active) await db.update(banners).set({ active: false }).where(ne(banners.id, row.id));
   return Response.json({ ok: true, banner: row });
-});
+}, "banners:write");
 
 const patchSchema = z.object({
   id: z.number(),
@@ -44,11 +44,11 @@ export const PATCH = withAdmin(async (_admin, req: Request) => {
   // only one banner active at a time
   if (fields.active === true) await db.update(banners).set({ active: false }).where(ne(banners.id, id));
   return Response.json({ ok: true });
-});
+}, "banners:write");
 
 export const DELETE = withAdmin(async (_admin, req: Request) => {
   const { id } = await req.json().catch(() => ({}));
   if (typeof id !== "number") return Response.json({ error: "invalid_request" }, { status: 400 });
   await db.delete(banners).where(eq(banners.id, id));
   return Response.json({ ok: true });
-});
+}, "banners:write");

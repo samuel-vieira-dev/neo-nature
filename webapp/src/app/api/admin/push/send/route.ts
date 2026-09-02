@@ -41,4 +41,4 @@ export const POST = withAdmin(async (_admin, req: Request) => {
   }
 
   return Response.json({ ok: true, targeted: audience.length, sent });
-});
+}, "push:send");

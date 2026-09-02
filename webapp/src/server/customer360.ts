@@ -25,6 +25,8 @@ export type Customer360 = {
   primaryEmail: string | null;
   primaryPhone: string | null;
   createdAt: string;
+  /** Customer fields locked against the webhook feed (plan §2.1) — see field-locks.ts. */
+  lockedFields: string[];
   /** Every distinct identity observed across orders + app accounts. */
   emails: string[];
   phones: string[];
@@ -149,6 +151,11 @@ export async function loadCustomer(
       paymentMethod: o.paymentMethod,
       address: o.address,
       items: itemsByOrder.get(o.id) ?? [],
+      lockedFields: o.lockedFields ?? [],
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      email: o.email,
+      shippingTrackingId: o.shippingTrackingId,
     };
   };
   const purchases = groupOrders(customerOrders)
@@ -236,6 +243,7 @@ export async function loadCustomer(
     primaryEmail: customer.primaryEmail,
     primaryPhone: customer.primaryPhone,
     createdAt: customer.createdAt.toISOString(),
+    lockedFields: customer.lockedFields ?? [],
     emails: emailList,
     phones: [...phones],
     buygoodsPairs: [...pairs.values()],

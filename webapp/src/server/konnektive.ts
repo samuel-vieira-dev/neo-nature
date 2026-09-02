@@ -5,11 +5,16 @@ import { notifyUser } from "@/server/push";
 import { hydrateUserFromOrders } from "@/server/buygoods";
 import { resolveCustomerForOrder } from "@/server/customer-identity";
 import { invalidateCustomersCache } from "@/server/crm";
+import { stripLockedFields } from "@/server/field-locks";
 import type { NormalizedOrder, KonnektiveItem, OrderStatus } from "@/server/konnektive-parse";
 
 // Ingestion half of the Konnektive integration. The payload parsing lives in
 // konnektive-parse.ts, which stays free of DB imports so it can be unit-tested
 // against real captures without a database.
+//
+// Same rule as buygoods.ts: updating an existing order runs the patch through
+// stripLockedFields() against `locked_fields`, so a field an admin has
+// manually corrected in the panel is left alone — see src/server/field-locks.ts.
 export * from "@/server/konnektive-parse";
 
 function buildTrackingSteps(
@@ -93,27 +98,35 @@ export async function ingestKonnektiveOrder(o: NormalizedOrder): Promise<IngestR
   if (existing) {
     await db
       .update(orders)
-      .set({
-        userId: existing.userId ?? user?.id ?? null,
-        email: existing.email || o.email,
-        status: o.status,
-        total: o.total,
-        currency: o.currency,
-        shippingStatus: o.shippingStatus ?? existing.shippingStatus,
-        shippingTrackingId: o.shippingTrackingId ?? existing.shippingTrackingId,
-        fulfilledAt: o.fulfilledAt ?? existing.fulfilledAt,
-        refundedAt,
-        chargebackAt,
-        refundAmount,
-        chargebackAmount,
-        address: o.address || existing.address,
-        // Headline product, from the first line. The direct feed carries no
-        // items[], so keep what we have rather than blanking it.
-        productName: o.items[0]?.name || existing.productName,
-        productCodename: o.items[0]?.productId || existing.productCodename,
-        trackingSteps,
-        ...attribution,
-      })
+      .set(
+        // Fields the admin panel has locked (see field-locks.ts) are dropped
+        // from the patch here so a manual correction is never clobbered by
+        // the webhook feed.
+        stripLockedFields(
+          {
+            userId: existing.userId ?? user?.id ?? null,
+            email: existing.email || o.email,
+            status: o.status,
+            total: o.total,
+            currency: o.currency,
+            shippingStatus: o.shippingStatus ?? existing.shippingStatus,
+            shippingTrackingId: o.shippingTrackingId ?? existing.shippingTrackingId,
+            fulfilledAt: o.fulfilledAt ?? existing.fulfilledAt,
+            refundedAt,
+            chargebackAt,
+            refundAmount,
+            chargebackAmount,
+            address: o.address || existing.address,
+            // Headline product, from the first line. The direct feed carries no
+            // items[], so keep what we have rather than blanking it.
+            productName: o.items[0]?.name || existing.productName,
+            productCodename: o.items[0]?.productId || existing.productCodename,
+            trackingSteps,
+            ...attribution,
+          },
+          existing.lockedFields
+        )
+      )
       .where(eq(orders.id, existing.id));
 
     // The direct feed carries no items[]; only fill them in if the order has

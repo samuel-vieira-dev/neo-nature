@@ -61,7 +61,7 @@ type Stats = {
   revenueByPlatform: { platform: string; revenue: number }[];
 };
 type Resp = {
-  stats: Stats;
+  stats: Stats | null; // null when the account lacks analytics:read (CS role)
   facets: { origins: string[]; products: string[]; platforms: { key: string; label: string }[] };
   filteredCount: number;
   customers: CustomerRow[];

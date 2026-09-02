@@ -1,22 +1,22 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { users, orders, adminActionLogs, type User } from "@/db/schema";
-import { withAdmin } from "@/server/admin";
+import { users, orders, type User } from "@/db/schema";
+import { withAdmin, logAdminAction } from "@/server/admin";
 import { createImpersonationSession } from "@/server/session";
 import { linkOrdersToUser } from "@/server/buygoods";
+import { findOrProvisionAccount } from "@/server/leads";
 
 const schema = z
   .object({ userId: z.string().min(1).optional(), email: z.string().min(1).optional() })
   .refine((d) => d.userId || d.email, { message: "need_identifier" });
 
 /**
- * Resolves the account behind a CRM row that has no app user yet ("lead"),
- * creating the same row the OTP login would have created — keyed on the phone
- * and email BuyGoods gave us. Nothing is faked: onboarding is skipped by the
- * session (see /api/me `impersonating`), not by writing answers the customer
- * didn't give, so if they later sign in for real they still get the genuine
- * onboarding.
+ * Resolves the account behind a CRM row that has no app user yet ("lead").
+ * The phone comes off the customer's latest order (BuyGoods/Konnektive don't
+ * hand us a phone directly here — only the email the CRM row is keyed on);
+ * account lookup/provisioning itself is shared with the 360 "Open ticket"
+ * flow — see src/server/leads.ts.
  */
 async function resolveLead(email: string): Promise<{ user: User; provisioned: boolean } | null> {
   const key = email.toLowerCase().trim();
@@ -25,15 +25,7 @@ async function resolveLead(email: string): Promise<{ user: User; provisioned: bo
     orderBy: [desc(orders.placedAt)],
   });
   if (!order) return null;
-  const phone = order.customerPhoneE164;
-
-  const existing =
-    (phone ? await db.query.users.findFirst({ where: eq(users.phone, phone) }) : null) ??
-    (await db.query.users.findFirst({ where: eq(users.email, key) }));
-  if (existing) return { user: existing, provisioned: false };
-
-  const [user] = await db.insert(users).values({ id: crypto.randomUUID(), email: key, phone }).returning();
-  return { user, provisioned: true };
+  return findOrProvisionAccount({ email: key, phone: order.customerPhoneE164 });
 }
 
 // Opens the customer's own app session for the admin (15 min, see
@@ -63,12 +55,10 @@ export const POST = withAdmin(async (admin, req: Request) => {
   const fresh = (await db.query.users.findFirst({ where: eq(users.id, target.id) })) ?? target;
 
   await createImpersonationSession(fresh.id, admin.id);
-  await db.insert(adminActionLogs).values({
-    adminUserId: admin.id,
-    action: provisioned ? "impersonate_lead" : "impersonate",
+  await logAdminAction(admin, provisioned ? "impersonate_lead" : "impersonate", {
     targetUserId: fresh.id,
     metadata: { targetName: fresh.name, targetEmail: fresh.email, provisioned },
   });
 
   return Response.json({ ok: true });
-});
+}, "customers:impersonate");

@@ -4,10 +4,17 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, BellRing, CheckCircle2 } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
+import { useCan } from "@/components/AdminProvider";
+import NoAccess from "@/components/NoAccess";
 
 type Resp = { facets: { origins: string[]; products: string[] }; filteredCount: number };
 
 export default function AdminPushPage() {
+  // Hooks always run in the same order every render (React rule), so the
+  // permission gate is checked here but the actual <NoAccess/> return happens
+  // after every other hook below — the API already enforces this with a 403,
+  // this is just to skip rendering the form.
+  const hasAccess = useCan("push:send");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("");
@@ -40,6 +47,8 @@ export default function AdminPushPage() {
 
   const reach = data?.filteredCount ?? 0;
   const canSend = title.trim().length > 0 && body.trim().length > 0 && reach > 0 && !send.isPending;
+
+  if (!hasAccess) return <NoAccess />;
 
   return (
     <div className="max-w-2xl">

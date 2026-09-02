@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAdminUser } from "@/server/admin";
+import { AdminProvider, type AdminIdentity } from "@/components/AdminProvider";
 import AdminNav from "@/components/AdminNav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -10,10 +11,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // bounce off the proxy (which trusts the JWT) and loop.
   if (!admin) redirect("/api/auth/admin-logout");
 
+  // Client-safe identity only — never pass the full row (it carries
+  // passwordHash) across the server/client boundary.
+  const identity: AdminIdentity = {
+    id: admin.id,
+    name: admin.name,
+    email: admin.email,
+    role: admin.role,
+    permissions: admin.permissions,
+  };
+
   return (
-    <div className="min-h-dvh">
-      <AdminNav />
-      <div className="px-4 py-6 sm:px-6">{children}</div>
-    </div>
+    <AdminProvider admin={identity}>
+      <div className="min-h-dvh">
+        <AdminNav />
+        <div className="px-4 py-6 sm:px-6">{children}</div>
+      </div>
+    </AdminProvider>
   );
 }

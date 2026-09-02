@@ -35,6 +35,13 @@ export type CustomerOrder = {
   paymentMethod: string | null;
   address: string;
   items: { productName: string; sku: string | null; qty: number; price: number }[];
+  /** Order fields locked against the webhook feed (plan §2.1) — see field-locks.ts. */
+  lockedFields: string[];
+  // Raw editable fields (admin order edit pre-fills from these).
+  customerName: string;
+  customerPhone: string | null;
+  email: string;
+  shippingTrackingId: string | null;
 };
 
 export type CustomerRow = {
@@ -182,6 +189,11 @@ export function foldCustomers(
       paymentMethod: o.paymentMethod,
       address: o.address,
       items,
+      lockedFields: o.lockedFields ?? [],
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      email: o.email,
+      shippingTrackingId: o.shippingTrackingId,
     });
   }
   for (const [key, set] of productSet) {

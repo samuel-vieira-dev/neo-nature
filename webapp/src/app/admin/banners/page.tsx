@@ -4,10 +4,17 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Plus, Trash2, CheckCircle2, Circle } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
+import { useCan } from "@/components/AdminProvider";
+import NoAccess from "@/components/NoAccess";
 
 type Banner = { id: number; title: string; body: string; ctaLabel: string | null; ctaUrl: string | null; active: boolean };
 
 export default function AdminBannersPage() {
+  // Hooks always run in the same order every render (React rule), so the
+  // permission gate is checked here but the actual <NoAccess/> return happens
+  // after every other hook below — the API already enforces this with a 403,
+  // this is just to skip rendering the form.
+  const hasAccess = useCan("banners:write");
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -37,6 +44,8 @@ export default function AdminBannersPage() {
 
   const banners = data?.banners ?? [];
   const canCreate = title.trim() && body.trim() && !create.isPending;
+
+  if (!hasAccess) return <NoAccess />;
 
   return (
     <div className="max-w-2xl">

@@ -2,22 +2,27 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   AtSign,
   DollarSign,
   Flame,
   LifeBuoy,
+  Lock,
   LogIn,
   Package,
+  Pencil,
   Phone,
   Pill,
+  Plus,
   RotateCcw,
   ShieldAlert,
   Store,
 } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
+import { useAdmin, useCan } from "@/components/AdminProvider";
+import { editableOrderFields } from "@/server/permissions";
 
 type CustomerOrder = {
   id: string;
@@ -39,6 +44,12 @@ type CustomerOrder = {
   paymentMethod: string | null;
   address: string;
   items: { productName: string; sku: string | null; qty: number; price: number }[];
+  /** Order fields locked against the webhook feed (plan §2.1) — see field-locks.ts. */
+  lockedFields: string[];
+  customerName: string;
+  customerPhone: string | null;
+  email: string;
+  shippingTrackingId: string | null;
 };
 
 type Customer360 = {
@@ -47,6 +58,8 @@ type Customer360 = {
   primaryEmail: string | null;
   primaryPhone: string | null;
   createdAt: string;
+  /** Customer fields locked against the webhook feed (plan §2.1) — see field-locks.ts. */
+  lockedFields: string[];
   emails: string[];
   phones: string[];
   buygoodsPairs: { accountId: string; userId: string }[];
@@ -102,6 +115,16 @@ const statusTones: Record<CustomerOrder["status"], string> = {
   refunded: "bg-amber-50 text-amber-700",
 };
 
+// Field key -> human label, in the fixed display order from plan §2.1.
+const ORDER_FIELD_LABELS: Record<string, string> = {
+  address: "Address",
+  customerName: "Customer name",
+  customerPhone: "Customer phone",
+  email: "Email",
+  shippingTrackingId: "Tracking number",
+};
+const ORDER_FIELD_ORDER = ["address", "customerName", "customerPhone", "email", "shippingTrackingId"] as const;
+
 function Kpi({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
@@ -125,7 +148,90 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
   );
 }
 
-function OrderCard({ o, addOn = false }: { o: CustomerOrder; addOn?: boolean }) {
+/** Lock icon + "Unlock" for one edited field. Renders nothing when the field isn't locked. */
+function LockBadge({ locked, onUnlock, unlocking }: { locked: boolean; onUnlock: () => void; unlocking: boolean }) {
+  if (!locked) return null;
+  return (
+    <span className="inline-flex items-center gap-1 font-normal normal-case text-amber-700">
+      <span title="Edited in admin — the platform feed won't overwrite this">
+        <Lock className="h-3 w-3" />
+      </span>
+      <button
+        type="button"
+        onClick={onUnlock}
+        disabled={unlocking}
+        className="text-[11px] font-bold underline decoration-dotted hover:text-amber-900 disabled:opacity-50"
+      >
+        {unlocking ? "Unlocking…" : "Unlock"}
+      </button>
+    </span>
+  );
+}
+
+function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; customerId: string; addOn?: boolean }) {
+  const { role } = useAdmin();
+  const editableFields = editableOrderFields(role);
+  const qc = useQueryClient();
+
+  const [editing, setEditing] = useState(false);
+  const [address, setAddress] = useState(o.address || "");
+  const [customerName, setCustomerName] = useState(o.customerName || "");
+  const [customerPhone, setCustomerPhone] = useState(o.customerPhone || "");
+  const [email, setEmail] = useState(o.email || "");
+  const [trackingId, setTrackingId] = useState(o.shippingTrackingId || "");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin-customer", customerId] });
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+
+  const startEdit = () => {
+    setAddress(o.address || "");
+    setCustomerName(o.customerName || "");
+    setCustomerPhone(o.customerPhone || "");
+    setEmail(o.email || "");
+    setTrackingId(o.shippingTrackingId || "");
+    setFormError(null);
+    setEditing(true);
+  };
+
+  const save = useMutation({
+    mutationFn: () => {
+      const body: Record<string, string> = {};
+      if (editableFields.includes("address") && address.trim() && address.trim() !== o.address) body.address = address.trim();
+      // Only send what actually changed — an untouched field must not get locked.
+      if (editableFields.includes("customerName") && customerName.trim() && customerName.trim() !== (o.customerName || "")) body.customerName = customerName.trim();
+      if (editableFields.includes("customerPhone") && customerPhone.trim() && customerPhone.trim() !== (o.customerPhone || "")) body.customerPhone = customerPhone.trim();
+      if (editableFields.includes("email") && email.trim() && email.trim().toLowerCase() !== (o.email || "")) body.email = email.trim();
+      if (editableFields.includes("shippingTrackingId") && trackingId.trim() !== (o.shippingTrackingId || "")) body.shippingTrackingId = trackingId.trim();
+      if (Object.keys(body).length === 0) return Promise.reject(new Error("no_changes"));
+      return adminApi(`/api/admin/orders/${o.id}`, { method: "PATCH", body: JSON.stringify(body) });
+    },
+    onSuccess: () => {
+      setEditing(false);
+      invalidate();
+    },
+    onError: (e: Error) =>
+      setFormError(
+        e.message === "no_changes"
+          ? "Change at least one field."
+          : e.message === "no_permission"
+            ? "You don't have permission to edit that field."
+            : e.message === "invalid_request"
+              ? "Check the values and try again."
+              : "Couldn't save — try again."
+      ),
+  });
+
+  const unlock = useMutation({
+    mutationFn: (field: string) => adminApi(`/api/admin/orders/${o.id}/locks?field=${encodeURIComponent(field)}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+    onError: () => setFormError("Couldn't unlock that field."),
+  });
+
+  const canEdit = editableFields.length > 0;
+
   return (
     <div className={`rounded-xl border border-[var(--border)] bg-white p-3 ${addOn ? "ml-6" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -176,6 +282,92 @@ function OrderCard({ o, addOn = false }: { o: CustomerOrder; addOn?: boolean }) 
           ))}
         </ul>
       )}
+
+      {canEdit && (
+        <div className="mt-2 border-t border-[var(--border)] pt-2">
+          {!editing ? (
+            <button
+              onClick={startEdit}
+              className="flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
+            >
+              <Pencil className="h-3 w-3" /> Edit
+            </button>
+          ) : (
+            <div className="space-y-2.5 rounded-xl bg-[var(--surface)] p-3">
+              {ORDER_FIELD_ORDER.filter((f) => editableFields.includes(f)).map((field) => (
+                <div key={field}>
+                  {field === "address" && (
+                    <p className="mb-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800">
+                      This updates the address in this panel only. It does NOT change where BuyGoods/the carrier will
+                      ship — update it there too.
+                    </p>
+                  )}
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+                    {ORDER_FIELD_LABELS[field]}
+                    <LockBadge
+                      locked={o.lockedFields.includes(field)}
+                      onUnlock={() => unlock.mutate(field)}
+                      unlocking={unlock.isPending && unlock.variables === field}
+                    />
+                  </label>
+                  {field === "address" ? (
+                    <textarea
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      rows={2}
+                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    />
+                  ) : field === "customerName" ? (
+                    <input
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Customer name"
+                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    />
+                  ) : field === "customerPhone" ? (
+                    <input
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Customer phone"
+                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    />
+                  ) : field === "email" ? (
+                    <input
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Order email"
+                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    />
+                  ) : (
+                    <input
+                      value={trackingId}
+                      onChange={(e) => setTrackingId(e.target.value)}
+                      placeholder="Tracking number (blank to clear)"
+                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                    />
+                  )}
+                </div>
+              ))}
+              {formError && <p className="text-xs text-rose-600">{formError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex-1 rounded-lg border border-[var(--border)] py-1.5 text-xs font-semibold text-[var(--text)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => save.mutate()}
+                  disabled={save.isPending}
+                  className="flex-1 rounded-lg bg-[var(--accent)] py-1.5 text-xs font-display font-bold text-white disabled:opacity-50"
+                >
+                  {save.isPending ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -183,12 +375,104 @@ function OrderCard({ o, addOn = false }: { o: CustomerOrder; addOn?: boolean }) 
 export default function AdminCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [impersonating, setImpersonating] = useState(false);
+  const qc = useQueryClient();
+  const canEditCustomer = useCan("customers:write");
+  const canOpenTicket = useCan("tickets:write");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-customer", id],
     queryFn: () => adminApi<{ customer: Customer360 }>(`/api/admin/customers/${id}`),
   });
   const c = data?.customer;
+
+  const invalidateCustomer = () => {
+    qc.invalidateQueries({ queryKey: ["admin-customer", id] });
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+
+  // -- customer edit (name / primary email / primary phone) -----------------
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [custName, setCustName] = useState("");
+  const [custEmail, setCustEmail] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [custError, setCustError] = useState<string | null>(null);
+
+  const startCustomerEdit = () => {
+    if (!c) return;
+    setCustName(c.name || "");
+    setCustEmail(c.primaryEmail || "");
+    setCustPhone(c.primaryPhone || "");
+    setCustError(null);
+    setEditingCustomer(true);
+  };
+
+  const saveCustomer = useMutation({
+    mutationFn: () =>
+      adminApi(`/api/admin/customers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: custName.trim(),
+          primaryEmail: custEmail.trim() ? custEmail.trim() : null,
+          primaryPhone: custPhone.trim() ? custPhone.trim() : null,
+        }),
+      }),
+    onSuccess: () => {
+      setEditingCustomer(false);
+      invalidateCustomer();
+    },
+    onError: (e: Error) =>
+      setCustError(
+        e.message === "email_taken"
+          ? "That email is already used by another customer."
+          : e.message === "invalid_email"
+            ? "That doesn't look like a valid email."
+            : e.message === "invalid_phone"
+              ? "That doesn't look like a valid phone number."
+              : "Couldn't save — try again."
+      ),
+  });
+
+  const unlockCustomerField = useMutation({
+    mutationFn: (field: string) => adminApi(`/api/admin/customers/${id}/locks?field=${encodeURIComponent(field)}`, { method: "DELETE" }),
+    onSuccess: invalidateCustomer,
+    onError: () => setCustError("Couldn't unlock that field."),
+  });
+
+  // -- open ticket ------------------------------------------------------------
+  const [showTicketForm, setShowTicketForm] = useState(false);
+  const [ticketKind, setTicketKind] = useState<"support" | "refund" | "billing">("support");
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketDescription, setTicketDescription] = useState("");
+  const [ticketOrderNumber, setTicketOrderNumber] = useState("");
+  const [ticketError, setTicketError] = useState<string | null>(null);
+
+  const openTicket = useMutation({
+    mutationFn: () =>
+      adminApi(`/api/admin/customers/${id}/tickets`, {
+        method: "POST",
+        body: JSON.stringify({
+          subject: ticketSubject.trim(),
+          description: ticketDescription.trim() || undefined,
+          kind: ticketKind,
+          orderNumber: ticketOrderNumber.trim() || undefined,
+        }),
+      }),
+    onSuccess: () => {
+      setShowTicketForm(false);
+      setTicketKind("support");
+      setTicketSubject("");
+      setTicketDescription("");
+      setTicketOrderNumber("");
+      setTicketError(null);
+      qc.invalidateQueries({ queryKey: ["admin-customer", id] });
+    },
+    onError: (e: Error) =>
+      setTicketError(
+        e.message === "no_contact"
+          ? "This customer has no email or phone on file — open the ticket in Freshdesk directly."
+          : "Couldn't open the ticket — try again."
+      ),
+  });
 
   const impersonate = async () => {
     if (!c) return;
@@ -236,17 +520,95 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             <span className="text-xs">ID {c.id}</span>
           </div>
         </div>
-        {(c.accounts.length > 0 || c.primaryEmail) && (
-          <button
-            onClick={impersonate}
-            disabled={impersonating}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
-          >
-            <LogIn className="h-4 w-4" />
-            {impersonating ? "Opening…" : "View as customer"}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canEditCustomer && (
+            <button
+              onClick={() => (editingCustomer ? setEditingCustomer(false) : startCustomerEdit())}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+            >
+              <Pencil className="h-4 w-4" />
+              {editingCustomer ? "Cancel" : "Edit"}
+            </button>
+          )}
+          {(c.accounts.length > 0 || c.primaryEmail) && (
+            <button
+              onClick={impersonate}
+              disabled={impersonating}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
+            >
+              <LogIn className="h-4 w-4" />
+              {impersonating ? "Opening…" : "View as customer"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {editingCustomer && (
+        <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+          <p className="text-sm font-bold text-[var(--text)]">Edit customer</p>
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+              Name
+              <LockBadge
+                locked={c.lockedFields.includes("name")}
+                onUnlock={() => unlockCustomerField.mutate("name")}
+                unlocking={unlockCustomerField.isPending && unlockCustomerField.variables === "name"}
+              />
+            </label>
+            <input
+              value={custName}
+              onChange={(e) => setCustName(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+              Primary email
+              <LockBadge
+                locked={c.lockedFields.includes("primaryEmail")}
+                onUnlock={() => unlockCustomerField.mutate("primaryEmail")}
+                unlocking={unlockCustomerField.isPending && unlockCustomerField.variables === "primaryEmail"}
+              />
+            </label>
+            <input
+              value={custEmail}
+              onChange={(e) => setCustEmail(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+              Primary phone
+              <LockBadge
+                locked={c.lockedFields.includes("primaryPhone")}
+                onUnlock={() => unlockCustomerField.mutate("primaryPhone")}
+                unlocking={unlockCustomerField.isPending && unlockCustomerField.variables === "primaryPhone"}
+              />
+            </label>
+            <input
+              value={custPhone}
+              onChange={(e) => setCustPhone(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+            />
+          </div>
+          {custError && <p className="text-sm text-rose-600">{custError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingCustomer(false)}
+              className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-semibold text-[var(--text)]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveCustomer.mutate()}
+              disabled={saveCustomer.isPending}
+              className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
+            >
+              {saveCustomer.isPending ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -351,9 +713,9 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
           <div className="space-y-3">
             {c.purchases.map((g) => (
               <div key={g.anchor.id} className="space-y-2">
-                <OrderCard o={g.anchor} />
+                <OrderCard o={g.anchor} customerId={id} />
                 {g.addOns.map((o) => (
-                  <OrderCard key={o.id} o={o} addOn />
+                  <OrderCard key={o.id} o={o} customerId={id} addOn />
                 ))}
                 {g.addOns.length > 0 && (
                   <p className="ml-6 text-xs text-muted">Purchase total: {money2(g.groupTotal)}</p>
@@ -367,6 +729,67 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
 
       {/* support */}
       <Section icon={LifeBuoy} title="Support">
+        {canOpenTicket && (
+          <div className="mb-4">
+            {!showTicketForm ? (
+              <button
+                onClick={() => setShowTicketForm(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+              >
+                <Plus className="h-4 w-4 text-[var(--accent)]" /> Open ticket
+              </button>
+            ) : (
+              <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+                <p className="text-sm font-bold text-[var(--text)]">Open ticket</p>
+                <select
+                  value={ticketKind}
+                  onChange={(e) => setTicketKind(e.target.value as "support" | "refund" | "billing")}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm font-semibold"
+                >
+                  <option value="support">Support</option>
+                  <option value="refund">Refund</option>
+                  <option value="billing">Billing</option>
+                </select>
+                <input
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  placeholder="Subject"
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
+                <textarea
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={3}
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
+                <input
+                  value={ticketOrderNumber}
+                  onChange={(e) => setTicketOrderNumber(e.target.value)}
+                  placeholder="Order number (optional)"
+                  className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
+                {ticketError && <p className="text-sm text-rose-600">{ticketError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowTicketForm(false)}
+                    className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-semibold text-[var(--text)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => openTicket.mutate()}
+                    disabled={openTicket.isPending || !ticketSubject.trim()}
+                    className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
+                  >
+                    {openTicket.isPending ? "Opening…" : "Open ticket"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-xs font-semibold text-muted">App tickets</p>
         {c.localTickets.length === 0 ? (
           <p className="mt-1 text-sm text-muted">No tickets opened from the app.</p>

@@ -40,6 +40,10 @@ export const customers = pgTable(
     mergedIntoId: text("merged_into_id"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    // Fields edited in the admin panel. Webhook ingests skip these on update so a
+    // manual correction is never overwritten by the platform feed — see
+    // src/server/field-locks.ts. Unlocking removes the name from this list.
+    lockedFields: jsonb("locked_fields").$type<string[]>().notNull().default([]),
   },
   (t) => [index("customers_phone").on(t.primaryPhone)]
 );
@@ -210,6 +214,10 @@ export const orders = pgTable(
       .notNull()
       .default([]),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    // Fields edited in the admin panel. Webhook ingests skip these on update so a
+    // manual correction is never overwritten by the platform feed — see
+    // src/server/field-locks.ts. Unlocking removes the name from this list.
+    lockedFields: jsonb("locked_fields").$type<string[]>().notNull().default([]),
   },
   (t) => [
     index("orders_email").on(t.email),
@@ -346,6 +354,22 @@ export const adminActionLogs = pgTable("admin_action_logs", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
+
+// -------- staff accounts (admin panel) --------
+// Separate from `users` (customers): staff never mixes with the customer base.
+// Role/active are read from the DB on every request — never trusted from the JWT.
+export const adminUsers = pgTable("admin_users", {
+  id: text("id").primaryKey(), // uuid
+  email: text("email").notNull().unique(), // lowercase
+  name: text("name").notNull().default(""),
+  role: text("role").notNull().default("cs"), // admin | cs — see src/server/permissions.ts
+  passwordHash: text("password_hash").notNull(), // "scrypt$<salt>$<hash>"
+  active: boolean("active").notNull().default(true),
+  createdBy: text("created_by"), // admin_users.id of who created it (null on bootstrap)
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+export type AdminUser = typeof adminUsers.$inferSelect;
 
 export type Customer = typeof customers.$inferSelect;
 export type User = typeof users.$inferSelect;

@@ -6,6 +6,7 @@ import { normalizeIngestPhone } from "@/lib/phone-format";
 import { firstNameOf } from "@/lib/name";
 import { resolveCustomerForOrder, resolveCustomerForUser } from "@/server/customer-identity";
 import { invalidateCustomersCache } from "@/server/crm";
+import { stripLockedFields } from "@/server/field-locks";
 
 // ---------------------------------------------------------------------------
 // BuyGoods IPN ingestion. BuyGoods POSTs form-urlencoded order events to
@@ -16,6 +17,11 @@ import { invalidateCustomersCache } from "@/server/crm";
 // shipping_tracking_id field (e.g. "GFUS01065804546499") — despite this
 // comment previously claiming otherwise. See buildTrackingUrl in
 // src/lib/tracking.ts for the customer-facing link.
+//
+// On update (never on insert of a brand-new order), the patch is run through
+// stripLockedFields() against the existing row's `locked_fields` — any column
+// an admin has manually corrected in the panel is skipped here so this feed
+// can't clobber it back. See src/server/field-locks.ts.
 // ---------------------------------------------------------------------------
 
 type Params = Record<string, string>;
@@ -240,28 +246,36 @@ export async function ingestBuyGoodsEvent(
   if (existing) {
     await db
       .update(orders)
-      .set({
-        userId: existing.userId ?? user?.id ?? null,
-        email: existing.email || email,
-        status,
-        total,
-        currency,
-        shippingStatus,
-        shippingTrackingId: shippingTrackingId ?? existing.shippingTrackingId,
-        fulfilledAt,
-        refundedAt,
-        chargebackAt,
-        refundAmount,
-        chargebackAmount,
-        address: address || existing.address,
-        productName: productName || existing.productName,
-        productCodename: productCodename || existing.productCodename,
-        upsellFlag: upsellFlag ?? existing.upsellFlag,
-        buygoodsAccountId: existing.buygoodsAccountId ?? bgIdentity?.bgAccountId ?? null,
-        buygoodsUserId: existing.buygoodsUserId ?? bgIdentity?.bgUserId ?? null,
-        trackingSteps,
-        ...attribution,
-      })
+      .set(
+        // Fields the admin panel has locked (see field-locks.ts) are dropped
+        // from the patch here so a manual correction is never clobbered by
+        // the webhook feed.
+        stripLockedFields(
+          {
+            userId: existing.userId ?? user?.id ?? null,
+            email: existing.email || email,
+            status,
+            total,
+            currency,
+            shippingStatus,
+            shippingTrackingId: shippingTrackingId ?? existing.shippingTrackingId,
+            fulfilledAt,
+            refundedAt,
+            chargebackAt,
+            refundAmount,
+            chargebackAmount,
+            address: address || existing.address,
+            productName: productName || existing.productName,
+            productCodename: productCodename || existing.productCodename,
+            upsellFlag: upsellFlag ?? existing.upsellFlag,
+            buygoodsAccountId: existing.buygoodsAccountId ?? bgIdentity?.bgAccountId ?? null,
+            buygoodsUserId: existing.buygoodsUserId ?? bgIdentity?.bgUserId ?? null,
+            trackingSteps,
+            ...attribution,
+          },
+          existing.lockedFields
+        )
+      )
       .where(eq(orders.id, existing.id));
 
     // Canonical customer (sticky — only when the row doesn't have one yet).

@@ -49,7 +49,30 @@ forecast, churn detection, tiers).
 | `TWILIO_MESSAGING_SERVICE_SID` | Recommended for international customers — a Twilio Messaging Service (`MG…`) whose sender pool holds the US number **and** an alphanumeric sender ("NeoNature"). Twilio then picks a sender the destination country accepts (the UK, for one, refuses SMS from US long codes — error 21612). When set it is tried first, before `TWILIO_FROM_NUMBER`. |
 | `TWILIO_ALPHA_SENDER_ID` | Alternative to the Messaging Service: an alphanumeric sender (e.g. `NeoNature`, ≤11 chars) used directly for non-+1 destinations, and as the retry when the number is refused with 21612. Needs "Alphanumeric Sender ID" enabled on the Twilio account; some countries (Brazil, India…) require pre-registration. Never used for +1. |
 | `TRACKING_URL_TEMPLATE` | Optional — customer-facing tracking link with a `{code}` placeholder (defaults to 17TRACK's public page). |
-| `ADMIN_PASSWORD` | **Required** for `/admin-login` (replaces OTP for the admin panel). There is no fallback — if unset, admin login returns 503. Never commit the value; set it in the Railway variables and in your local `.env.local`. |
+| `ADMIN_PASSWORD` | **Bootstrap key only.** While `admin_users` is empty, `/admin-login` shows a *First access* form (name, email, password + this value as the "setup key") that creates the first account, always as `admin`. Once that first account exists this path is dead — every login after that is email + individual password (see "Admin panel access" below) and `ADMIN_PASSWORD` is inert. Still required to be set (unset → 503 on bootstrap); never commit the value. |
+
+## Admin panel access
+
+Staff sign in with an individual email + password (`admin_users` table, separate
+from the customer `users` table — see `src/server/permissions.ts` for the
+permission model). Two roles:
+
+- **Admin** — full access: customers, orders, tickets, revenue/dashboards, push,
+  banners, and `/admin/access` (create/edit/deactivate staff accounts, audit log).
+- **Customer Support (`cs`)** — customer search/360, "View as customer", opening
+  tickets, and editing only the order address. No revenue data, no push/banners,
+  no access management.
+
+`/admin/access` (permission `admins:manage`, admin only) is where accounts are
+created and roles/passwords/active status are managed; every write there — and
+every other admin write — is recorded in `admin_action_logs` with the acting
+staff member's name (see `logAdminAction` in `src/server/admin.ts`).
+
+Editing a customer or order field in the admin panel locks that field
+(`locked_fields` column) so the next BuyGoods/Konnektive webhook update skips
+it instead of overwriting the manual correction — see `src/server/field-locks.ts`.
+An "Unlock" action in the UI clears the lock so the platform feed writes to it
+again.
 
 ## Support tickets → Freshdesk (push-only)
 
