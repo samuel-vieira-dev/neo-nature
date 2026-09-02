@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { buildTicketListUrl, buildTicketPayload, createFreshdeskTicket, parseTicketList } from "./freshdesk";
+import {
+  buildTicketListUrl,
+  buildTicketPayload,
+  createFreshdeskTicket,
+  parseTicketList,
+  parseTicketListWithRequester,
+  listRecentFreshdeskTickets,
+} from "./freshdesk";
 
 describe("buildTicketPayload", () => {
   it("maps kind to Freshdesk priority and always opens the ticket", () => {
@@ -141,5 +148,102 @@ describe("parseTicketList", () => {
   it("tolerates junk rows and non-array payloads", () => {
     expect(parseTicketList("d", { error: "nope" })).toEqual([]);
     expect(parseTicketList("d", [null, "x", { subject: "no id" }])).toEqual([]);
+  });
+});
+
+describe("parseTicketListWithRequester", () => {
+  it("reads requester name/email/phone when present", () => {
+    const [t] = parseTicketListWithRequester("beneonature", [
+      {
+        id: 44194,
+        subject: "Where is my order",
+        status: 2,
+        priority: 3,
+        created_at: "2026-08-01T00:00:00Z",
+        updated_at: "2026-08-02T00:00:00Z",
+        requester: { name: "Jane Doe", email: "jane@x.com", phone: "+15551234567" },
+      },
+    ]);
+    expect(t.requester).toEqual({ name: "Jane Doe", email: "jane@x.com", phone: "+15551234567" });
+  });
+
+  it("falls back to requester.mobile when phone is absent", () => {
+    const [t] = parseTicketListWithRequester("d", [
+      { id: 1, subject: "s", status: 2, priority: 1, requester: { mobile: "+447713480000" } },
+    ]);
+    expect(t.requester.phone).toBe("+447713480000");
+  });
+
+  it("nulls out requester fields when there is no requester object", () => {
+    const [t] = parseTicketListWithRequester("d", [{ id: 1, subject: "s", status: 2, priority: 1 }]);
+    expect(t.requester).toEqual({ name: null, email: null, phone: null });
+  });
+
+  it("tolerates junk rows and non-array payloads", () => {
+    expect(parseTicketListWithRequester("d", { error: "nope" })).toEqual([]);
+    expect(parseTicketListWithRequester("d", [null, "x", { subject: "no id" }])).toEqual([]);
+  });
+});
+
+describe("listRecentFreshdeskTickets", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  const configure = () => {
+    vi.stubEnv("FRESHDESK_DOMAIN", "neonature");
+    vi.stubEnv("FRESHDESK_API_KEY", "key");
+  };
+
+  it("returns not_configured without hitting the network", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await listRecentFreshdeskTickets()).toEqual({ ok: false, reason: "not_configured" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("stops after one page when it comes back under 100 rows", async () => {
+    configure();
+    const rows = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, subject: `t${i}`, status: 2, priority: 1 }));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => rows });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listRecentFreshdeskTickets({ sinceDays: 90 });
+    expect(result).toEqual({ ok: true, tickets: expect.any(Array) });
+    if (result.ok) expect(result.tickets).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("include=requester");
+    expect(url).toContain("order_by=updated_at");
+    expect(url).toContain("per_page=100");
+    expect(url).toContain("page=1");
+  });
+
+  it("paginates while a page comes back full, capped at 3 pages", async () => {
+    configure();
+    const fullPage = () => Array.from({ length: 100 }, (_, i) => ({ id: i + 1, subject: "t", status: 2, priority: 1 }));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => fullPage() });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listRecentFreshdeskTickets();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    if (result.ok) expect(result.tickets).toHaveLength(300);
+  });
+
+  it("returns api_error on a failed request without throwing", async () => {
+    configure();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "boom" });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await listRecentFreshdeskTickets()).toEqual({ ok: false, reason: "api_error", detail: "500" });
+  });
+
+  it("returns api_error when fetch throws", async () => {
+    configure();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
+    expect(await listRecentFreshdeskTickets()).toEqual({ ok: false, reason: "api_error", detail: "network" });
   });
 });

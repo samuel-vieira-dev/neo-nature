@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -378,6 +378,8 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
   const qc = useQueryClient();
   const canEditCustomer = useCan("customers:write");
   const canOpenTicket = useCan("tickets:write");
+  const canSeeCrm = useCan("analytics:read");
+  const supportSectionRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-customer", id],
@@ -474,6 +476,13 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
       ),
   });
 
+  // The header action bar's "Open ticket" doesn't duplicate the form — it
+  // just opens/focuses the same one down in the Support section (plan §3.3).
+  const focusTicketForm = () => {
+    setShowTicketForm(true);
+    supportSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const impersonate = async () => {
     if (!c) return;
     setImpersonating(true);
@@ -489,12 +498,18 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
     }
   };
 
+  // Admin sees the CRM list behind this page; CS only ever reaches the 360
+  // from the Support desk, so the back link (and its destination) follows
+  // analytics:read (plan §3.2).
+  const backHref = canSeeCrm ? "/admin" : "/admin/support";
+  const backLabel = canSeeCrm ? "Customers" : "Support desk";
+
   if (isLoading) return <p className="text-sm text-muted">Loading customer…</p>;
   if (error || !c)
     return (
       <div>
-        <Link href="/admin" className="flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline">
-          <ArrowLeft className="h-4 w-4" /> Customers
+        <Link href={backHref} className="flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline">
+          <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
         <p className="mt-4 text-sm text-muted">Customer not found.</p>
       </div>
@@ -502,8 +517,8 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <Link href="/admin" className="flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline">
-        <ArrowLeft className="h-4 w-4" /> Customers
+      <Link href={backHref} className="flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline">
+        <ArrowLeft className="h-4 w-4" /> {backLabel}
       </Link>
 
       {/* header */}
@@ -520,27 +535,37 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             <span className="text-xs">ID {c.id}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {canEditCustomer && (
-            <button
-              onClick={() => (editingCustomer ? setEditingCustomer(false) : startCustomerEdit())}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
-            >
-              <Pencil className="h-4 w-4" />
-              {editingCustomer ? "Cancel" : "Edit"}
-            </button>
-          )}
-          {(c.accounts.length > 0 || c.primaryEmail) && (
-            <button
-              onClick={impersonate}
-              disabled={impersonating}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
-            >
-              <LogIn className="h-4 w-4" />
-              {impersonating ? "Opening…" : "View as customer"}
-            </button>
-          )}
-        </div>
+      </div>
+
+      {/* action bar (plan §3.3) */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {canOpenTicket && (
+          <button
+            onClick={focusTicketForm}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+          >
+            <LifeBuoy className="h-4 w-4 text-[var(--accent)]" /> Open ticket
+          </button>
+        )}
+        {(c.accounts.length > 0 || c.primaryEmail) && (
+          <button
+            onClick={impersonate}
+            disabled={impersonating}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
+          >
+            <LogIn className="h-4 w-4" />
+            {impersonating ? "Opening…" : "View as customer"}
+          </button>
+        )}
+        {canEditCustomer && (
+          <button
+            onClick={() => (editingCustomer ? setEditingCustomer(false) : startCustomerEdit())}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+          >
+            <Pencil className="h-4 w-4" />
+            {editingCustomer ? "Cancel" : "Edit"}
+          </button>
+        )}
       </div>
 
       {editingCustomer && (
@@ -728,6 +753,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
       </Section>
 
       {/* support */}
+      <div ref={supportSectionRef}>
       <Section icon={LifeBuoy} title="Support">
         {canOpenTicket && (
           <div className="mb-4">
@@ -843,6 +869,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
           </div>
         )}
       </Section>
+      </div>
 
       <div className="flex items-center gap-2 py-3">
         <Pill className="h-3.5 w-3.5 text-muted" />

@@ -110,6 +110,41 @@ export function parseTicketList(domain: string, data: unknown): FreshdeskTicket[
   return out;
 }
 
+/** Live Freshdesk ticket with the requester attached — only the recent-queue
+ *  endpoint (below) fetches this; the per-customer lookup above already knows
+ *  the email it searched for. */
+export type FreshdeskTicketWithRequester = FreshdeskTicket & {
+  requester: { name: string | null; email: string | null; phone: string | null };
+};
+
+/** Pure + unit-tested: like parseTicketList, but also reads requester.{name,email,phone}
+ *  when the response was fetched with `include=requester`. */
+export function parseTicketListWithRequester(domain: string, data: unknown): FreshdeskTicketWithRequester[] {
+  if (!Array.isArray(data)) return [];
+  const out: FreshdeskTicketWithRequester[] = [];
+  for (const row of data) {
+    if (typeof row !== "object" || row === null) continue;
+    const t = row as Record<string, unknown>;
+    if (typeof t.id !== "number") continue;
+    const req = typeof t.requester === "object" && t.requester !== null ? (t.requester as Record<string, unknown>) : null;
+    out.push({
+      id: t.id,
+      subject: typeof t.subject === "string" ? t.subject : "(no subject)",
+      status: STATUS_LABELS[t.status as number] ?? String(t.status ?? "?"),
+      priority: PRIORITY_LABELS[t.priority as number] ?? String(t.priority ?? "?"),
+      createdAt: typeof t.created_at === "string" ? t.created_at : "",
+      updatedAt: typeof t.updated_at === "string" ? t.updated_at : "",
+      url: `https://${domain}.freshdesk.com/a/tickets/${t.id}`,
+      requester: {
+        name: req && typeof req.name === "string" ? req.name : null,
+        email: req && typeof req.email === "string" ? req.email : null,
+        phone: req && typeof req.phone === "string" ? req.phone : req && typeof req.mobile === "string" ? req.mobile : null,
+      },
+    });
+  }
+  return out;
+}
+
 export type FreshdeskListResult =
   | { ok: true; tickets: FreshdeskTicket[] }
   | { ok: false; reason: "not_configured" | "api_error"; detail?: string };
@@ -148,6 +183,51 @@ export async function listFreshdeskTickets(emails: string[]): Promise<FreshdeskL
     ok: true,
     tickets: [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
   };
+}
+
+export type FreshdeskRecentListResult =
+  | { ok: true; tickets: FreshdeskTicketWithRequester[] }
+  | { ok: false; reason: "not_configured" | "api_error"; detail?: string };
+
+/**
+ * Lists tickets updated in the last `sinceDays` days, across ALL requesters —
+ * powers the support desk's unified ticket queue (src/server/support-desk.ts),
+ * unlike listFreshdeskTickets above which is scoped to one customer's emails.
+ * Paginates up to 3 pages (300 tickets) while a page comes back full (100
+ * rows); bounded by a 5s timeout per request; never throws.
+ */
+export async function listRecentFreshdeskTickets({
+  sinceDays = 90,
+}: { sinceDays?: number } = {}): Promise<FreshdeskRecentListResult> {
+  if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
+  const domain = process.env.FRESHDESK_DOMAIN!;
+  const apiKey = process.env.FRESHDESK_API_KEY!;
+  const auth = Buffer.from(`${apiKey}:X`).toString("base64");
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+
+  const tickets: FreshdeskTicketWithRequester[] = [];
+  try {
+    for (let page = 1; page <= 3; page++) {
+      const url = `https://${domain}.freshdesk.com/api/v2/tickets?include=requester&order_by=updated_at&per_page=100&updated_since=${encodeURIComponent(since)}&page=${page}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        console.error(`[freshdesk] recent list failed ${res.status}: ${detail.slice(0, 200)}`);
+        return { ok: false, reason: "api_error", detail: `${res.status}` };
+      }
+      const pageTickets = parseTicketListWithRequester(domain, await res.json());
+      tickets.push(...pageTickets);
+      if (pageTickets.length < 100) break;
+    }
+  } catch (e) {
+    console.error("[freshdesk] recent list threw:", e);
+    return { ok: false, reason: "api_error", detail: "network" };
+  }
+
+  return { ok: true, tickets };
 }
 
 export type FreshdeskResult =

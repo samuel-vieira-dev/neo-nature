@@ -1,0 +1,453 @@
+"use client";
+
+import { Fragment, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { DollarSign, Users, Smartphone, BellRing, UserPlus, UserMinus, Search, ChevronRight, ChevronDown, LogIn, Store } from "lucide-react";
+import Link from "next/link";
+import { adminApi } from "@/lib/adminApi";
+
+type CustomerOrder = {
+  id: string;
+  number: string;
+  placedAt: string;
+  status: "confirmed" | "shipped" | "canceled" | "refunded";
+  total: number;
+  currency: string;
+  shippingStatus: string | null;
+  trackingUrl: string | null;
+  fulfilledAt: string | null;
+  refundedAt: string | null;
+  chargebackAt: string | null;
+  refundAmount: number | null;
+  chargebackAmount: number | null;
+  saleOrigin: string;
+  platform: string;
+  platformKey: string;
+  paymentMethod: string | null;
+  address: string;
+  items: { productName: string; sku: string | null; qty: number; price: number }[];
+};
+type CustomerRow = {
+  id: string | null;
+  email: string;
+  name: string;
+  phone: string | null;
+  ordersCount: number;
+  totalSpent: number;
+  firstOrderAt: string | null;
+  lastOrderAt: string | null;
+  saleOrigin: string;
+  platforms: string[];
+  platformKeys: string[];
+  products: string[];
+  hasApp: boolean;
+  onboarded: boolean;
+  lastDoseDay: string | null;
+  totalDoses: number;
+  churnFlag: boolean;
+  reachable: boolean;
+  userId: string | null;
+  orders: CustomerOrder[];
+};
+type Stats = {
+  customers: number;
+  appUsers: number;
+  reachable: number;
+  churned: number;
+  newCustomers: number;
+  totalOrders: number;
+  totalRevenue: number;
+  revenueByOrigin: { origin: string; revenue: number }[];
+  revenueByPlatform: { platform: string; revenue: number }[];
+};
+type Resp = {
+  stats: Stats | null; // null when the account lacks analytics:read (CS role)
+  facets: { origins: string[]; products: string[]; platforms: { key: string; label: string }[] };
+  filteredCount: number;
+  customers: CustomerRow[];
+  offset: number;
+  limit: number;
+};
+
+const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const money2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const shortDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }) : "—";
+
+const statusTones: Record<CustomerOrder["status"], string> = {
+  shipped: "bg-emerald-50 text-emerald-700",
+  confirmed: "bg-sky-50 text-sky-700",
+  canceled: "bg-rose-50 text-rose-700",
+  refunded: "bg-amber-50 text-amber-700",
+};
+
+function StatCard({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+      <div className="flex items-center gap-2 text-muted">
+        <Icon className={`h-4 w-4 ${tone}`} />
+        <span className="text-xs font-semibold">{label}</span>
+      </div>
+      <p className="mt-1 font-display text-2xl font-bold text-[var(--text)]">{value}</p>
+    </div>
+  );
+}
+
+export default function CrmPage() {
+  const [q, setQ] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [product, setProduct] = useState("");
+  const [status, setStatus] = useState("");
+  const [reachable, setReachable] = useState(false);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [offset, setOffset] = useState(0);
+  // Debounced copy of the search box: each keystroke used to refire the whole
+  // CRM aggregation server-side.
+  const [dq, setDq] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDq(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+  // Any filter change restarts from the first page (state adjusted during
+  // render — https://react.dev/learn/you-might-not-need-an-effect).
+  const filterKey = `${dq}|${origin}|${platform}|${product}|${status}|${reachable}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setOffset(0);
+  }
+
+  const toggle = (email: string) => {
+    setOpen((s) => {
+      const next = new Set(s);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  };
+
+  const params = new URLSearchParams();
+  if (dq) params.set("q", dq);
+  if (origin) params.set("origin", origin);
+  if (platform) params.set("platform", platform);
+  if (product) params.set("product", product);
+  if (status) params.set("status", status);
+  if (reachable) params.set("reachable", "1");
+  if (offset) params.set("offset", String(offset));
+
+  const { data } = useQuery({
+    queryKey: ["admin-customers", params.toString()],
+    queryFn: () => adminApi<Resp>(`/api/admin/customers?${params.toString()}`),
+  });
+
+  const stats = data?.stats;
+  const rows = data?.customers ?? [];
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+
+  // Leads (no app account yet) are resolved server-side from their email —
+  // the account gets provisioned on first preview. See /api/admin/impersonate.
+  const impersonate = async (r: CustomerRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImpersonating(r.email);
+    try {
+      const payload = r.userId ? { userId: r.userId } : { email: r.email };
+      await adminApi("/api/admin/impersonate", { method: "POST", body: JSON.stringify(payload) });
+      window.open("/orders", "_blank", "noopener");
+    } catch {
+      alert("Couldn't start the preview session.");
+    } finally {
+      setImpersonating(null);
+    }
+  };
+
+  return (
+    <div>
+      <h1 className="font-display text-2xl font-bold text-[var(--text)]">Customers</h1>
+      <p className="mt-1 text-sm text-muted">
+        Lifecycle across every sales platform (BuyGoods merchant accounts, Konnektive) and app accounts.
+      </p>
+
+      {/* stats */}
+      {stats && (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard icon={DollarSign} label="Revenue" value={money(stats.totalRevenue)} />
+          <StatCard icon={Users} label="Customers" value={stats.customers.toString()} />
+          <StatCard icon={Smartphone} label="App users" value={stats.appUsers.toString()} tone="text-sky-600" />
+          <StatCard icon={BellRing} label="Reachable" value={stats.reachable.toString()} tone="text-violet-600" />
+          <StatCard icon={UserPlus} label="New (30d)" value={stats.newCustomers.toString()} tone="text-emerald-600" />
+          <StatCard icon={UserMinus} label="Churned" value={stats.churned.toString()} tone="text-rose-600" />
+        </div>
+      )}
+
+      {/* revenue by platform / merchant account */}
+      {stats && stats.revenueByPlatform.length > 0 && (
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+            <Store className="h-3.5 w-3.5" /> Revenue by platform &amp; merchant account
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {stats.revenueByPlatform.map((r) => (
+              <span key={r.platform} className="rounded-full bg-[var(--surface)] px-3 py-1 text-sm">
+                <span className="font-semibold text-[var(--text)]">{r.platform}</span>{" "}
+                <span className="text-[var(--accent)]">{money(r.revenue)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* revenue by attribution (who sent the traffic) */}
+      {stats && stats.revenueByOrigin.length > 0 && (
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+          <p className="text-xs font-semibold text-muted">Revenue by traffic attribution</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {stats.revenueByOrigin.slice(0, 8).map((r) => (
+              <span key={r.origin} className="rounded-full bg-[var(--surface)] px-3 py-1 text-sm">
+                <span className="font-semibold text-[var(--text)]">{r.origin}</span>{" "}
+                <span className="text-[var(--accent)]">{money(r.revenue)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* filters */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3">
+          <Search className="h-4 w-4 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, email or order id"
+            className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
+          />
+        </div>
+        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <option value="">All platforms</option>
+          {data?.facets.platforms.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+        </select>
+        <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <option value="">All attributions</option>
+          {data?.facets.origins.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <select value={product} onChange={(e) => setProduct(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <option value="">All products</option>
+          {data?.facets.products.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <option value="">Any status</option>
+          <option value="active">Active</option>
+          <option value="churned">Churned</option>
+        </select>
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+          <input type="checkbox" checked={reachable} onChange={(e) => setReachable(e.target.checked)} /> Push-reachable
+        </label>
+      </div>
+
+      <p className="mt-3 text-sm text-muted">
+        {data
+          ? data.filteredCount === 0
+            ? "0 customers"
+            : `Showing ${data.offset + 1}–${data.offset + rows.length} of ${data.filteredCount} customer${data.filteredCount === 1 ? "" : "s"}`
+          : "Loading…"}
+      </p>
+
+      {/* table */}
+      <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+        <table className="w-full min-w-[820px] text-left text-sm">
+          <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
+            <tr>
+              <th className="w-8 px-2 py-3"></th>
+              <th className="px-4 py-3 font-semibold">Customer</th>
+              <th className="px-4 py-3 font-semibold">Bought via</th>
+              <th className="px-4 py-3 font-semibold">Attribution</th>
+              <th className="px-4 py-3 font-semibold">Orders</th>
+              <th className="px-4 py-3 font-semibold">LTV</th>
+              <th className="px-4 py-3 font-semibold">First</th>
+              <th className="px-4 py-3 font-semibold">Last</th>
+              <th className="px-4 py-3 font-semibold">Engagement</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {rows.map((r) => {
+              const rowKey = r.id ?? r.email;
+              const isOpen = open.has(rowKey);
+              const hasCanceledOrRefunded = r.orders.some((o) => o.status === "canceled" || o.status === "refunded");
+              return (
+                <Fragment key={rowKey}>
+                  <tr onClick={() => toggle(rowKey)} className="cursor-pointer hover:bg-[var(--surface)]">
+                    <td className="px-2 py-3 text-muted">
+                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-[var(--text)]">{r.name || "—"}</p>
+                      <p className="text-xs text-muted">{r.email}</p>
+                      <div className="mt-1 flex items-center gap-1">
+                        {r.hasApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
+                        {r.reachable && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">Push</span>}
+                        {r.churnFlag && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">Churn</span>}
+                        {r.id && (
+                          <Link
+                            href={`/admin/customers/${r.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--border)]"
+                          >
+                            360 →
+                          </Link>
+                        )}
+                        <button
+                          onClick={(e) => impersonate(r, e)}
+                          disabled={impersonating === r.email}
+                          title={
+                            r.userId
+                              ? "View the app as this customer"
+                              : "Preview this lead's app view (creates their account)"
+                          }
+                          className="ml-1 flex items-center gap-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text)] hover:bg-[var(--border)] disabled:opacity-50"
+                        >
+                          <LogIn className="h-3 w-3" />
+                          {impersonating === r.email ? "…" : "View as"}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.platforms.length === 0 ? (
+                        <span className="text-muted">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {r.platforms.map((p) => (
+                            <span key={p} className="rounded bg-[var(--surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text)]">
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted">{r.saleOrigin}</td>
+                    <td className="px-4 py-3 text-[var(--text)]">{r.ordersCount}</td>
+                    <td className="px-4 py-3 font-semibold text-[var(--text)]">{money(r.totalSpent)}</td>
+                    <td className="px-4 py-3 text-muted">{shortDate(r.firstOrderAt)}</td>
+                    <td className="px-4 py-3 text-muted">{shortDate(r.lastOrderAt)}</td>
+                    <td className="px-4 py-3 text-muted">
+                      {r.hasApp ? (
+                        <span>{r.totalDoses} doses · last {shortDate(r.lastDoseDay)}</span>
+                      ) : (
+                        // An account can exist without the customer ever using
+                        // it — "View as" provisions one for leads.
+                        <span className="text-xs">{r.userId ? "Never signed in" : "No app account"}</span>
+                      )}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={9} className="bg-[var(--surface)] px-4 py-3">
+                        {r.orders.length === 0 ? (
+                          <p className="py-2 text-sm text-muted">No orders yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {r.orders.map((o) => (
+                              <div key={o.id} className="rounded-xl border border-[var(--border)] bg-white p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-display text-sm font-bold text-[var(--text)]">#{o.number}</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${statusTones[o.status]}`}>
+                                      {o.status}
+                                    </span>
+                                  </div>
+                                  <span className="font-semibold text-[var(--text)]">{money2(o.total)} {o.currency}</span>
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted sm:grid-cols-4">
+                                  <span>Placed: {shortDate(o.placedAt)}</span>
+                                  <span>Bought via: {o.platform}</span>
+                                  <span>Attribution: {o.saleOrigin}</span>
+                                  <span>Payment: {o.paymentMethod || "—"}</span>
+                                  <span>
+                                    Fulfillment: {o.shippingStatus || "—"}
+                                    {o.fulfilledAt ? ` (${shortDate(o.fulfilledAt)})` : ""}
+                                  </span>
+                                  {o.trackingUrl && (
+                                    <a
+                                      href={o.trackingUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-semibold text-[var(--accent)] hover:underline"
+                                    >
+                                      Track package →
+                                    </a>
+                                  )}
+                                  {o.chargebackAt && (
+                                    <span className="font-semibold text-rose-700">
+                                      Chargeback: {o.chargebackAmount != null ? money2(o.chargebackAmount) : "amount unknown"}
+                                      {o.total != null && o.chargebackAmount != null && o.chargebackAmount < o.total ? " (partial)" : ""}
+                                      {` (${shortDate(o.chargebackAt)})`}
+                                    </span>
+                                  )}
+                                  {o.refundedAt && !o.chargebackAt && (
+                                    <span className="font-semibold text-amber-700">
+                                      Refund: {o.refundAmount != null ? money2(o.refundAmount) : "amount unknown"}
+                                      {o.refundAmount != null && o.refundAmount < o.total ? " (partial)" : ""}
+                                      {` (${shortDate(o.refundedAt)})`}
+                                    </span>
+                                  )}
+                                </div>
+                                {o.address && <p className="mt-1 text-xs text-muted">{o.address}</p>}
+                                {o.items.length > 0 && (
+                                  <ul className="mt-2 space-y-0.5 text-xs text-[var(--text)]">
+                                    {o.items.map((it, i) => (
+                                      <li key={i} className="flex justify-between gap-2">
+                                        <span>
+                                          {it.productName || "Product"} {it.sku ? `· ${it.sku}` : ""} × {it.qty}
+                                        </span>
+                                        <span className="text-muted">{money2(it.price)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            ))}
+                            {hasCanceledOrRefunded && (
+                              <p className="pt-1 text-xs text-muted">LTV counts confirmed and shipped orders only.</p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-4 py-10 text-center text-muted">No customers match these filters.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* pagination */}
+      {data && data.filteredCount > data.limit && (
+        <div className="mt-3 flex items-center justify-between text-sm">
+          <button
+            onClick={() => setOffset(Math.max(0, offset - (data.limit || 100)))}
+            disabled={offset === 0}
+            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+          >
+            ← Previous
+          </button>
+          <span className="text-muted">
+            Page {Math.floor(offset / data.limit) + 1} of {Math.max(1, Math.ceil(data.filteredCount / data.limit))}
+          </span>
+          <button
+            onClick={() => setOffset(offset + data.limit)}
+            disabled={offset + data.limit >= data.filteredCount}
+            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

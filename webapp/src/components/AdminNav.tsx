@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, Send, Megaphone, ShieldCheck, UserCog, LogOut } from "lucide-react";
+import { LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut } from "lucide-react";
 import { useAdmin } from "./AdminProvider";
 import { ROLE_LABELS, type Permission } from "@/server/permissions";
 
 const links: { href: string; label: string; icon: React.ElementType; exact?: boolean; permission?: Permission }[] = [
-  { href: "/admin", label: "Customers", icon: Users, exact: true },
+  { href: "/admin/support", label: "Support", icon: LifeBuoy },
+  { href: "/admin", label: "Customers", icon: Users, exact: true, permission: "analytics:read" },
   { href: "/admin/push", label: "Push", icon: Send, permission: "push:send" },
   { href: "/admin/banners", label: "Banners", icon: Megaphone, permission: "banners:write" },
   { href: "/admin/access", label: "Access", icon: ShieldCheck, permission: "admins:manage" },
