@@ -24,7 +24,7 @@ import { stripLockedFields } from "@/server/field-locks";
 // can't clobber it back. See src/server/field-locks.ts.
 // ---------------------------------------------------------------------------
 
-type Params = Record<string, string>;
+export type Params = Record<string, string>;
 
 /**
  * Merge query + body params; body is canonical, query fills gaps.
@@ -66,10 +66,18 @@ function num(s: string | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
-type OrderStatus = "confirmed" | "shipped" | "canceled" | "refunded";
+export type OrderStatus = "confirmed" | "shipped" | "canceled" | "refunded";
 
-/** Bank-initiated dispute, distinct from a merchant-issued refund but tracked under the same "refunded" status. */
-function isChargebackEvent(p: Params, eventTag: string | undefined): boolean {
+/**
+ * Bank-initiated dispute, distinct from a merchant-issued refund but tracked
+ * under the same "refunded" status. Also matches "chargeback alert" /
+ * "Chargeback Alert-RDR" style action types (a forced pre-dispute refund) —
+ * see the ago/2026 refund/chargeback analysis: those are reported as refunds
+ * with Reason="Chargeback alert" but are chargeback-program events, not
+ * ordinary merchant refunds. Exported for src/server/n8n-forward.ts, which
+ * reuses this exact rule to route IPN fan-out to the right n8n webhook.
+ */
+export function isChargebackEvent(p: Params, eventTag: string | undefined): boolean {
   const action = (p.action_type || p.type || eventTag || "").toLowerCase();
   return action.includes("chargeback") || action.includes("dispute");
 }
@@ -86,7 +94,8 @@ function readRefundAmount(p: Params): string | null {
   return candidates.length > 0 ? Math.max(...candidates).toFixed(2) : null;
 }
 
-function deriveStatus(p: Params, eventTag: string | undefined): OrderStatus {
+/** Exported for src/server/n8n-forward.ts — see isChargebackEvent above. */
+export function deriveStatus(p: Params, eventTag: string | undefined): OrderStatus {
   const action = (p.action_type || p.type || eventTag || "").toLowerCase();
   if (p.was_canceled === "1" || action.includes("cancel")) return "canceled";
   if (action.includes("refund") || isChargebackEvent(p, eventTag)) return "refunded";

@@ -9,5 +9,7 @@ export const GET = withAdmin(async (_admin, req: Request) => {
   const priority = url.searchParams.get("priority") || undefined;
   const updatedFrom = url.searchParams.get("updatedFrom") || undefined;
   const updatedTo = url.searchParams.get("updatedTo") || undefined;
-  return Response.json(await getTicketQueue({ status, q, kind, priority, updatedFrom, updatedTo }));
+  const excludeStatusRaw = url.searchParams.get("excludeStatus") || undefined;
+  const excludeStatus = excludeStatusRaw ? excludeStatusRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+  return Response.json(await getTicketQueue({ status, q, kind, priority, updatedFrom, updatedTo, excludeStatus }));
 }, "customers:read");

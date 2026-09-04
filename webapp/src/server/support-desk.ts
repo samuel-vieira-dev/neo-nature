@@ -68,6 +68,11 @@ export type TicketQueueFilters = {
   updatedFrom?: string;
   /** Inclusive, YYYY-MM-DD, compared against updatedAt up to 23:59:59.999 UTC that day. */
   updatedTo?: string;
+  /** Case-insensitive; drops tickets whose status is any of these. Used by the
+   *  stat-card links, whose counters are defined as "not resolved/closed"
+   *  rather than one single status (see getSupportStats' openTickets and
+   *  refundRequests) — a plain `status` equality can't express that. */
+  excludeStatus?: string[];
 };
 
 /**
@@ -80,6 +85,10 @@ export function filterTicketQueue(list: SupportTicket[], opts: TicketQueueFilter
   if (opts.status) {
     const s = opts.status.toLowerCase();
     out = out.filter((t) => t.status.toLowerCase() === s);
+  }
+  if (opts.excludeStatus?.length) {
+    const excluded = new Set(opts.excludeStatus.map((s) => s.toLowerCase()));
+    out = out.filter((t) => !excluded.has(t.status.toLowerCase()));
   }
   if (opts.kind) {
     out = out.filter((t) => t.kind === opts.kind);

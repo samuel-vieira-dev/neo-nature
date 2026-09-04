@@ -113,18 +113,23 @@ function StatCard({
   value,
   tone = "text-[var(--accent)]",
   onClick,
+  active = false,
 }: {
   icon: React.ElementType;
   label: string;
   value: number | string;
   tone?: string;
   onClick?: () => void;
+  active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="cursor-pointer rounded-2xl border border-[var(--border)] bg-white p-4 text-left transition hover:border-[var(--accent)]"
+      aria-pressed={active}
+      className={`cursor-pointer rounded-2xl border bg-white p-4 text-left transition hover:border-[var(--accent)] ${
+        active ? "border-[var(--accent)] ring-1 ring-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"
+      }`}
     >
       <div className="flex items-center gap-2 text-muted">
         <Icon className={`h-4 w-4 ${tone}`} />
@@ -171,7 +176,16 @@ const TICKET_PRIORITIES: { value: string; label: string }[] = [
   { value: "urgent", label: "Urgent" },
 ];
 
-type TicketsInitial = { status?: string; kind?: string; priority?: string; updatedFrom?: string; updatedTo?: string };
+type TicketsInitial = {
+  status?: string;
+  kind?: string;
+  priority?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  /** Set only when arriving via a stat card whose counter excludes resolved/closed
+   *  tickets (Open tickets, Refund requests) — not a manual filter control. */
+  excludeStatus?: string;
+};
 
 function TicketsPanel({ initial }: { initial: TicketsInitial }) {
   const [status, setStatus] = useState(initial.status ?? "");
@@ -179,6 +193,7 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
   const [priority, setPriority] = useState(initial.priority ?? "");
   const [updatedFrom, setUpdatedFrom] = useState(initial.updatedFrom ?? "");
   const [updatedTo, setUpdatedTo] = useState(initial.updatedTo ?? "");
+  const [excludeStatus, setExcludeStatus] = useState(initial.excludeStatus ?? "");
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
 
@@ -188,6 +203,7 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
   if (priority) params.set("priority", priority);
   if (updatedFrom) params.set("updatedFrom", updatedFrom);
   if (updatedTo) params.set("updatedTo", updatedTo);
+  if (excludeStatus) params.set("excludeStatus", excludeStatus);
   if (dq) params.set("q", dq);
 
   const { data, isLoading, error } = useQuery({
@@ -195,13 +211,14 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
     queryFn: () => adminApi<TicketsResp>(`/api/admin/support/tickets?${params.toString()}`),
   });
 
-  const hasFilters = !!(status || kind || priority || updatedFrom || updatedTo || q);
+  const hasFilters = !!(status || kind || priority || updatedFrom || updatedTo || excludeStatus || q);
   const clearFilters = () => {
     setStatus("");
     setKind("");
     setPriority("");
     setUpdatedFrom("");
     setUpdatedTo("");
+    setExcludeStatus("");
     setQ("");
   };
 
@@ -260,6 +277,12 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
           </button>
         )}
       </div>
+
+      {excludeStatus && (
+        <p className="mt-3 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+          Excluding {excludeStatus.split(",").join(" and ").toLowerCase()} tickets — matches the counter you clicked.
+        </p>
+      )}
 
       {data?.truncated && (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
@@ -737,11 +760,20 @@ function SupportPageInner() {
     priority: searchParams.get("priority") ?? "",
     updatedFrom: searchParams.get("updatedFrom") ?? "",
     updatedTo: searchParams.get("updatedTo") ?? "",
+    excludeStatus: searchParams.get("excludeStatus") ?? "",
   };
   const ordersInitial: OrdersInitial = {
     status: searchParams.get("status") ?? "",
     problem: searchParams.get("problem") ?? "",
   };
+
+  // Whether the page's current filters exactly match a stat card's own
+  // criteria — used to highlight that card as "active" (see the corresponding
+  // getSupportStats definitions in support-desk.ts).
+  const isTicketsFilter = (filters: Record<string, string>) =>
+    tab === "tickets" && Object.entries(filters).every(([k, v]) => (searchParams.get(k) ?? "") === v);
+  const isOrdersFilter = (filters: Record<string, string>) =>
+    tab === "orders" && Object.entries(filters).every(([k, v]) => (searchParams.get(k) ?? "") === v);
 
   return (
     <div>
@@ -756,7 +788,8 @@ function SupportPageInner() {
             icon={LifeBuoy}
             label="Open tickets"
             value={stats ? `${stats.openTickets}${stats.ticketsTruncated ? "+" : ""}` : "…"}
-            onClick={() => goTo("tickets", { status: "Open" })}
+            onClick={() => goTo("tickets", { excludeStatus: "Resolved,Closed" })}
+            active={isTicketsFilter({ excludeStatus: "Resolved,Closed", kind: "" })}
           />
           <StatCard
             icon={PackageX}
@@ -764,13 +797,15 @@ function SupportPageInner() {
             value={stats ? stats.awaitingShipment : "…"}
             tone="text-sky-600"
             onClick={() => goTo("orders", { problem: "awaiting" })}
+            active={isOrdersFilter({ problem: "awaiting", status: "" })}
           />
           <StatCard
             icon={RotateCcw}
             label="Refund requests"
             value={stats ? `${stats.refundRequests}${stats.ticketsTruncated ? "+" : ""}` : "…"}
             tone="text-amber-600"
-            onClick={() => goTo("tickets", { kind: "refund" })}
+            onClick={() => goTo("tickets", { kind: "refund", excludeStatus: "Resolved,Closed" })}
+            active={isTicketsFilter({ kind: "refund", excludeStatus: "Resolved,Closed" })}
           />
           <StatCard
             icon={ShieldAlert}
@@ -778,6 +813,7 @@ function SupportPageInner() {
             value={stats ? stats.chargebacks7d : "…"}
             tone="text-rose-600"
             onClick={() => goTo("orders", { problem: "chargeback" })}
+            active={isOrdersFilter({ problem: "chargeback", status: "" })}
           />
         </div>
       )}

@@ -204,6 +204,31 @@ describe("filterTicketQueue", () => {
     const list = [makeTicket({ id: 1, subject: "Refund please" }), makeTicket({ id: 2, subject: "Where is my order" })];
     expect(filterTicketQueue(list, { q: "refund" }).map((t) => t.id)).toEqual([1]);
   });
+
+  it("excludes tickets whose status is in excludeStatus, case-insensitively", () => {
+    const list = [
+      makeTicket({ id: 1, status: "Open" }),
+      makeTicket({ id: 2, status: "Pending" }),
+      makeTicket({ id: 3, status: "Resolved" }),
+      makeTicket({ id: 4, status: "closed" }),
+    ];
+    expect(filterTicketQueue(list, { excludeStatus: ["Resolved", "Closed"] }).map((t) => t.id)).toEqual([1, 2]);
+  });
+
+  it("combines kind + excludeStatus the same way the Refund requests stat card does", () => {
+    // Mirrors getSupportStats' refundRequests definition: kind === "refund"
+    // && status !== "Resolved" && status !== "Closed" — the stat-card click
+    // must produce this same set so the counter and the list agree.
+    const list = [
+      makeTicket({ id: 1, kind: "refund", status: "Open" }),
+      makeTicket({ id: 2, kind: "refund", status: "Pending" }),
+      makeTicket({ id: 3, kind: "refund", status: "Resolved" }), // counted out
+      makeTicket({ id: 4, kind: "refund", status: "Closed" }), // counted out
+      makeTicket({ id: 5, kind: "support", status: "Open" }), // wrong kind
+    ];
+    const result = filterTicketQueue(list, { kind: "refund", excludeStatus: ["Resolved", "Closed"] });
+    expect(result.map((t) => t.id)).toEqual([1, 2]);
+  });
 });
 
 describe("projectSupportCustomer", () => {
