@@ -5,6 +5,7 @@ import Providers from "@/components/Providers";
 import BottomNav from "@/components/BottomNav";
 import AppShell from "@/components/AppShell";
 import Clarity from "@/components/Clarity";
+import StylesheetGuard from "@/components/StylesheetGuard";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
       <body className="font-sans antialiased">
+        <StylesheetGuard />
         <Providers>
           <AppShell>{children}</AppShell>
           <BottomNav />

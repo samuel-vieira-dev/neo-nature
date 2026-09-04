@@ -6,7 +6,7 @@ import { jwtVerify } from "jose";
 const APP_COOKIE = "nn_session";
 const ADMIN_COOKIE = "nn_admin";
 
-const APP_PUBLIC = ["/login", "/api/auth", "/webhook-buygoods-info", "/webhook-konnektive"];
+const APP_PUBLIC = ["/login", "/api/auth", "/api/health", "/webhook-buygoods-info", "/webhook-konnektive"];
 
 async function hasValidCookie(request: NextRequest, name: string): Promise<boolean> {
   const token = request.cookies.get(name)?.value;

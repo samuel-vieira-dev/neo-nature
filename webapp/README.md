@@ -53,6 +53,13 @@ forecast, churn detection, tiers).
 | `N8N_FORWARD_ENABLED` | Optional override for the n8n fan-out above. Unset: forwarding is **on in production, off everywhere else** (dev/test never hit the client's real n8n with seeded or replayed data). Set to `true`/`false` to force it either way — e.g. a developer testing the real integration locally, or killing the fan-out in prod if the client's n8n is misbehaving. |
 | `ADMIN_PASSWORD` | **Bootstrap key only.** While `admin_users` is empty, `/admin-login` shows a *First access* form (name, email, password + this value as the "setup key") that creates the first account, always as `admin`. Once that first account exists this path is dead — every login after that is email + individual password (see "Admin panel access" below) and `ADMIN_PASSWORD` is inert. Still required to be set (unset → 503 on bootstrap); never commit the value. |
 
+## Deploys and the "page with no CSS" bug
+
+Every build names its CSS chunk by content hash and the prerendered HTML points at that exact file, so a visitor who gets HTML from one build and assets from another sees unstyled markup. Two guards against it:
+
+- `railway.json` sets `healthcheckPath: /api/health` (dependency-free liveness probe) and `overlapSeconds: 0`, so the new container only takes traffic once it answers and the old one stops serving at that moment instead of the two answering side by side.
+- `src/components/StylesheetGuard.tsx` is an inline script in the root layout that reloads the page once (loop-guarded per minute via sessionStorage) if any stylesheet fails to load — the second request lands on a single consistent build.
+
 ## Admin panel access
 
 Staff sign in with an individual email + password (`admin_users` table, separate
