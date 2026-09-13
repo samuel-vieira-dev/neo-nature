@@ -4,11 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { ArrowRight, Camera, CheckCircle2, Loader2, PartyPopper, Package, HeartHandshake, MessageCirclePlus, Phone } from "lucide-react";
+import { ArrowRight, Camera, CheckCircle2, Loader2, PartyPopper, Package, HeartHandshake } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { useOrders, useCreateTicket } from "@/lib/hooks";
 import { useRequestIds } from "@/lib/request-id";
 import { PageHeader, CTA } from "@/components/ui";
+import RefundForm from "@/components/RefundForm";
 import { issueTypes } from "@/lib/data";
 
 const stepVariants = {
@@ -68,7 +69,7 @@ export default function NewTicketPage() {
 
   return (
     <div>
-      <PageHeader title="Open a ticket" subtitle="Takes less than a minute" backHref="/support" />
+      <PageHeader title={step === 6 ? "Refund request" : "Open a ticket"} subtitle={step === 6 ? "Complete the form for our team to review" : "Takes less than a minute"} backHref="/support" />
 
       {/* progress dots */}
       {step < 3 && (
@@ -151,7 +152,7 @@ export default function NewTicketPage() {
               </div>
               {issue === "refund" && (
                 <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-center text-sm text-[var(--accent-strong)]">
-                  Covered by our 90-day guarantee — refunds are processed within 48h, no questions asked. 💚
+                  Covered by our 90-day guarantee — submit your request for review by our team. 💚
                 </p>
               )}
               {issue && (
@@ -228,29 +229,9 @@ export default function NewTicketPage() {
             </motion.div>
           )}
 
-          {/* REFUND — how to proceed: ticket or phone. Some people would rather
-              talk to someone than type, so we offer both instead of dropping
-              them straight into the description form. */}
           {step === 6 && (
             <motion.div key="s6" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
-              <h2 className="font-display text-lg font-bold text-[var(--text)]">How would you like to do this?</h2>
-              <p className="mt-1 text-base text-muted">
-                Both reach the same team — pick whichever is easier for you.
-              </p>
-              <div className="mt-5 space-y-3">
-                <CTA onClick={() => setStep(2)}>
-                  <MessageCirclePlus className="h-5 w-5" /> Open a refund ticket
-                </CTA>
-                <a
-                  href="tel:+18772864137"
-                  className="flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:bg-amber-700"
-                >
-                  <Phone className="h-5 w-5 text-white" /> Call us · +1 877 286 4137
-                </a>
-              </div>
-              <p className="mt-3 text-center text-sm text-muted">
-                Either way it&apos;s covered by the 90-day guarantee.
-              </p>
+              <RefundForm orderNumber={orderNumber} onBack={() => setStep(5)} />
             </motion.div>
           )}
 

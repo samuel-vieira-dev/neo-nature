@@ -33,6 +33,7 @@ async function nextTicketId() {
 }
 
 export type CreateTicketInput = {
+  refundResponse?: import("@/lib/refund/form").RefundResponse;
   userId: string;
   email: string | null;
   phone: string | null;
@@ -71,6 +72,7 @@ export async function createTicketForUser(input: CreateTicketInput): Promise<Cre
     .insert(tickets)
     .values({
       id,
+      refundResponse: input.refundResponse,
       userId: input.userId,
       subject: input.subject,
       orderNumber,

@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   "analytics:read", // stats/receita no topo do CRM
   "push:send",
   "banners:write",
+  "refund-form:write",
   "admins:manage", // criar/editar/desativar contas + ver auditoria
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

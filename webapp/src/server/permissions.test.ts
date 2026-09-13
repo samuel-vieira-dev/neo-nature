@@ -16,6 +16,7 @@ describe("permissionsFor", () => {
     const adminOnly: Permission[] = [
       "push:send",
       "banners:write",
+      "refund-form:write",
       "analytics:read",
       "customers:write",
       "orders:write",

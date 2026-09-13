@@ -302,6 +302,9 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export const ticketIdSeq = pgSequence("ticket_id_seq", { startWith: 2900 });
 
 export const tickets = pgTable("tickets", {
+  refundResponse: jsonb("refund_response").$type<import("@/lib/refund/form").RefundResponse>(),
+  refundReviewStatus: text("refund_review_status").notNull().default("new"),
+  refundNotes: text("refund_notes").notNull().default(""),
   id: text("id").primaryKey(), // "T-2901" — see ticketIdSeq
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   subject: text("subject").notNull(),
@@ -382,3 +385,21 @@ export type Ticket = typeof tickets.$inferSelect;
 export type AppNotification = typeof notifications.$inferSelect;
 export type Banner = typeof banners.$inferSelect;
 export type WebhookLog = typeof webhookLogs.$inferSelect;
+
+// Immutable form versions keep in-progress forms and historical answers stable.
+export const refundForms = pgTable("refund_forms", {
+  id: serial("id").primaryKey(),
+  definition: jsonb("definition").$type<import("@/lib/refund/form").RefundForm>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+export const refundUploads = pgTable("refund_uploads", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(),
+  fieldId: text("field_id").notNull(),
+  name: text("name").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  dataBase64: text("data_base64").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (t) => [index("refund_upload_request").on(t.userId, t.requestId)]);

@@ -1,0 +1,855 @@
+{
+  "title": "Neo Nature Refund Request",
+  "pages": [
+    {
+      "id": "start",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "4decfef6-34e4-4354-bdfd-ba54be669ecd",
+          "type": "copy",
+          "label": "To expedite the processing of your refund, please complete this brief form. It will only take a few minutes and will help us handle your request as efficiently as possible.\n🔒 Your information is secure. No sensitive data will be shared.\n\n1. Please, enter the email address you used when placing your order."
+        },
+        {
+          "id": "064443f2-715f-445b-8267-2bd0da65b1ab",
+          "type": "email",
+          "label": "E-mail",
+          "required": true
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "649f05f1-665a-46c3-9bda-f87d60420ef7",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "a824b087-fc7d-4856-90f2-6cffc30acaff",
+          "type": "copy",
+          "label": "2. Please, enter your full name exactly as it appears on your order"
+        },
+        {
+          "id": "229022c9-ba5b-4890-b807-15f6831420ef",
+          "type": "text",
+          "label": "Full Name",
+          "required": true,
+          "minLength": 5
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "f69ded21-1da3-44d6-8704-93642d2d22a4",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "75998b32-584c-4a81-8563-c2baa60c3d00",
+          "type": "copy",
+          "label": "3. Please, provide the phone number you entered when placing your order. We will not contact you"
+        },
+        {
+          "id": "b1a9887d-4a90-41da-80e0-5a912d17649f",
+          "type": "tel",
+          "label": "Phone Number",
+          "required": true
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "b1c483b8-d277-46ca-876f-3470353b131c",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "676f1cc9-42fb-4a16-95fa-f462c8fffc56",
+          "type": "copy",
+          "label": "4. Please, provide the purchase date of your order."
+        },
+        {
+          "id": "c030c6d0-4ade-4245-92d3-5d6197fba1ce",
+          "type": "date",
+          "label": "4. Please, provide the purchase date of your order.",
+          "required": true,
+          "noFuture": true
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "fb79942b-0e0c-4c6a-bd56-26478da2a509",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "030efa30-4244-4520-baad-a170c578202c",
+          "type": "copy",
+          "label": "5. Please, provide the exact name of the product you are requesting a refund for."
+        },
+        {
+          "id": "fa1a00b4-f17a-4156-ae3f-39c9617481ac",
+          "type": "text",
+          "label": "Product Name",
+          "required": true
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "19f0c9a2-6c0d-4233-a9f3-6c9ea0664a93",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "c49985d3-a878-43bd-bc72-93d7ea03740d",
+          "type": "copy",
+          "label": "6. Please, enter your order number to make it easier for us to verify your purchase"
+        },
+        {
+          "id": "38e6f077-f106-40a1-821e-2dbc2cdc9422",
+          "type": "text",
+          "label": "Order Number",
+          "required": true
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "ed5d092d-0fcb-46d9-a861-604935a35302",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "7b988a6b-8cf4-4661-9ba7-0e67544d51c7",
+          "type": "copy",
+          "label": "7. How many units of the product did you buy?"
+        },
+        {
+          "id": "73bc2183-d460-4ef2-bef0-ad36aec65281",
+          "type": "choice",
+          "label": "7. How many units of the product did you buy?",
+          "required": true,
+          "options": [
+            {
+              "id": "607ddc08-8416-49b8-8c43-7b325fe51f81",
+              "label": "1"
+            },
+            {
+              "id": "97f992d2-5286-4ec6-924b-817c41973b04",
+              "label": "2"
+            },
+            {
+              "id": "8fbb5083-9245-4753-9503-d154ced73aa9",
+              "label": "3"
+            },
+            {
+              "id": "864bb165-3e78-4a67-9260-d2781ac06ff3",
+              "label": "4"
+            },
+            {
+              "id": "58e3a7b3-ae07-4fb3-9bf4-05be28262743",
+              "label": "5"
+            },
+            {
+              "id": "82b9a725-019d-4400-aeef-54d06b3f02a1",
+              "label": "6"
+            },
+            {
+              "id": "531e791d-a58c-458b-a1bd-8baa44bf89ca",
+              "label": "More than 6"
+            }
+          ]
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "0842ea3f-e2cc-41bd-80cf-6f03ee7efae7",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "4ff708d3-979d-4411-b908-531898d5d3f3",
+          "type": "copy",
+          "label": "8. Select the method of payment used when placing your order."
+        },
+        {
+          "id": "41e3e5e4-51ea-4161-ba93-f5db96a4bb4c",
+          "type": "choice",
+          "label": "8. Select the method of payment used when placing your order.",
+          "required": true,
+          "options": [
+            {
+              "id": "9f26bea8-8f86-44a6-a834-93f16fd6cde6",
+              "label": "Paypal"
+            },
+            {
+              "id": "b705401f-e661-40e0-a50c-b56f5e9197b9",
+              "label": "Credit Card"
+            },
+            {
+              "id": "2dd5c4e5-69f6-44fc-8e0b-465a4ac54124",
+              "label": "Other"
+            }
+          ]
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "ff3c5316-ea26-403c-b0b1-deaf1dbd70bd",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "e33ff012-4a6f-4070-8dc9-b1ac3bdc4fd2",
+          "type": "copy",
+          "label": "9. Please specify the reason for purchasing the product.\n\nKindly include as many details as possible."
+        },
+        {
+          "id": "5be41a5c-0b79-46eb-8f3e-b4d2a185842b",
+          "type": "textarea",
+          "label": "9. Please specify the reason for purchasing the product.\n\nKindly include as many details as possible.",
+          "required": true,
+          "minLength": 10
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "f62352f0-0553-4e72-b63c-e9a843530c48",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "1654af1d-731e-4d12-9991-cd352cc87090",
+          "type": "copy",
+          "label": "10. Have you already received the product at your address?"
+        },
+        {
+          "id": "16ff6e58-b11c-4371-9fc8-799284facf10",
+          "type": "choice",
+          "label": "10. Have you already received the product at your address?",
+          "required": true,
+          "options": [
+            {
+              "id": "0e561b35-f44a-49f2-9142-fb2782115f82",
+              "label": "Yes, I have received the product"
+            },
+            {
+              "id": "0e7f81b7-fa2b-480f-8f27-ab54154b9817",
+              "label": "No, I haven't received the product yet"
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "16ff6e58-b11c-4371-9fc8-799284facf10",
+              "value": "0e7f81b7-fa2b-480f-8f27-ab54154b9817"
+            }
+          ],
+          "target": "a3061a0b-d8da-4ce7-86a0-973fd0db9b38",
+          "stop": false
+        },
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "16ff6e58-b11c-4371-9fc8-799284facf10",
+              "value": "0e561b35-f44a-49f2-9142-fb2782115f82"
+            }
+          ],
+          "target": "22c7cb77-af09-4781-ab97-e01377c53f8c",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "a3061a0b-d8da-4ce7-86a0-973fd0db9b38",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "25637f9f-904a-4ba4-982b-5802e1238a6e",
+          "type": "copy",
+          "label": "We completely understand your situation and we truly want to ensure that you receive all the support you need.\n\nTo proceed in the best and most efficient way possible, it is very important that we have access to the tracking information associated with your order.\nWe kindly ask that you send us this tracking information directly by email to support email.\n\nOnce your message reaches us, our team will carefully review all the details provided. This review allows us to fully understand the context, confirm the status of your order, and identify the best possible solution for your case.\nAfter the validation is complete, we will get back in touch with you to explain clearly what we found, confirm the next steps, and guide you through the resolution process.\nYour cooperation in providing this information is essential to move things forward smoothly and without unnecessary delays.\n\nPlease rest assured that we are fully committed to handling your request with attention, professionalism, and care.\nWhenever you need assistance, know that we are here for you. Our mission is to make sure you feel supported at every stage, and that no question or concern goes unanswered.\nThank you once again for your collaboration and for trusting our team to assist you."
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "16ff6e58-b11c-4371-9fc8-799284facf10",
+              "value": "0e7f81b7-fa2b-480f-8f27-ab54154b9817"
+            }
+          ],
+          "target": "01d0228f-7c83-41fa-af7a-608c56640a68",
+          "stop": true
+        },
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "c7ec8a28-a60a-4415-9a0f-7cc6fabf1648",
+              "value": "ca0b317b-65f6-4419-8e95-24da4fd96dc8"
+            }
+          ],
+          "target": "01d0228f-7c83-41fa-af7a-608c56640a68",
+          "stop": true
+        }
+      ]
+    },
+    {
+      "id": "22c7cb77-af09-4781-ab97-e01377c53f8c",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "464a491f-fccc-4477-98e7-4fc31e0debc0",
+          "type": "copy",
+          "label": "11. Kindly upload a photo of your purchase receipt below.\nPlease ensure that the product is fully visible in the picture. If it is still packaged, kindly take a photo of the entire packaging"
+        },
+        {
+          "id": "ab1311b6-aab9-4bbc-978b-d4801e34547b",
+          "type": "copy",
+          "label": "First photo: photo of the product"
+        },
+        {
+          "id": "5f3b71e5-1422-4679-ba71-9e091419117e",
+          "type": "file",
+          "label": "First photo: photo of the product",
+          "required": true,
+          "accept": "image",
+          "maxMB": 20
+        },
+        {
+          "id": "6fa7066e-9a3a-4900-b491-034f8bf7a62b",
+          "type": "copy",
+          "label": "Second photo: photo of the product box"
+        },
+        {
+          "id": "908d0a4f-f324-409b-beba-8060cfac5ec2",
+          "type": "file",
+          "label": "Second photo: photo of the product box",
+          "required": true,
+          "accept": "image",
+          "maxMB": 20
+        },
+        {
+          "id": "f2016e97-14a9-448e-ac09-8e9002670a5b",
+          "type": "copy",
+          "label": "Third photo: photo with the product in your hands"
+        },
+        {
+          "id": "5cb3a5ec-228d-40d8-9348-85fca9b42dfc",
+          "type": "file",
+          "label": "Third photo: photo with the product in your hands",
+          "required": true,
+          "accept": "image",
+          "maxMB": 20
+        },
+        {
+          "id": "a1724829-51d2-403b-9c2b-4d763953ac42",
+          "type": "copy",
+          "label": "Fourth photo: selfie with the product."
+        },
+        {
+          "id": "f8a05d93-d748-42ea-8dde-86b8b4611d8b",
+          "type": "file",
+          "label": "Fourth photo: selfie with the product.",
+          "required": true,
+          "accept": "image",
+          "maxMB": 20
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "a24f90d4-096c-489f-83c9-783886cc1c87",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "549432d1-39eb-43ec-a684-a090ba51228c",
+          "type": "copy",
+          "label": "12. Before proceeding, you need to be aware of and agree to the following refund process terms:"
+        },
+        {
+          "id": "7ed637ab-4882-4e87-a8cb-655447c3241f",
+          "type": "copy",
+          "label": "- The cost of returning the product is the sole responsibility of the customer.\n- The refund analysis process will only begin after the product has been received and verified by our team.\n- The purchase date will be checked to validate whether the order is within the eligibility period.\n- The product must be returned in its original packaging, with all items complete and in good condition."
+        },
+        {
+          "id": "c7ec8a28-a60a-4415-9a0f-7cc6fabf1648",
+          "type": "choice",
+          "label": "Agreement to refund process terms",
+          "required": true,
+          "options": [
+            {
+              "id": "38e42607-07a8-449e-9013-66166bf7adab",
+              "label": "Yes, I agree"
+            },
+            {
+              "id": "ca0b317b-65f6-4419-8e95-24da4fd96dc8",
+              "label": "I do not agree"
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "c7ec8a28-a60a-4415-9a0f-7cc6fabf1648",
+              "value": "ca0b317b-65f6-4419-8e95-24da4fd96dc8"
+            }
+          ],
+          "target": "a3061a0b-d8da-4ce7-86a0-973fd0db9b38",
+          "stop": false
+        },
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "c7ec8a28-a60a-4415-9a0f-7cc6fabf1648",
+              "value": "38e42607-07a8-449e-9013-66166bf7adab"
+            }
+          ],
+          "target": "ce644f20-19ae-47d5-adda-3d90a171af0e",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "ce644f20-19ae-47d5-adda-3d90a171af0e",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "5207bf67-6cef-4eb0-8ac8-6a3100e8023b",
+          "type": "copy",
+          "label": "13. Have you used the product?"
+        },
+        {
+          "id": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+          "type": "choice",
+          "label": "13. Have you used the product?",
+          "required": true,
+          "options": [
+            {
+              "id": "400bbcd7-9751-426b-ab73-0f7b2b4e307b",
+              "label": "Yes, more than 7 days"
+            },
+            {
+              "id": "adc64ae1-7b53-4575-aec3-79ce9feac044",
+              "label": "Yes, more than 14 days"
+            },
+            {
+              "id": "55e507a6-f4fe-4746-b8cb-da4f72a3dc17",
+              "label": "Yes, more than 30 days"
+            },
+            {
+              "id": "7bd78fe0-f761-4d9c-a7b4-31736aa87129",
+              "label": "Yes, more than 2 months"
+            },
+            {
+              "id": "037eddfb-42f9-496d-89d8-69f7955ddc7e",
+              "label": "Yes, more than 3 months"
+            },
+            {
+              "id": "4a7aa9df-76a8-4c32-af10-ca8c522c6d77",
+              "label": "I haven't used anything"
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "OR",
+          "conditions": [
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "400bbcd7-9751-426b-ab73-0f7b2b4e307b"
+            },
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "adc64ae1-7b53-4575-aec3-79ce9feac044"
+            }
+          ],
+          "target": "118a377f-8562-4e03-8e5e-888fbe5c78d8",
+          "stop": false
+        },
+        {
+          "operator": "OR",
+          "conditions": [
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "4a7aa9df-76a8-4c32-af10-ca8c522c6d77"
+            }
+          ],
+          "target": "118a377f-8562-4e03-8e5e-888fbe5c78d8",
+          "stop": false
+        },
+        {
+          "operator": "OR",
+          "conditions": [
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "55e507a6-f4fe-4746-b8cb-da4f72a3dc17"
+            },
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "037eddfb-42f9-496d-89d8-69f7955ddc7e"
+            },
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "7bd78fe0-f761-4d9c-a7b4-31736aa87129"
+            }
+          ],
+          "target": "40588f3b-89b8-4d44-864b-50156f34233c",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "40588f3b-89b8-4d44-864b-50156f34233c",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "a9a819ff-4336-4ccf-be9c-a83131bcbda2",
+          "type": "copy",
+          "label": "We understand your concern. Most people who followed the program consistently for this period have already started noticing positive changes — in fact, yours is the only case like this we’ve seen. Many customers report improvements in their daily energy, confidence, and overall well-being once they stay consistent, and most continue to see results strengthening over time.This shows how unique your situation is, and it’s exactly why we’re here to support you. Please remember, you’re not alone — the vast majority of people who stay on track experience the benefits they were hoping for.👉 Keep reading, because in the next step you’ll see even more positive cases that prove how powerful consistency really is."
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "8e73a80c-46f8-4719-b04b-ad9f16309e83",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "8b593638-1116-4469-96b0-c9714adaa52f",
+          "type": "copy",
+          "label": "Clients who stick with the program consistently are almost always the ones who reach their goals. In fact, the majority not only notice improvements, but also report that their progress accelerates the longer they stay committed. It’s this steady consistency that separates those who succeed from those who give up too early.👉 And the most encouraging part? Many of these clients started with the same doubts and concerns, but today they’re enjoying the results they once thought were out of reach."
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "1f9de7c9-96c7-4ec5-bf01-3cda177b891d",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "7481c1c7-50bf-449b-acfb-c99abca5c919",
+          "type": "copy",
+          "label": "The strongest results come from clients who stayed consistent until the end of their program. They’re the ones who report visible changes in their body, a noticeable boost in daily energy, more confidence in their routines, and even improvements in overall well-being. These aren’t isolated stories — they’re the common experiences of people who decided not to stop halfway.👉 Your case can be the next success story, as long as you keep going with the same consistency that brought results to so many others."
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "0d12f027-e250-466a-98cd-c5eb9dfec6c4",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "2d571af3-3557-4b1b-b633-850a4cadd642",
+          "type": "copy",
+          "label": "14. How would you like to proceed?"
+        },
+        {
+          "id": "5b18b567-90b9-4139-b009-180cae120d0b",
+          "type": "choice",
+          "label": "14. How would you like to proceed?",
+          "required": true,
+          "options": [
+            {
+              "id": "4f5310e7-1c49-4c40-a939-d8527654c6ce",
+              "label": "I want to give it another try"
+            },
+            {
+              "id": "992e1fe1-690c-4a4b-9f04-ef8f13961033",
+              "label": "No, I don't want to improve, and I want to proceed with the refund."
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "5b18b567-90b9-4139-b009-180cae120d0b",
+              "value": "4f5310e7-1c49-4c40-a939-d8527654c6ce"
+            }
+          ],
+          "target": "a4d480e4-fd27-4cc0-9c8e-8643f32e8de2",
+          "stop": false
+        },
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "5b18b567-90b9-4139-b009-180cae120d0b",
+              "value": "992e1fe1-690c-4a4b-9f04-ef8f13961033"
+            }
+          ],
+          "target": "884f294e-3abe-489b-9acb-2727df391448",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "a4d480e4-fd27-4cc0-9c8e-8643f32e8de2",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "9f5cc8dc-5483-4d2d-950a-910f16f2f703",
+          "type": "copy",
+          "label": "Congratulations on your decision to continue with the program!\nBy making this choice, you’ve aligned yourself with the same path that led many of our greatest success stories to achieve life-changing results. What truly separates those who succeed from those who give up is not luck, but commitment, consistency, and trust in the process.\n\nEvery single day that you follow the program correctly, you’re not just going through the motions — you are actively building the foundation of your transformation. The first steps may feel small, but they are essential. Over time, these daily efforts compound, creating the real and lasting change you’ve been looking for.\n\nThink of this journey as one of the best investments you’ll ever make: an investment in yourself. Stay focused, follow each instruction carefully, and always remind yourself why you started. With determination, you are closer than ever to becoming one of the success stories we proudly share as proof of how powerful this program can be.\n\nAnd remember, you are never alone in this process. Our dedicated support team is always by your side, ready to assist you with any questions, doubts, or encouragement you may need along the way. You can reach us anytime at support email.\n\nWe truly believe in you. We trust the process. And we are genuinely excited to celebrate your results together. Stay consistent, stay motivated, and get ready to watch your transformation unfold before your eyes."
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "5b18b567-90b9-4139-b009-180cae120d0b",
+              "value": "4f5310e7-1c49-4c40-a939-d8527654c6ce"
+            }
+          ],
+          "target": "01d0228f-7c83-41fa-af7a-608c56640a68",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "884f294e-3abe-489b-9acb-2727df391448",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "082887a7-4e17-4858-9a8e-fef792a4ced4",
+          "type": "copy",
+          "label": "15. What did you expect that didn’t happen?"
+        },
+        {
+          "id": "0ebbd6d7-8c32-4627-b819-21f0ab37858c",
+          "type": "textarea",
+          "label": "15. What did you expect that didn’t happen?",
+          "required": true,
+          "minLength": 10
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "c9cecac0-6805-41b4-9af4-1fd1c0dc5f67",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "368a8211-65ee-40e5-ae86-072304417c8a",
+          "type": "copy",
+          "label": "16. Was the product as advertised?"
+        },
+        {
+          "id": "70f4261d-13f3-42b6-9a6e-a2ec8fcd3d63",
+          "type": "choice",
+          "label": "16. Was the product as advertised?",
+          "required": true,
+          "options": [
+            {
+              "id": "b64147ef-89b5-400d-bd48-d63d71ca655b",
+              "label": "Yes"
+            },
+            {
+              "id": "3338866d-48df-4804-a1f6-d79f1e7859e4",
+              "label": "No"
+            }
+          ]
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "e54a47bf-a358-4d85-9ffc-f2e55ffa964e",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "4b86fc54-430f-47ed-b84a-65a8ae8bb9d9",
+          "type": "copy",
+          "label": "17. What is the main reason for the refund?"
+        },
+        {
+          "id": "f3a6e9f9-6319-47b8-a63c-656d3efe785d",
+          "type": "textarea",
+          "label": "17. What is the main reason for the refund?",
+          "required": true,
+          "minLength": 15
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "66473d71-b68f-417c-b46d-e29d4d773f43",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "b2d98cb3-73b4-428d-9c8c-8ce1dbbddfca",
+          "type": "copy",
+          "label": "18. Please upload a short video.\nInstructions:\nSay your full name and order number.\nBriefly explain the reasons for your request.\nShow the product on camera.\n👉 This video is very important because it helps us verify your case more quickly and ensures that we can process your request without delays. Thank you for your collaboration! 💙"
+        },
+        {
+          "id": "0a35dfa5-84ba-4b1a-943b-8bcff952c0f4",
+          "type": "file",
+          "label": "18. Please upload a short video.\nInstructions:\nSay your full name and order number.\nBriefly explain the reasons for your request.\nShow the product on camera.\n👉 This video is very important because it helps us verify your case more quickly and ensures that we can process your request without delays. Thank you for your collaboration! 💙",
+          "required": true,
+          "accept": "video",
+          "maxMB": 20
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "8ca46995-4d50-44c3-921c-fec201484761",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "9ff32e26-81fc-4351-955a-07687f5773c5",
+          "type": "copy",
+          "label": "19. Can you tell us if you received more bottles than you expected?"
+        },
+        {
+          "id": "2f70d24d-4dbd-4136-9041-6deed70afbad",
+          "type": "choice",
+          "label": "19. Can you tell us if you received more bottles than you expected?",
+          "required": true,
+          "options": [
+            {
+              "id": "f970b00d-2d14-4377-987c-bb056cde8470",
+              "label": "Yes"
+            },
+            {
+              "id": "ef409e19-9edc-42c9-b504-bfe6cbc25f68",
+              "label": "No"
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "OR",
+          "conditions": [
+            {
+              "field": "2f70d24d-4dbd-4136-9041-6deed70afbad",
+              "value": "f970b00d-2d14-4377-987c-bb056cde8470"
+            },
+            {
+              "field": "2f70d24d-4dbd-4136-9041-6deed70afbad",
+              "value": "ef409e19-9edc-42c9-b504-bfe6cbc25f68"
+            }
+          ],
+          "target": "8afbb81a-b4cd-4d03-8a94-b08d57a24036",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "8afbb81a-b4cd-4d03-8a94-b08d57a24036",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "941e23af-c44e-4c2b-a83c-cf958af3bef2",
+          "type": "copy",
+          "label": "20. Final Declaration."
+        },
+        {
+          "id": "b14c419d-e40c-482d-b8bd-14b1717aaeef",
+          "type": "checkbox",
+          "label": "20. Final Declaration.",
+          "required": true,
+          "options": [
+            {
+              "id": "e9341c22-1f36-4d30-af7e-b42ac241354b",
+              "label": "I confirm that all the information I have provided in this form is accurate and truthful. I understand that my request will only proceed after a detailed review by the support team, and that the validation process is mandatory before any refund or resolution can be approved."
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "operator": "AND",
+          "conditions": [
+            {
+              "field": "b14c419d-e40c-482d-b8bd-14b1717aaeef",
+              "value": "e9341c22-1f36-4d30-af7e-b42ac241354b"
+            }
+          ],
+          "target": "43d546d5-3a56-434b-b95a-d8a7dda2f5e7",
+          "stop": false
+        }
+      ]
+    },
+    {
+      "id": "118a377f-8562-4e03-8e5e-888fbe5c78d8",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "0cc67af3-10db-478d-9592-e049ad1a2f6c",
+          "type": "copy",
+          "label": "We instruct you to use the program for at least 30 days, because this is when the best results happen. 🎉 🎉By taking this step, you’ve shown not only commitment, but also the patience and discipline that lead to real transformation.\nTo achieve the best results, it’s essential that you follow the program consistently for . The first weeks are the foundation — they prepare your body and mind for the changes that will come with continued use. Every day of consistency brings you closer to the outcome you deserve.\nRemember: lasting results don’t appear overnight. They are built day after day, with discipline and trust in the process. By completing at least one month of use, you’ll unlock the real benefits the program was designed to deliver.\nAnd you’re not alone on this journey. Our team is here to support you whenever you need guidance, encouragement, or even just to share your progress. Feel free to reach out at  support email at any time.\nWe can’t wait to celebrate your progress and see how much you’ll achieve by following through. Keep going strong — your transformation is just beginning!\nStay motivated, stay consistent, and give yourself the gift of at least one month of dedication."
+        }
+      ],
+      "rules": [
+        {
+          "operator": "OR",
+          "conditions": [
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "400bbcd7-9751-426b-ab73-0f7b2b4e307b"
+            },
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "adc64ae1-7b53-4575-aec3-79ce9feac044"
+            },
+            {
+              "field": "a6d1ca4d-c089-4119-bc75-a59e2eaf807f",
+              "value": "4a7aa9df-76a8-4c32-af10-ca8c522c6d77"
+            }
+          ],
+          "target": null,
+          "stop": true
+        }
+      ]
+    },
+    {
+      "id": "9441933d-3326-4c35-801b-ae818efdc61a",
+      "thankYou": false,
+      "blocks": [
+        {
+          "id": "a96f4516-6e0a-4110-b80a-c36623305940",
+          "type": "copy",
+          "label": "To follow up on your order, the first step is to get your tracking details. Just send a quick message to our support team at support email asking for your tracking code — they’ll be happy to help you right away.While you wait for your package, remember that staying consistent with the program brings wonderful benefits: more stable energy during the day, better sleep, improved digestion, a balanced mood, and sharper focus. Little by little, these positive changes add up, making a real difference in your health and well-being."
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "43d546d5-3a56-434b-b95a-d8a7dda2f5e7",
+      "thankYou": true,
+      "blocks": [
+        {
+          "id": "ede3fe5f-f19f-4d2b-9fd2-031a003244c2",
+          "type": "copy",
+          "label": "Thank you for completing the information form.\n\nYour request has been successfully submitted to our system and is now under review.\nOur team will carefully analyze all the details you have provided to ensure accuracy, fairness, and full compliance with our refund policy. This verification process is essential to protect both our customers and the integrity of our program.\nOnce the validation is finalized, you will be contacted directly by our team with the outcome of your request and any next steps that may be required. Please keep an eye on your inbox, as all updates will be sent to the email you provided.\nWe truly appreciate your  during this process. Rest assured that your case is being handled with the highest level of attention and care.\nThank you once again for your trust — we are here to support you at every stage of this procedure."
+        }
+      ],
+      "rules": []
+    },
+    {
+      "id": "01d0228f-7c83-41fa-af7a-608c56640a68",
+      "thankYou": true,
+      "blocks": [
+        {
+          "id": "f2f1f3ac-5c61-457f-b1f0-697ec389ce3e",
+          "type": "copy",
+          "label": "Thank you for your time and patience."
+        }
+      ],
+      "rules": []
+    }
+  ]
+}
