@@ -8,10 +8,11 @@ import ImpersonationBanner from "@/components/ImpersonationBanner";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const admin = pathname.startsWith("/admin");
+  const standaloneRefund = pathname.startsWith("/refund");
   return (
     <main className={`relative z-10 mx-auto min-h-dvh w-full ${admin ? "max-w-5xl" : "max-w-md pb-32"}`}>
-      <ImpersonationBanner />
-      <InstallBanner />
+      {!standaloneRefund && <ImpersonationBanner />}
+      {!standaloneRefund && <InstallBanner />}
       {children}
     </main>
   );

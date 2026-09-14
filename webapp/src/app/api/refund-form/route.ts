@@ -2,19 +2,20 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { refundRequests, refundUploads, tickets } from "@/db/schema";
-import { withUser } from "@/server/session";
+import { withRefundUser } from "@/server/session";
 import { getRefundForm } from "@/server/refund-form";
 import { createTicketForUser, serializeTicket } from "@/server/tickets";
 import { EMAIL_FIELD, NAME_FIELD, PHONE_FIELD, ORDER_FIELD, responseDescription, validateSubmission } from "@/lib/refund/form";
 
-export const GET = withUser(async user => Response.json({ ...await getRefundForm(), defaults: {
-  [EMAIL_FIELD]: user.email ?? "", [NAME_FIELD]: user.fullName || user.name || "", [PHONE_FIELD]: user.phone ?? "",
-} }));
+export const GET = withRefundUser(async ({ user, orderNumber }) => Response.json({ ...await getRefundForm(), defaults: {
+  [EMAIL_FIELD]: user.email ?? "", [NAME_FIELD]: user.fullName || user.name || "", [PHONE_FIELD]: user.phone ?? "", ...(orderNumber ? { [ORDER_FIELD]: orderNumber } : {}),
+}, lockedFields: orderNumber ? [ORDER_FIELD] : [] }));
 const submissionSchema = z.object({ version: z.number().int().nonnegative(), clientRequestId: z.uuid(), answers: z.record(z.string().max(100), z.string().max(4000)).refine(a => Object.keys(a).length <= 40) });
-export const POST = withUser(async (user, req: Request) => {
+export const POST = withRefundUser(async ({ user, orderNumber }, req: Request) => {
   const parsed = submissionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
-  const { version, answers, clientRequestId } = parsed.data;
+  const { version, clientRequestId } = parsed.data;
+  const answers = orderNumber ? { ...parsed.data.answers, [ORDER_FIELD]: orderNumber } : parsed.data.answers;
   const existing = await db.query.tickets.findFirst({ where: eq(tickets.clientRequestId, clientRequestId) });
   if (existing) {
     if (existing.userId !== user.id || !existing.refundResponse) return Response.json({ error: "duplicate_request" }, { status: 409 });

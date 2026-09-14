@@ -150,6 +150,7 @@ describe("forwardToN8n", () => {
 
     const body = JSON.parse(init.body);
     expect(body.params).toEqual(params);
+    expect(body.refund_url).toMatch(/^https:\/\/app\.beneonature\.com\/refund\/access\?token=/);
     expect(body.received_at).toBe(meta.receivedAt);
     expect(body.event).toBe(meta.eventTag);
     expect(body.content_type).toBe(meta.contentType);

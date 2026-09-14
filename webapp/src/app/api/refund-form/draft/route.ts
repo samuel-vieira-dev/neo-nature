@@ -2,9 +2,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { refundRequests, refundUploads } from "@/db/schema";
-import { refundProgressOutcome } from "@/lib/refund/form";
+import { ORDER_FIELD, refundProgressOutcome } from "@/lib/refund/form";
 import { getRefundForm } from "@/server/refund-form";
-import { withUser } from "@/server/session";
+import { withRefundUser } from "@/server/session";
 
 const draftSchema = z.object({
   requestId: z.uuid(),
@@ -13,10 +13,11 @@ const draftSchema = z.object({
   answers: z.record(z.string().max(100), z.string().max(4000)).refine(a => Object.keys(a).length <= 40),
 });
 
-export const POST = withUser(async (user, req: Request) => {
+export const POST = withRefundUser(async ({ user, orderNumber }, req: Request) => {
   const parsed = draftSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
-  const { requestId, version, currentPageId, answers } = parsed.data;
+  const { requestId, version, currentPageId } = parsed.data;
+  const answers = orderNumber ? { ...parsed.data.answers, [ORDER_FIELD]: orderNumber } : parsed.data.answers;
   const config = await getRefundForm(version);
   if (!config) return Response.json({ error: "unknown_form_version" }, { status: 400 });
   if (!config.form.pages.some(page => page.id === currentPageId)) return Response.json({ error: "invalid_page" }, { status: 400 });

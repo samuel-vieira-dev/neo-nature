@@ -2,12 +2,13 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users, type User } from "@/db/schema";
+import { orders, users, type Order, type User } from "@/db/schema";
 
 // Two independent sessions so the customer app and the admin panel can be open
 // in normal browser tabs at the same time (same origin, different cookies).
 export const APP_COOKIE = "nn_session";
 export const ADMIN_COOKIE = "nn_admin";
+export const REFUND_COOKIE = "nn_refund";
 const secret = () => new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-secret-change-me");
 
 async function setSessionCookie(name: string, userId: string, opts?: { expiresIn?: string; maxAgeSec?: number; extra?: Record<string, unknown> }) {
@@ -53,6 +54,61 @@ export const createSession = (userId: string) => setSessionCookie(APP_COOKIE, us
 export const createAdminSession = (userId: string) => setSessionCookie(ADMIN_COOKIE, userId, { expiresIn: "12h", maxAgeSec: 60 * 60 * 12 });
 export const sessionUserId = () => userIdFromCookie(APP_COOKIE);
 export const adminSessionUserId = () => userIdFromCookie(ADMIN_COOKIE);
+
+const refundSecret = () =>
+  new TextEncoder().encode(`neo-nature-refund-session:${process.env.SESSION_SECRET ?? "dev-secret-change-me"}`);
+
+export async function createRefundSession(userId: string, orderId: string) {
+  const token = await new SignJWT({ uid: userId, oid: orderId, scope: "refund" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("24h")
+    .sign(refundSecret());
+  (await cookies()).set(REFUND_COOKIE, token, {
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24, path: "/",
+  });
+}
+
+export type RefundAccess = { user: User; order: Order | null; orderNumber: string | null };
+
+/** Accepts a normal app session or the order-scoped session minted by an email link. */
+export async function requireRefundAccess(scopedOnly = false): Promise<RefundAccess> {
+  if (!scopedOnly) {
+    const appUser = await getUser();
+    if (appUser) return { user: appUser, order: null, orderNumber: null };
+  }
+  const token = (await cookies()).get(REFUND_COOKIE)?.value;
+  if (!token) throw unauthorized();
+  try {
+    const { payload } = await jwtVerify(token, refundSecret());
+    if (payload.scope !== "refund" || typeof payload.uid !== "string" || typeof payload.oid !== "string") throw new Error("invalid_scope");
+    const [user, order] = await Promise.all([
+      db.query.users.findFirst({ where: eq(users.id, payload.uid) }),
+      db.query.orders.findFirst({ where: eq(orders.id, payload.oid) }),
+    ]);
+    if (!user || !order || order.userId !== user.id) throw new Error("invalid_order");
+    return { user, order, orderNumber: order.buygoodsOrderId ?? order.konnektiveOrderId ?? order.number };
+  } catch {
+    throw unauthorized();
+  }
+}
+
+export function withRefundUser<T extends unknown[]>(
+  handler: (access: RefundAccess, ...args: T) => Promise<Response>
+): (...args: T) => Promise<Response> {
+  return async (...args: T) => {
+    try {
+      const request = args[0] instanceof Request ? args[0] : null;
+      const scopedOnly = request?.headers.get("x-refund-access") === "email";
+      return await handler(await requireRefundAccess(scopedOnly), ...args);
+    } catch (e) {
+      if (e instanceof Response) return e;
+      console.error("[refund-api]", e);
+      return Response.json({ error: "internal" }, { status: 500 });
+    }
+  };
+}
 
 const IMPERSONATION_TTL = "15m";
 

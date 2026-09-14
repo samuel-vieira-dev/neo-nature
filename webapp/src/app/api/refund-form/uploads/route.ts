@@ -3,14 +3,14 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { refundRequests, refundUploads, tickets } from "@/db/schema";
-import { withUser } from "@/server/session";
+import { withRefundUser } from "@/server/session";
 import { getRefundForm } from "@/server/refund-form";
 import { makeLimiter } from "@/server/rate-limit";
 const limiter = makeLimiter({ max: 30, windowMs: 60 * 60 * 1000 });
 const MAX_BYTES = 20 * 1024 * 1024;
 const metadata = z.object({ requestId: z.uuid(), fieldId: z.string().max(100), version: z.coerce.number().int().nonnegative() });
 const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime", "video/webm"]);
-export const POST = withUser(async (user, req: Request) => {
+export const POST = withRefundUser(async ({ user }, req: Request) => {
   if (!limiter.hit(user.id).allowed) return Response.json({ error: "Too many uploads. Please try again later." }, { status: 429 });
   // Read with a hard bound even when Content-Length is absent or forged.
   const reader = req.body?.getReader();
