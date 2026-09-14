@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { refundUploads, tickets } from "@/db/schema";
+import { refundRequests, refundUploads, tickets } from "@/db/schema";
 import { withUser } from "@/server/session";
 import { getRefundForm } from "@/server/refund-form";
 import { makeLimiter } from "@/server/rate-limit";
@@ -41,11 +41,15 @@ export const POST = withUser(async (user, req: Request) => {
       and u.created_at < now() - interval '7 days'
       and not exists (select 1 from tickets t where t.user_id = u.user_id
         and t.client_request_id = u.request_id
-        and t.refund_response -> 'answers' ->> u.field_id = u.id)`);
+        and t.refund_response -> 'answers' ->> u.field_id = u.id)
+      and not exists (select 1 from refund_requests r where r.user_id = u.user_id
+        and r.id = u.request_id and r.answers ->> u.field_id = u.id)`);
     const [usage] = await tx.select({ total: sql<number>`coalesce(sum(${refundUploads.size}),0)` }).from(refundUploads).where(and(eq(refundUploads.userId, user.id), sql`${refundUploads.createdAt} > now() - interval '24 hours'`));
     if (Number(usage.total) + file.size > 200 * 1024 * 1024) return "Daily upload limit reached. Please try again tomorrow or contact support.";
     const existing = await tx.query.tickets.findFirst({ where: and(eq(tickets.clientRequestId, requestId), eq(tickets.userId, user.id)) });
     if (existing) return "This request has already been submitted.";
+    const draft = await tx.query.refundRequests.findFirst({ where: eq(refundRequests.id, requestId) });
+    if (draft && draft.userId !== user.id) return "Invalid request.";
     await tx.insert(refundUploads).values({ id, userId: user.id, requestId, fieldId, name: file.name.slice(0,200), mime: file.type, size: file.size, dataBase64: bytes.toString("base64") });
     return null;
   });

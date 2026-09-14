@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { refundUploads, tickets } from "@/db/schema";
+import { refundRequests, refundUploads, tickets } from "@/db/schema";
 import { withUser } from "@/server/session";
 import { getRefundForm } from "@/server/refund-form";
 import { createTicketForUser, serializeTicket } from "@/server/tickets";
@@ -18,6 +18,7 @@ export const POST = withUser(async (user, req: Request) => {
   const existing = await db.query.tickets.findFirst({ where: eq(tickets.clientRequestId, clientRequestId) });
   if (existing) {
     if (existing.userId !== user.id || !existing.refundResponse) return Response.json({ error: "duplicate_request" }, { status: 409 });
+    await db.update(refundRequests).set({ outcome: existing.refundResponse.outcome, ticketId: existing.id, currentPageId: existing.refundResponse.endPage, submittedAt: existing.createdAt, updatedAt: new Date() }).where(eq(refundRequests.id, clientRequestId));
     return Response.json({ ticket: serializeTicket(existing), endPage: existing.refundResponse.endPage });
   }
   const config = await getRefundForm(version);
@@ -34,5 +35,13 @@ export const POST = withUser(async (user, req: Request) => {
     orderNumber: result.answers[ORDER_FIELD], description: responseDescription(refundResponse).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>"), clientRequestId, refundResponse,
   });
   if (!ticket.ok) return Response.json({ error: ticket.error }, { status: 409 });
+  await db.insert(refundRequests).values({
+    id: clientRequestId, userId: user.id, formVersion: version, formDefinition: config.form,
+    answers: result.answers, currentPageId: result.endPage, outcome: result.outcome,
+    ticketId: ticket.ticket.id, submittedAt: new Date(),
+  }).onConflictDoUpdate({ target: refundRequests.id, set: {
+    answers: result.answers, currentPageId: result.endPage, outcome: result.outcome,
+    ticketId: ticket.ticket.id, submittedAt: new Date(), updatedAt: new Date(),
+  } });
   return Response.json({ ticket: ticket.ticket, endPage: result.endPage });
 });

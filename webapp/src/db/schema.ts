@@ -403,3 +403,22 @@ export const refundUploads = pgTable("refund_uploads", {
   dataBase64: text("data_base64").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (t) => [index("refund_upload_request").on(t.userId, t.requestId)]);
+
+// One row is created as soon as a customer opens the native refund flow. It is
+// updated after every answer/page change, so abandoned and flow-blocked attempts
+// remain visible to the customer-care team without creating a support ticket.
+export const refundRequests = pgTable("refund_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  formVersion: integer("form_version").notNull(),
+  formDefinition: jsonb("form_definition").$type<import("@/lib/refund/form").RefundForm>().notNull(),
+  answers: jsonb("answers").$type<import("@/lib/refund/form").Answers>().notNull().default({}),
+  currentPageId: text("current_page_id").notNull(),
+  outcome: text("outcome").notNull().default("draft"), // draft | blocked | refund | retained
+  ticketId: text("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+  reviewStatus: text("review_status").notNull().default("new"),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "date" }),
+}, (t) => [index("refund_request_user").on(t.userId), index("refund_request_updated").on(t.updatedAt)]);

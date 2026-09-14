@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
@@ -29,12 +29,32 @@ function FormSession({ config: initialConfig, orderNumber, onBack }: { config: C
   const [uploading, setUploading] = useState<string | null>(null);
   const [fileNames, setFileNames] = useState<Record<string,string>>({});
   const [ticketId, setTicketId] = useState<string | null>(null);
-  const requestId = useRef<string | null>(null);
+  const [saveState, setSaveState] = useState<"saving" | "saved" | "error">("saving");
+  const requestId = useRef(crypto.randomUUID());
+  const started = useRef(false);
+  const autosaveReady = useRef(false);
   const lock = useRef(false);
   const title = useRef<HTMLHeadingElement>(null);
   const qc = useQueryClient();
   const page = config.form.pages.find(p => p.id === history.at(-1))!;
-  const getId = () => requestId.current ??= crypto.randomUUID();
+  const getId = () => requestId.current;
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void fetch("/api/refund-form/draft", { method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+      body: JSON.stringify({ requestId: getId(), version: config.version, currentPageId: page.id, answers }),
+    }).then(res => { if (!res.ok) throw new Error(); setSaveState("saved"); }).catch(() => setSaveState("error"));
+  }, [answers, config.version, page.id]);
+  useEffect(() => {
+    if (!autosaveReady.current) { autosaveReady.current = true; return; }
+    const timer = window.setTimeout(() => {
+      setSaveState("saving");
+      void fetch("/api/refund-form/draft", { method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+        body: JSON.stringify({ requestId: getId(), version: config.version, currentPageId: page.id, answers }),
+      }).then(res => { if (!res.ok) throw new Error(); setSaveState("saved"); }).catch(() => setSaveState("error"));
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [answers, config.version, page.id]);
   const update = (id: string, value: string) => { setAnswers(a => ({ ...a, [id]: value })); setErrors(e => ({ ...e, [id]: "" })); setError(""); };
   const advance = (id: string) => { setHistory(h => [...h, id]); setErrors({}); setError(""); requestAnimationFrame(() => { title.current?.focus(); title.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }); };
   async function upload(block: RefundBlock, file?: File) {
@@ -68,7 +88,7 @@ function FormSession({ config: initialConfig, orderNumber, onBack }: { config: C
   const willSubmit = config.form.pages.find(p => p.id === next)?.thankYou;
   return <div className="pb-8" data-clarity-mask="true">
     <h2 ref={title} tabIndex={-1} className="font-display text-xl font-bold outline-none">{config.form.title}</h2>
-    <p className="mt-2 flex items-center gap-2 text-sm text-muted"><ShieldCheck className="h-4 w-4" />{ticketId ? `Reference: ${ticketId}` : `Step ${history.length} · Your information is secure`}</p>
+    <p className="mt-2 flex items-center gap-2 text-sm text-muted"><ShieldCheck className="h-4 w-4" />{ticketId ? `Reference: ${ticketId}` : `Step ${history.length} · Your information is secure · ${saveState === "saving" ? "Saving progress…" : saveState === "saved" ? "Progress saved" : "Progress will retry when you continue"}`}</p>
     <form onSubmit={proceed} noValidate className="mt-5 space-y-5">
       <fieldset disabled={busy || !!uploading || !!ticketId} className="space-y-5 disabled:opacity-70">
         {page.blocks.map(b => b.type === "copy" ? <p key={b.id} className="whitespace-pre-line text-base leading-relaxed">{b.label}</p> : <div key={b.id}>
@@ -84,7 +104,7 @@ function FormSession({ config: initialConfig, orderNumber, onBack }: { config: C
       </fieldset>
       {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-700">{error}</p>}
       {!ticketId && next && <button type="submit" disabled={busy || !!uploading} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] p-4 font-bold text-white disabled:opacity-60">{busy ? <><Loader2 className="h-5 w-5 animate-spin" /> Submitting…</> : willSubmit ? "Submit" : "Next"}</button>}
-      {!ticketId && !next && <div className="card rounded-2xl p-4"><p className="text-sm text-muted">No refund request has been submitted. Contact our team if you need help.</p><a href="tel:+18772864137" className="mt-2 block font-bold text-[var(--accent)]">Call support · +1 877 286 4137</a></div>}
+      {!ticketId && !next && <div className="card rounded-2xl p-4"><p className="text-sm text-muted">Your refund inquiry and the information provided have been recorded for our team. Contact support if you need help.</p><a href="tel:+18772864137" className="mt-2 block font-bold text-[var(--accent)]">Call support · +1 877 286 4137</a></div>}
       {!ticketId && <button type="button" disabled={busy || !!uploading} onClick={() => { setErrors({}); setError(""); if(history.length > 1) setHistory(h => h.slice(0,-1)); else onBack(); }} className="flex min-h-12 items-center gap-2 font-semibold text-muted"><ArrowLeft className="h-4 w-4" /> Back</button>}
       {ticketId && <Link href="/support" className="block rounded-2xl bg-[var(--accent)] p-4 text-center font-bold text-white">View my tickets</Link>}
     </form>

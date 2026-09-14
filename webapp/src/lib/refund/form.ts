@@ -60,6 +60,14 @@ export function nextPage(form: RefundForm, pageId: string, answers: Answers) {
   }
   return form.pages[index + 1]?.id ?? null;
 }
+export function refundProgressOutcome(form: RefundForm, pageId: string, answers: Answers): "draft" | "blocked" {
+  const page = form.pages.find(p => p.id === pageId);
+  if (!page || page.thankYou) return "draft";
+  return page.rules.some(rule => {
+    const matches = rule.conditions.map(c => answers[c.field] === c.value);
+    return rule.stop && (rule.operator === "AND" ? matches.every(Boolean) : matches.some(Boolean));
+  }) ? "blocked" : "draft";
+}
 export function fieldError(block: RefundBlock, value = "") {
   if (block.type === "copy") return null;
   if (!value.trim()) return block.required ? "Please complete this field." : null;

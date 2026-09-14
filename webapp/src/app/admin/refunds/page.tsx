@@ -6,8 +6,9 @@ import { useCan } from "@/components/AdminProvider";
 import NoAccess from "@/components/NoAccess";
 import { RefundForm, RefundResponse } from "@/lib/refund/form";
 
-type RequestRow = { id: string; userId: string; email: string; orderNumber: string; createdAt: string; status: string; notes: string; response: RefundResponse; syncStatus: string; freshdeskId: number | null };
+type RequestRow = { id: string; userId: string; ticketId: string | null; email: string; name: string; orderNumber: string; createdAt: string; updatedAt: string; submittedAt: string | null; status: string; notes: string; response: RefundResponse; syncStatus: string; freshdeskId: number | null };
 const statuses: Record<string,string> = {new:"New",in_review:"In review",awaiting_customer:"Awaiting customer",closed:"Closed"};
+const outcomes: Record<string,string> = {draft:"In progress / abandoned",blocked:"Stopped by form rules",refund:"Refund submitted",retained:"Customer retained"};
 const input = "w-full rounded-xl border border-[var(--border)] bg-white p-3 text-sm";
 const button = "rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50";
 export default function RefundsPage() {
@@ -17,21 +18,22 @@ export default function RefundsPage() {
   if (!canRead) return <NoAccess />;
   return <div className="mx-auto max-w-5xl" data-clarity-mask="true">
     <h1 className="font-display text-2xl font-bold">Refund forms</h1>
-    <p className="mt-1 text-sm text-muted">Review submissions and attachments. Review status does not issue a refund or change the order.</p>
+    <p className="mt-1 text-sm text-muted">Track every form from the moment it is opened, including abandoned attempts, stopped flows, answers and attachments. Review status does not issue a refund or change the order.</p>
     <div className="my-5 flex gap-3"><button className={tab === "requests" ? button : input+" !w-auto"} onClick={() => setTab("requests")}>Requests</button>{canEdit && <button className={tab === "form" ? button : input+" !w-auto"} onClick={() => setTab("form")}>Edit form</button>}</div>
     {tab === "requests" ? <Requests /> : <FormEditor />}
   </div>;
 }
 function Requests() {
   const [status,setStatus] = useState(""); const [page,setPage] = useState(0);
+  const [outcome,setOutcome] = useState("");
   const [selected,setSelected] = useState<RequestRow | null>(null);
-  const query = useQuery({ queryKey:["admin-refunds",status,page], queryFn:() => adminApi<{requests:RequestRow[];total:number}>(`/api/admin/refund-requests?status=${encodeURIComponent(status)}&page=${page}`) });
+  const query = useQuery({ queryKey:["admin-refunds",status,outcome,page], queryFn:() => adminApi<{requests:RequestRow[];total:number}>(`/api/admin/refund-requests?status=${encodeURIComponent(status)}&outcome=${encodeURIComponent(outcome)}&page=${page}`) });
   return <div>
-    <label className="mb-4 block max-w-xs text-sm font-semibold">Review status<select value={status} onChange={e => {setStatus(e.target.value);setPage(0);}} className={input}><option value="">All statuses</option>{Object.entries(statuses).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+    <div className="mb-4 grid max-w-2xl gap-3 sm:grid-cols-2"><label className="block text-sm font-semibold">Form state<select value={outcome} onChange={e => {setOutcome(e.target.value);setPage(0);}} className={input}><option value="">All progress</option>{Object.entries(outcomes).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label><label className="block text-sm font-semibold">Review status<select value={status} onChange={e => {setStatus(e.target.value);setPage(0);}} className={input}><option value="">All statuses</option>{Object.entries(statuses).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label></div>
     {query.isPending ? <p role="status">Loading requests…</p> : query.isError ? <div role="alert">Couldn&apos;t load requests. <button onClick={() => query.refetch()} className={button}>Retry</button></div> : <>
-      <p className="mb-3 text-sm text-muted">{query.data.total} submissions</p>
-      <div className="space-y-3">{query.data.requests.map(r => <button key={r.id} onClick={() => setSelected(r)} className="card flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-left"><span><strong>{r.id} · Order {r.orderNumber}</strong><span className="block text-sm text-muted">{r.email} · {new Date(r.createdAt).toLocaleString()}</span></span><span className="text-sm">{r.response.outcome === "retained" ? "Continued program · " : ""}{statuses[r.status]}</span></button>)}</div>
-      {!query.data.requests.length && <p className="card rounded-2xl p-8 text-center text-muted">No submissions found.</p>}
+      <p className="mb-3 text-sm text-muted">{query.data.total} tracked forms</p>
+      <div className="space-y-3">{query.data.requests.map(r => <button key={r.id} onClick={() => setSelected(r)} className="card flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-left"><span><strong>{r.ticketId ?? `Draft ${r.id.slice(0,8)}`} · Order {r.orderNumber}</strong><span className="block text-sm text-muted">{r.name || r.email || "Customer"}{r.email ? ` · ${r.email}` : ""} · Updated {new Date(r.updatedAt).toLocaleString()}</span></span><span className="text-sm"><strong>{outcomes[r.response.outcome] ?? r.response.outcome}</strong><span className="block text-muted">{statuses[r.status]}</span></span></button>)}</div>
+      {!query.data.requests.length && <p className="card rounded-2xl p-8 text-center text-muted">No tracked forms found.</p>}
       <div className="mt-4 flex items-center gap-4"><button className={button} disabled={page===0} onClick={() => setPage(p=>p-1)}>Previous</button><span>Page {page+1}</span><button className={button} disabled={(page+1)*25 >= query.data.total} onClick={() => setPage(p=>p+1)}>Next</button></div>
     </>}
     {selected && <RequestDetail key={selected.id} row={selected} close={() => setSelected(null)} />}
@@ -43,10 +45,13 @@ function RequestDetail({row,close}:{row:RequestRow;close:()=>void}) {
   useEffect(() => { dialog.current?.showModal(); }, []);
   const [status,setStatus] = useState(row.status); const [notes,setNotes] = useState(row.notes);
   const mutation = useMutation({ mutationFn:() => adminApi("/api/admin/refund-requests",{method:"PATCH",body:JSON.stringify({id:row.id,status,notes})}), onSuccess:() => {qc.invalidateQueries({queryKey:["admin-refunds"]});close();} });
+  const answered = row.response.form.pages.flatMap(p => p.blocks).filter(b => b.type !== "copy" && row.response.answers[b.id]);
+  const currentPage = row.response.form.pages.findIndex(p => p.id === row.response.endPage) + 1;
   return <dialog ref={dialog} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-3xl overflow-y-auto rounded-3xl bg-white p-0 text-[var(--text)] backdrop:bg-black/40" aria-label={`Request ${row.id}`} onCancel={e => { e.preventDefault(); if (!mutation.isPending) close(); }}>
-    <div className="mx-auto max-w-3xl rounded-3xl bg-white p-5 sm:p-8"><div className="flex justify-between gap-4"><h2 className="text-xl font-bold">{row.id} · Order {row.orderNumber}</h2><button autoFocus onClick={close} disabled={mutation.isPending} className="font-semibold">Close</button></div>
-      <p className="mt-2 text-sm text-muted">Form version {row.response.version} · Freshdesk: {row.syncStatus}{row.freshdeskId ? ` (#${row.freshdeskId})` : ""}</p>
-      <div className="my-6 space-y-5">{row.response.form.pages.flatMap(p => p.blocks).filter(b => b.type !== "copy" && row.response.answers[b.id]).map(b => <div key={b.id}><h3 className="whitespace-pre-line text-sm font-bold">{b.label}</h3>{b.type === "file" ? <a className="mt-1 inline-block font-semibold text-[var(--accent)] underline" href={`/api/admin/refund-requests/${encodeURIComponent(row.id)}/attachments/${encodeURIComponent(row.response.answers[b.id])}`}>Download {b.accept === "video" ? "video" : "photo"}</a> : <p className="mt-1 whitespace-pre-wrap break-words rounded-xl bg-[var(--surface)] p-3 text-sm">{b.options?.find(o => o.id === row.response.answers[b.id])?.label ?? row.response.answers[b.id]}</p>}</div>)}</div>
+    <div className="mx-auto max-w-3xl rounded-3xl bg-white p-5 sm:p-8"><div className="flex justify-between gap-4"><h2 className="text-xl font-bold">{row.ticketId ?? `Draft ${row.id.slice(0,8)}`} · Order {row.orderNumber}</h2><button autoFocus onClick={close} disabled={mutation.isPending} className="font-semibold">Close</button></div>
+      <p className="mt-2 text-sm text-muted">{outcomes[row.response.outcome] ?? row.response.outcome} · Page {currentPage || "—"} of {row.response.form.pages.length} · Form version {row.response.version}</p>
+      <p className="mt-1 text-sm text-muted">Opened {new Date(row.createdAt).toLocaleString()} · Last activity {new Date(row.updatedAt).toLocaleString()} · Freshdesk: {row.syncStatus}{row.freshdeskId ? ` (#${row.freshdeskId})` : ""}</p>
+      <div className="my-6 space-y-5">{answered.map(b => <div key={b.id}><h3 className="whitespace-pre-line text-sm font-bold">{b.label}</h3>{b.type === "file" ? <a className="mt-1 inline-block font-semibold text-[var(--accent)] underline" href={`/api/admin/refund-requests/${encodeURIComponent(row.id)}/attachments/${encodeURIComponent(row.response.answers[b.id])}`}>Download {b.accept === "video" ? "video" : "photo"}</a> : <p className="mt-1 whitespace-pre-wrap break-words rounded-xl bg-[var(--surface)] p-3 text-sm">{b.options?.find(o => o.id === row.response.answers[b.id])?.label ?? row.response.answers[b.id]}</p>}</div>)}{!answered.length && <p className="rounded-xl bg-[var(--surface)] p-4 text-sm text-muted">The customer opened the form but has not answered any fields yet.</p>}</div>
       {canWrite && <form onSubmit={e => {e.preventDefault();mutation.mutate();}} className="space-y-4"><label className="block text-sm font-semibold">Review status<select value={status} onChange={e=>setStatus(e.target.value)} className={input}>{Object.entries(statuses).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label className="block text-sm font-semibold">Internal notes<textarea className={input} rows={5} maxLength={8000} value={notes} onChange={e=>setNotes(e.target.value)} /></label>{mutation.isError && <p role="alert" className="text-rose-700">{mutation.error.message}</p>}<button className={button} disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Save review"}</button></form>}
     </div>
   </dialog>;
