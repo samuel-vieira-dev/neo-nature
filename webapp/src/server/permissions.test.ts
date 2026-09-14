@@ -6,9 +6,9 @@ describe("permissionsFor", () => {
     expect(permissionsFor("admin")).toEqual(PERMISSIONS);
   });
 
-  it("cs has exactly the five customer-support permissions", () => {
+  it("cs has the customer-support and full refund-management permissions", () => {
     expect(new Set(permissionsFor("cs"))).toEqual(
-      new Set(["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund"])
+      new Set(["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund", "refund-form:write"])
     );
   });
 
@@ -16,7 +16,6 @@ describe("permissionsFor", () => {
     const adminOnly: Permission[] = [
       "push:send",
       "banners:write",
-      "refund-form:write",
       "analytics:read",
       "customers:write",
       "orders:write",

@@ -28,7 +28,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export const ROLES = {
   admin: [...PERMISSIONS],
-  cs: ["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund"],
+  cs: ["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund", "refund-form:write"],
 } as const satisfies Record<string, readonly Permission[]>;
 export type Role = keyof typeof ROLES;
 
