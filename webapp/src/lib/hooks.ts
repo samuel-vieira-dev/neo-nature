@@ -14,7 +14,7 @@ import { usePathname, useRouter } from "next/navigation";
  * (nn_admin) — redirecting from there would kick the admin out of /admin-login.
  */
 function isCustomerAuthPage(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/admin");
+  return pathname.startsWith("/login") || pathname.startsWith("/admin") || pathname.startsWith("/refund");
 }
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -66,13 +66,14 @@ export type Me = {
 };
 
 export function useMe() {
-  // Skip on the admin area: it has no customer session, so the request would
-  // only ever 401 (and admins shouldn't pay for a pointless round-trip).
+  // Skip areas that do not use the normal customer session. The public refund
+  // flow has its own order-scoped session, so /api/me would correctly return
+  // 401 there and must not trigger the global /login redirect.
   const pathname = usePathname();
   return useQuery({
     queryKey: ["me"],
     queryFn: () => api<Me>("/api/me"),
-    enabled: !pathname.startsWith("/admin"),
+    enabled: !pathname.startsWith("/admin") && !pathname.startsWith("/refund"),
   });
 }
 

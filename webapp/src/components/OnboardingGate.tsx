@@ -24,7 +24,8 @@ export default function OnboardingGate() {
       !me.impersonating &&
       !pathname.startsWith("/onboarding") &&
       !pathname.startsWith("/login") &&
-      !pathname.startsWith("/admin")
+      !pathname.startsWith("/admin") &&
+      !pathname.startsWith("/refund")
     ) {
       router.replace("/onboarding");
     }
