@@ -39,7 +39,6 @@ forecast, churn detection, tiers).
 |---|---|
 | `DATABASE_URL` | Postgres connection string |
 | `SESSION_SECRET` | JWT session signing |
-| `PUBLIC_APP_URL` | Optional public origin used in signed refund links sent to email automation. Defaults to `https://app.beneonature.com`. |
 | `JOB_KEY` | Auth for the cron endpoint `/api/jobs/tick` |
 | `DEMO_MODE` + `NEXT_PUBLIC_DEMO_MODE` | `true` enables persona login, on-screen OTP, demo panel |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Real web push |

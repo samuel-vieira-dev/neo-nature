@@ -1,5 +1,4 @@
 import { deriveStatus, isChargebackEvent, type Params } from "@/server/buygoods";
-import { createRefundEmailUrl } from "@/server/refund-link";
 
 // ---------------------------------------------------------------------------
 // Fan-out of every BuyGoods IPN we receive to the client's n8n webhooks, in
@@ -100,10 +99,8 @@ export async function forwardToN8n(target: N8nTarget, params: Params, meta: Forw
   }
 
   const url = `${baseUrl()}/${N8N_PATH[target]}`;
-  const refundUrl = target === "orders" ? await createRefundEmailUrl(`bg-${params.order_id_global}`) : null;
   const body = JSON.stringify({
     params,
-    refund_url: refundUrl,
     received_at: meta.receivedAt,
     event: meta.eventTag ?? null,
     content_type: meta.contentType ?? null,

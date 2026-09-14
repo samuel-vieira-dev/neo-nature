@@ -88,7 +88,7 @@ export async function requireRefundAccess(scopedOnly = false): Promise<RefundAcc
       db.query.orders.findFirst({ where: eq(orders.id, payload.oid) }),
     ]);
     if (!user || !order || order.userId !== user.id) throw new Error("invalid_order");
-    return { user, order, orderNumber: order.buygoodsOrderId ?? order.konnektiveOrderId ?? order.number };
+    return { user, order, orderNumber: order.number };
   } catch {
     throw unauthorized();
   }
