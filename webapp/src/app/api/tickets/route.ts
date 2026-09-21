@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { tickets } from "@/db/schema";
-import { withUser } from "@/server/session";
+import { withUser, requirePurchaseEmailConfirmation } from "@/server/session";
 import { createTicketForUser, serializeTicket } from "@/server/tickets";
 
 const createSchema = z.object({
@@ -23,6 +23,7 @@ export const GET = withUser(async (user) => {
 });
 
 export const POST = withUser(async (user, request: Request) => {
+  await requirePurchaseEmailConfirmation();
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
 

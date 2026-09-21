@@ -31,7 +31,7 @@ export default function Home() {
   // package wasn't in hand when they first signed in). No dose button, streak
   // or bottle forecast — the package is the whole story until it lands. Both
   // layouts wait for /api/me so the wrong one never flashes first.
-  const preArrival = hydrated && !me.user.onboarded;
+  const preArrival = hydrated && !me.user.onboarded && !me.linkAccess;
   const packageOrder = ordersData?.orders.find((o) => o.awaitingArrival) ?? activeOrder ?? ordersData?.orders[0];
   const bottleProduct = me?.bottle ? productById(me.bottle.productId) : null;
   const runsOutLabel = me?.bottle

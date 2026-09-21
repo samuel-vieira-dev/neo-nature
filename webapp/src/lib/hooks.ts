@@ -14,7 +14,7 @@ import { usePathname, useRouter } from "next/navigation";
  * (nn_admin) — redirecting from there would kick the admin out of /admin-login.
  */
 function isCustomerAuthPage(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/admin") || pathname.startsWith("/refund");
+  return pathname.startsWith("/access-error") || pathname.startsWith("/login") || pathname.startsWith("/admin") || pathname.startsWith("/refund");
 }
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -63,6 +63,7 @@ export type Me = {
   unread: number;
   bottle: { productId: string; dosesTaken: number; dosesLeft: number; daysLeft: number; runsOutAt: string } | null;
   impersonating: boolean;
+  linkAccess: boolean;
 };
 
 export function useMe() {

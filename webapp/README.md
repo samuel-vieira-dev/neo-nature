@@ -117,3 +117,38 @@ a **free trial account** to validate, then swap in the client's real credentials
 - Catalog/protocols/kits/FAQ live in code (`src/lib/data.ts`), user data in Postgres
 
 Deploy failed.
+
+
+### Customer access from purchase emails
+
+Campaign link: `https://<app-domain>/?order_id=<order-id>&email=<purchase-email>`
+(URL-encode both values, especially `+` in email addresses). The direct endpoint
+`/api/auth/link?order_id=...&email=...` is also supported. IDs may be the internal
+order ID, order number, BuyGoods ID, or Konnektive ID. The order must already exist
+in the database and its purchase email must match.
+
+The server creates a 30-day customer session and redirects to `/`, removing the
+credentials from the displayed URL before rendering analytics or app content.
+Link sessions skip mandatory onboarding and can track orders and log doses.
+Support and refund entry require typing the purchase email once per link session;
+the server enforces that confirmation too. Reopening a link resets confirmation.
+Existing SMS login, admin login, and standalone refund links remain available.
+Recorded content is not implemented by this change.
+
+Build campaign URLs using URL encoding instead of raw string interpolation:
+
+```js
+const link = new URL("https://<app-domain>/");
+link.searchParams.set("order_id", orderId);
+link.searchParams.set("email", purchaseEmail);
+// Send link.toString() to the buyer.
+```
+
+For example, an email of `buyer+order@example.com` becomes
+`?order_id=12345&email=buyer%2Border%40example.com`. A missing or mismatched
+order/email opens the access-error page without granting a customer session.
+
+Treat these reusable links as account-access credentials: anyone holding one can
+access the customer app. Retyping an email already present in the link is a usability
+confirmation, not independent identity verification. Query parameters may remain in
+email systems and server access logs; avoid logging or sharing complete links.

@@ -6,7 +6,7 @@ import { jwtVerify } from "jose";
 const APP_COOKIE = "nn_session";
 const ADMIN_COOKIE = "nn_admin";
 
-const APP_PUBLIC = ["/login", "/refund", "/api/refund/access", "/api/refund-form", "/api/auth", "/api/health", "/webhook-buygoods-info", "/webhook-konnektive"];
+const APP_PUBLIC = ["/access-error", "/login", "/refund", "/api/refund/access", "/api/refund-form", "/api/auth", "/api/health", "/webhook-buygoods-info", "/webhook-konnektive"];
 
 async function hasValidCookie(request: NextRequest, name: string): Promise<boolean> {
   const token = request.cookies.get(name)?.value;
@@ -33,6 +33,17 @@ export async function proxy(request: NextRequest) {
     if (await hasValidCookie(request, ADMIN_COOKIE)) return NextResponse.next();
     if (isAdminApi) return Response.json({ error: "unauthorized" }, { status: 401 });
     return NextResponse.redirect(new URL("/admin-login", request.url));
+  }
+
+  // Accept email campaign links before existing-session redirects.
+  if ((pathname === "/" || pathname === "/login") && (request.nextUrl.searchParams.has("order_id") || request.nextUrl.searchParams.has("email"))) {
+    const url = new URL("/api/auth/link", request.url);
+    url.searchParams.set("order_id", request.nextUrl.searchParams.get("order_id") ?? "");
+    url.searchParams.set("email", request.nextUrl.searchParams.get("email") ?? "");
+    const response = NextResponse.redirect(url);
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
   }
 
   // ---- Customer app (nn_session) ----

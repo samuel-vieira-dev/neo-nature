@@ -1,7 +1,7 @@
 import { desc, eq, isNull, and } from "drizzle-orm";
 import { db } from "@/db";
 import { doseLogs, notifications, bottles } from "@/db/schema";
-import { withUser, impersonatorId } from "@/server/session";
+import { withUser, impersonatorId, linkSession } from "@/server/session";
 import { appNow, userToday } from "@/server/time";
 import { computeStreak, bottleForecast } from "@/server/domain";
 import { loadUserOrders } from "@/server/orders";
@@ -60,5 +60,6 @@ export const GET = withUser(async (user) => {
     // an admin previewing this account skips the onboarding gate — see
     // OnboardingGate — so leads can be inspected without faking their answers
     impersonating: !!impersonatedBy,
+    linkAccess: !!(await linkSession()),
   });
 });

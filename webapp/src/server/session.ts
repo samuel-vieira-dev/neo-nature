@@ -47,6 +47,20 @@ async function userIdFromCookie(name: string): Promise<string | null> {
   return (payload?.uid as string) ?? null;
 }
 
+export const createLinkSession = (userId: string, orderId: string, purchaseEmailConfirmed = false) =>
+  setSessionCookie(APP_COOKIE, userId, { extra: { access: "purchase-link", orderId, purchaseEmailConfirmed } });
+
+export async function linkSession() {
+  const payload = await payloadFromCookie(APP_COOKIE);
+  if (payload?.access !== "purchase-link" || typeof payload.uid !== "string" || typeof payload.orderId !== "string") return null;
+  return { userId: payload.uid, orderId: payload.orderId, confirmed: payload.purchaseEmailConfirmed === true };
+}
+
+export async function requirePurchaseEmailConfirmation() {
+  const session = await linkSession();
+  if (session && !session.confirmed) throw Response.json({ error: "purchase_email_required" }, { status: 403 });
+}
+
 export const createSession = (userId: string) => setSessionCookie(APP_COOKIE, userId);
 // Admin sessions are short-lived (12h, renewed on each login) — unlike the
 // 30-day customer app session. Staff are on shared machines more often, and a
@@ -76,7 +90,10 @@ export type RefundAccess = { user: User; order: Order | null; orderNumber: strin
 export async function requireRefundAccess(scopedOnly = false): Promise<RefundAccess> {
   if (!scopedOnly) {
     const appUser = await getUser();
-    if (appUser) return { user: appUser, order: null, orderNumber: null };
+    if (appUser) {
+      await requirePurchaseEmailConfirmation();
+      return { user: appUser, order: null, orderNumber: null };
+    }
   }
   const token = (await cookies()).get(REFUND_COOKIE)?.value;
   if (!token) throw unauthorized();

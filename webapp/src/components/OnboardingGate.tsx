@@ -22,6 +22,7 @@ export default function OnboardingGate() {
       !me.user.awaitingDelivery &&
       // an admin previewing a lead's account gets the real app, not onboarding
       !me.impersonating &&
+      !me.linkAccess &&
       !pathname.startsWith("/onboarding") &&
       !pathname.startsWith("/login") &&
       !pathname.startsWith("/admin") &&
