@@ -6,6 +6,7 @@ import { orders } from "@/db/schema";
 export const purchaseLinkSchema = z.object({
   orderId: z.string().trim().min(1).max(100),
   email: z.string().trim().toLowerCase().pipe(z.email().max(320)),
+  name: z.string().trim().min(1).max(100).optional(),
 });
 
 export async function findPurchase(orderId: string, email: string) {

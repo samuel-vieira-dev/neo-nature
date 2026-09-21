@@ -22,7 +22,11 @@ export async function GET(request: Request) {
   (await cookies()).delete(REFUND_COOKIE);
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (!limiter.hit(ip).allowed) return redirect("/access-error");
-  const parsed = purchaseLinkSchema.safeParse({ orderId: url.searchParams.get("order_id"), email: url.searchParams.get("email") });
+  const parsed = purchaseLinkSchema.safeParse({
+    orderId: url.searchParams.get("order_id"),
+    email: url.searchParams.get("email"),
+    name: url.searchParams.get("name") ?? undefined,
+  });
   if (!parsed.success) return redirect("/access-error");
   const order = await findPurchase(parsed.data.orderId, parsed.data.email);
   if (!order) return redirect("/access-error");
@@ -32,6 +36,7 @@ export async function GET(request: Request) {
   // Attach only the validated purchase. Do not relink other orders during login.
   if (!order.userId) await db.update(orders).set({ userId: resolved.user.id }).where(eq(orders.id, order.id));
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, resolved.user.id));
-  await createLinkSession(resolved.user.id, order.id);
+  if (parsed.data.name) await createLinkSession(resolved.user.id, order.id, false, parsed.data.name);
+  else await createLinkSession(resolved.user.id, order.id);
   return redirect("/");
 }

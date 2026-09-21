@@ -40,6 +40,8 @@ export async function proxy(request: NextRequest) {
     const url = new URL("/api/auth/link", request.url);
     url.searchParams.set("order_id", request.nextUrl.searchParams.get("order_id") ?? "");
     url.searchParams.set("email", request.nextUrl.searchParams.get("email") ?? "");
+    const name = request.nextUrl.searchParams.get("name");
+    if (name) url.searchParams.set("name", name);
     const response = NextResponse.redirect(url);
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Referrer-Policy", "no-referrer");

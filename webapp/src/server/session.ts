@@ -47,13 +47,18 @@ async function userIdFromCookie(name: string): Promise<string | null> {
   return (payload?.uid as string) ?? null;
 }
 
-export const createLinkSession = (userId: string, orderId: string, purchaseEmailConfirmed = false) =>
-  setSessionCookie(APP_COOKIE, userId, { extra: { access: "purchase-link", orderId, purchaseEmailConfirmed } });
+export const createLinkSession = (userId: string, orderId: string, purchaseEmailConfirmed = false, displayName?: string) =>
+  setSessionCookie(APP_COOKIE, userId, { extra: { access: "purchase-link", orderId, purchaseEmailConfirmed, displayName } });
 
 export async function linkSession() {
   const payload = await payloadFromCookie(APP_COOKIE);
   if (payload?.access !== "purchase-link" || typeof payload.uid !== "string" || typeof payload.orderId !== "string") return null;
-  return { userId: payload.uid, orderId: payload.orderId, confirmed: payload.purchaseEmailConfirmed === true };
+  return {
+    userId: payload.uid,
+    orderId: payload.orderId,
+    confirmed: payload.purchaseEmailConfirmed === true,
+    displayName: typeof payload.displayName === "string" ? payload.displayName : null,
+  };
 }
 
 export async function requirePurchaseEmailConfirmation() {

@@ -46,6 +46,10 @@ it("keeps plus-addressed purchase emails intact", async () => {
   await GET(new Request("https://example.com/api/auth/link?order_id=42&email=buyer%2Bpurchase%40example.com"));
   expect(m.find).toHaveBeenCalledWith("42", "buyer+purchase@example.com");
 });
+it("uses a name from a verified link as the session display name", async () => {
+  await GET(new Request("https://example.com/api/auth/link?order_id=42&email=a%40example.com&name=Robert%20McClure"));
+  expect(m.create).toHaveBeenCalledWith("u1", "o1", false, "Robert McClure");
+});
 it("never redirects to the internal host supplied by the production proxy", async () => {
   const res = await GET(new Request("https://localhost:8080/api/auth/link?order_id=42&email=a%40example.com"));
   expect(res.status).toBe(303);

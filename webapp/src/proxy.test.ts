@@ -13,6 +13,12 @@ it.each(["/", "/login"])("routes campaign links at %s to automatic access before
   expect(response.headers.get("referrer-policy")).toBe("no-referrer");
 });
 
+it("preserves the supplied display name while routing a campaign link", async () => {
+  const response = await proxy(new NextRequest("https://example.com/?order_id=42&email=buyer%40example.com&name=Robert%20McClure"));
+  const destination = new URL(response.headers.get("location")!);
+  expect(destination.searchParams.get("name")).toBe("Robert McClure");
+});
+
 it("processes a new buyer's link even when another buyer is already signed in", async () => {
   const token = await new SignJWT({ uid: "previous-buyer" })
     .setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h")

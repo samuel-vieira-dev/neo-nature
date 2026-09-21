@@ -13,7 +13,7 @@ beforeEach(() => { mocks.jar.clear(); mocks.findUser.mockResolvedValue({ id: "cu
 describe("purchase link sessions", () => {
   it("requires email confirmation before support and refund access", async () => {
     await createLinkSession("customer", "purchase");
-    expect(await linkSession()).toEqual({ userId: "customer", orderId: "purchase", confirmed: false });
+    expect(await linkSession()).toEqual({ userId: "customer", orderId: "purchase", confirmed: false, displayName: null });
     await expect(requirePurchaseEmailConfirmation()).rejects.toMatchObject({ status: 403 });
     await expect(requireRefundAccess()).rejects.toMatchObject({ status: 403 });
   });
@@ -28,7 +28,7 @@ describe("purchase link sessions", () => {
   it("a new link clears previous confirmation, including account switches", async () => {
     await createLinkSession("customer", "purchase", true);
     await createLinkSession("other", "other-purchase");
-    expect(await linkSession()).toEqual({ userId: "other", orderId: "other-purchase", confirmed: false });
+    expect(await linkSession()).toEqual({ userId: "other", orderId: "other-purchase", confirmed: false, displayName: null });
   });
   it("rejects forged and expired sessions", async () => {
     mocks.jar.set(APP_COOKIE, "forged");
@@ -44,5 +44,9 @@ describe("purchase link sessions", () => {
     await destroySession();
     expect(await linkSession()).toBeNull();
     await expect(requireRefundAccess()).rejects.toMatchObject({ status: 401 });
+  });
+  it("keeps the name supplied in a verified purchase link only in that session", async () => {
+    await createLinkSession("customer", "purchase", false, "Robert McClure");
+    expect(await linkSession()).toEqual({ userId: "customer", orderId: "purchase", confirmed: false, displayName: "Robert McClure" });
   });
 });

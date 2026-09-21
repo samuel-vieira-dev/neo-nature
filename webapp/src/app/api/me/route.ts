@@ -9,6 +9,7 @@ import { loadUserOrders } from "@/server/orders";
 export const GET = withUser(async (user) => {
   const today = userToday(user);
   const now = appNow(user);
+  const purchaseLink = await linkSession();
 
   const [impersonatedBy, doses, unreadRows, bottleRows, orderList] = await Promise.all([
     impersonatorId(),
@@ -33,8 +34,8 @@ export const GET = withUser(async (user) => {
   return Response.json({
     user: {
       id: user.id,
-      name: user.name,
-      fullName: user.fullName,
+      name: purchaseLink?.displayName || user.name,
+      fullName: purchaseLink?.displayName || user.fullName,
       email: user.email,
       phone: user.phone,
       niche: user.niche,
@@ -60,6 +61,6 @@ export const GET = withUser(async (user) => {
     // an admin previewing this account skips the onboarding gate — see
     // OnboardingGate — so leads can be inspected without faking their answers
     impersonating: !!impersonatedBy,
-    linkAccess: !!(await linkSession()),
+    linkAccess: !!purchaseLink,
   });
 });
