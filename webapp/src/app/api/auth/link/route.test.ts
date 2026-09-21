@@ -12,7 +12,7 @@ it("validates normalized credentials and removes them from the destination", asy
   const res = await GET(new Request("https://example.com/api/auth/link?order_id=42&email=A%40EXAMPLE.COM"));
   expect(m.find).toHaveBeenCalledWith("42", "a@example.com");
   expect(m.create).toHaveBeenCalledWith("u1", "o1");
-  expect(res.headers.get("location")).toBe("https://example.com/");
+  expect(res.headers.get("location")).toBe("/");
   expect(res.headers.get("referrer-policy")).toBe("no-referrer");
   expect(m.remove).toHaveBeenCalledWith("nn_refund");
 });
@@ -36,7 +36,7 @@ it("provisions a first-time buyer and attaches the validated purchase before gra
   m.find.mockResolvedValue({ id: "o2", userId: null, email: "new@example.com", customerPhoneE164: null });
   m.provision.mockResolvedValue({ user: { id: "u2" }, provisioned: true });
   const res = await GET(new Request("https://example.com/api/auth/link?order_id=43&email=new%40example.com"));
-  expect(res.headers.get("location")).toBe("https://example.com/");
+  expect(res.headers.get("location")).toBe("/");
   expect(m.provision).toHaveBeenCalledWith({ email: "new@example.com", phone: null });
   expect(m.update).toHaveBeenCalledTimes(2);
   expect(m.update.mock.invocationCallOrder[0]).toBeLessThan(m.create.mock.invocationCallOrder[0]);
@@ -45,4 +45,11 @@ it("provisions a first-time buyer and attaches the validated purchase before gra
 it("keeps plus-addressed purchase emails intact", async () => {
   await GET(new Request("https://example.com/api/auth/link?order_id=42&email=buyer%2Bpurchase%40example.com"));
   expect(m.find).toHaveBeenCalledWith("42", "buyer+purchase@example.com");
+});
+it("never redirects to the internal host supplied by the production proxy", async () => {
+  const res = await GET(new Request("https://localhost:8080/api/auth/link?order_id=42&email=a%40example.com"));
+  expect(res.status).toBe(303);
+  expect(res.headers.get("location")).toBe("/");
+  const invalid = await GET(new Request("https://localhost:8080/api/auth/link"));
+  expect(invalid.headers.get("location")).toBe("/access-error");
 });

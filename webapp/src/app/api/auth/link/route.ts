@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, users } from "@/db/schema";
@@ -12,7 +11,8 @@ const limiter = makeLimiter({ max: 20, windowMs: 15 * 60 * 1000 });
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const redirect = (path: string) => {
-    const response = NextResponse.redirect(new URL(path, url), 303);
+    // Keep the browser's public origin: Railway exposes an internal host in request.url.
+    const response = new Response(null, { status: 303, headers: { Location: path } });
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Referrer-Policy", "no-referrer");
     return response;
