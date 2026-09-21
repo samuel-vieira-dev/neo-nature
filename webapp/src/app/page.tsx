@@ -58,8 +58,8 @@ export default function Home() {
       {/* header */}
       <FadeUp className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-muted">{greeting},</p>
-          <h1 className="font-display text-2xl font-bold text-[var(--text)]">{firstName || "…"}</h1>
+          <p className="text-sm text-muted">{greeting}{firstName ? "," : ""}</p>
+          {firstName && <h1 className="font-display text-2xl font-bold text-[var(--text)]">{firstName}</h1>}
         </div>
         <Link
           href="/notifications"
