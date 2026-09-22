@@ -14,7 +14,7 @@ import { hasPermission, permissionsFor, type Permission, type Role } from "./per
 // single central checkpoint for "can this staff member do this".
 //
 // Routes that let staff edit a customer/order field (customers:write,
-// orders:address/orders:write) also add that field name to the row's
+// orders:write) also add that field name to the row's
 // `locked_fields` column, so a later webhook update never silently
 // overwrites a manual correction — see src/server/field-locks.ts.
 // ---------------------------------------------------------------------------

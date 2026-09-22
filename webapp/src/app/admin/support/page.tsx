@@ -5,12 +5,12 @@
 // shows revenue: just open tickets, order/shipping status, and refunds or
 // chargebacks as operational flags. Every role that reaches /admin has
 // customers:read, so no page-level permission gate is needed here — only the
-// per-action gates below (Edit address).
+// the order list is read-only.
 
 import { Fragment, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   LifeBuoy,
   PackageX,
@@ -18,12 +18,9 @@ import {
   ShieldAlert,
   Search,
   Lock,
-  Pencil,
   ExternalLink,
 } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
-import { useAdmin } from "@/components/AdminProvider";
-import { editableOrderFields } from "@/server/permissions";
 
 // ---------------------------------------------------------------------------
 // Contracts — plan §4. Another agent implements the routes in parallel; these
@@ -365,94 +362,14 @@ const ORDER_PROBLEMS: { value: string; label: string }[] = [
 ];
 const LIMIT = 50;
 
-function EditAddressForm({ order, onDone }: { order: OrderRow; onDone: () => void }) {
-  const qc = useQueryClient();
-  const [address, setAddress] = useState(order.address || "");
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const save = useMutation({
-    mutationFn: () => {
-      if (!address.trim() || address.trim() === order.address) return Promise.reject(new Error("no_changes"));
-      return adminApi(`/api/admin/orders/${order.id}`, { method: "PATCH", body: JSON.stringify({ address: address.trim() }) });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["support-orders"] });
-      onDone();
-    },
-    onError: (e: Error) =>
-      setFormError(
-        e.message === "no_changes"
-          ? "Change the address first."
-          : e.message === "no_permission"
-            ? "You don't have permission to edit that field."
-            : "Couldn't save — try again."
-      ),
-  });
-
-  const unlock = useMutation({
-    mutationFn: () => adminApi(`/api/admin/orders/${order.id}/locks?field=address`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["support-orders"] }),
-    onError: () => setFormError("Couldn't unlock that field."),
-  });
-
-  return (
-    <div className="space-y-2.5 rounded-xl bg-[var(--surface)] p-3">
-      <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800">
-        This updates the address in this panel only. It does NOT change where BuyGoods/the carrier will ship — update
-        it there too.
-      </p>
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-        Address
-        {order.lockedFields.includes("address") && (
-          <span className="inline-flex items-center gap-1 font-normal normal-case text-amber-700">
-            <span title="Edited in admin — the platform feed won't overwrite this">
-              <Lock className="h-3 w-3" />
-            </span>
-            <button
-              type="button"
-              onClick={() => unlock.mutate()}
-              disabled={unlock.isPending}
-              className="text-[11px] font-bold underline decoration-dotted hover:text-amber-900 disabled:opacity-50"
-            >
-              {unlock.isPending ? "Unlocking…" : "Unlock"}
-            </button>
-          </span>
-        )}
-      </label>
-      <textarea
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
-        rows={2}
-        className="w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-      />
-      {formError && <p className="text-xs text-rose-600">{formError}</p>}
-      <div className="flex gap-2 pt-1">
-        <button onClick={onDone} className="flex-1 rounded-lg border border-[var(--border)] py-1.5 text-xs font-semibold text-[var(--text)]">
-          Cancel
-        </button>
-        <button
-          onClick={() => save.mutate()}
-          disabled={save.isPending}
-          className="flex-1 rounded-lg bg-[var(--accent)] py-1.5 text-xs font-display font-bold text-white disabled:opacity-50"
-        >
-          {save.isPending ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 type OrdersInitial = { status?: string; problem?: string };
 
 function OrdersPanel({ initial }: { initial: OrdersInitial }) {
-  const { role } = useAdmin();
-  const canEditAddress = editableOrderFields(role).includes("address");
   const [status, setStatus] = useState(initial.status ?? "");
   const [problem, setProblem] = useState(initial.problem ?? "");
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const [offset, setOffset] = useState(0);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const filterKey = `${status}|${problem}|${dq}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
@@ -562,14 +479,6 @@ function OrdersPanel({ initial }: { initial: OrdersInitial }) {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {canEditAddress && (
-                            <button
-                              onClick={() => setEditingId(editingId === o.id ? null : o.id)}
-                              className="flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
-                            >
-                              <Pencil className="h-3 w-3" /> Edit address
-                            </button>
-                          )}
                           {o.customerId && (
                             <Link href={`/admin/customers/${o.customerId}`} className="text-xs font-semibold text-[var(--accent)] hover:underline">
                               360 →
@@ -578,13 +487,6 @@ function OrdersPanel({ initial }: { initial: OrdersInitial }) {
                         </div>
                       </td>
                     </tr>
-                    {editingId === o.id && (
-                      <tr>
-                        <td colSpan={8} className="bg-[var(--surface)] px-4 py-3">
-                          <EditAddressForm order={o} onDone={() => setEditingId(null)} />
-                        </td>
-                      </tr>
-                    )}
                   </Fragment>
                 ))}
                 {rows.length === 0 && (

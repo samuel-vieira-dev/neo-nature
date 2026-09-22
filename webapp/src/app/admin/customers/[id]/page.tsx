@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Store,
 } from "lucide-react";
+import OrderRefund from "@/components/admin/OrderRefund";
 import { adminApi } from "@/lib/adminApi";
 import { useAdmin, useCan } from "@/components/AdminProvider";
 import { editableOrderFields } from "@/server/permissions";
@@ -117,13 +118,12 @@ const statusTones: Record<CustomerOrder["status"], string> = {
 
 // Field key -> human label, in the fixed display order from plan §2.1.
 const ORDER_FIELD_LABELS: Record<string, string> = {
-  address: "Address",
   customerName: "Customer name",
   customerPhone: "Customer phone",
   email: "Email",
   shippingTrackingId: "Tracking number",
 };
-const ORDER_FIELD_ORDER = ["address", "customerName", "customerPhone", "email", "shippingTrackingId"] as const;
+const ORDER_FIELD_ORDER = ["customerName", "customerPhone", "email", "shippingTrackingId"] as const;
 
 function Kpi({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
@@ -174,7 +174,6 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
   const qc = useQueryClient();
 
   const [editing, setEditing] = useState(false);
-  const [address, setAddress] = useState(o.address || "");
   const [customerName, setCustomerName] = useState(o.customerName || "");
   const [customerPhone, setCustomerPhone] = useState(o.customerPhone || "");
   const [email, setEmail] = useState(o.email || "");
@@ -187,7 +186,6 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
   };
 
   const startEdit = () => {
-    setAddress(o.address || "");
     setCustomerName(o.customerName || "");
     setCustomerPhone(o.customerPhone || "");
     setEmail(o.email || "");
@@ -199,7 +197,6 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
   const save = useMutation({
     mutationFn: () => {
       const body: Record<string, string> = {};
-      if (editableFields.includes("address") && address.trim() && address.trim() !== o.address) body.address = address.trim();
       // Only send what actually changed — an untouched field must not get locked.
       if (editableFields.includes("customerName") && customerName.trim() && customerName.trim() !== (o.customerName || "")) body.customerName = customerName.trim();
       if (editableFields.includes("customerPhone") && customerPhone.trim() && customerPhone.trim() !== (o.customerPhone || "")) body.customerPhone = customerPhone.trim();
@@ -293,6 +290,8 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
         </ul>
       )}
 
+      <OrderRefund orderId={o.id} orderNumber={o.number} platformKey={o.platformKey} />
+
       {canEdit && (
         <div className="mt-2 border-t border-[var(--border)] pt-2">
           {!editing ? (
@@ -306,12 +305,6 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
             <div className="space-y-2.5 rounded-xl bg-[var(--surface)] p-3">
               {ORDER_FIELD_ORDER.filter((f) => editableFields.includes(f)).map((field) => (
                 <div key={field}>
-                  {field === "address" && (
-                    <p className="mb-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-800">
-                      This updates the address in this panel only. It does NOT change where BuyGoods/the carrier will
-                      ship — update it there too.
-                    </p>
-                  )}
                   <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
                     {ORDER_FIELD_LABELS[field]}
                     <LockBadge
@@ -320,14 +313,7 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
                       unlocking={unlock.isPending && unlock.variables === field}
                     />
                   </label>
-                  {field === "address" ? (
-                    <textarea
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      rows={2}
-                      className="mt-1 w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                    />
-                  ) : field === "customerName" ? (
+                  { field === "customerName" ? (
                     <input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}

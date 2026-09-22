@@ -8,7 +8,7 @@ describe("permissionsFor", () => {
 
   it("cs has the customer-support and full refund-management permissions", () => {
     expect(new Set(permissionsFor("cs"))).toEqual(
-      new Set(["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund", "refund-form:write"])
+      new Set(["customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"])
     );
   });
 
@@ -28,13 +28,12 @@ describe("permissionsFor", () => {
 });
 
 describe("editableOrderFields", () => {
-  it("cs may edit only the address", () => {
-    expect(editableOrderFields("cs")).toEqual(["address"]);
+  it("cs cannot edit order fields", () => {
+    expect(editableOrderFields("cs")).toEqual([]);
   });
 
-  it("admin may edit all five editable order fields", () => {
+  it("admin may edit non-address order fields", () => {
     expect(editableOrderFields("admin")).toEqual([
-      "address",
       "customerName",
       "customerPhone",
       "email",

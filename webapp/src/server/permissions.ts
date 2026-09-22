@@ -15,9 +15,8 @@ export const PERMISSIONS = [
   "customers:impersonate", // "View as customer"
   "customers:export", // futuro (sem UI ainda)
   "tickets:write", // abrir ticket a partir do 360
-  "orders:address", // editar SÓ o endereço do pedido
-  "orders:write", // editar todos os campos editáveis do pedido (inclui endereço)
-  "orders:refund", // futuro (sem UI ainda)
+  "orders:write", // editar os demais campos permitidos do pedido
+  "orders:refund", // processar refund de pedidos Konnektive
   "analytics:read", // stats/receita no topo do CRM
   "push:send",
   "banners:write",
@@ -28,7 +27,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export const ROLES = {
   admin: [...PERMISSIONS],
-  cs: ["customers:read", "customers:impersonate", "tickets:write", "orders:address", "orders:refund", "refund-form:write"],
+  cs: ["customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"],
 } as const satisfies Record<string, readonly Permission[]>;
 export type Role = keyof typeof ROLES;
 
@@ -43,7 +42,6 @@ export function hasPermission(role: Role, p: Permission): boolean {
 /** Which order fields this role may edit (see plan §2.1). */
 export function editableOrderFields(role: Role): readonly string[] {
   if (hasPermission(role, "orders:write"))
-    return ["address", "customerName", "customerPhone", "email", "shippingTrackingId"];
-  if (hasPermission(role, "orders:address")) return ["address"];
+    return ["customerName", "customerPhone", "email", "shippingTrackingId"];
   return [];
 }

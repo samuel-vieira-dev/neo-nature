@@ -9,11 +9,10 @@ import { normalizeIngestPhone } from "@/lib/phone-format";
 
 // Which order fields a role may touch is an allowlist computed from the
 // role's permissions (editableOrderFields — plan §2.1), checked here on the
-// server: CS gets only `address`, admin gets the full set. Editing a field
+// server: only Admin may edit the remaining fields. Editing a field
 // locks it (see field-locks.ts) so the BuyGoods/Konnektive feed never
 // clobbers a manual correction again until it's explicitly unlocked.
 const patchSchema = z.object({
-  address: z.string().max(500).optional(),
   customerName: z.string().max(200).optional(),
   customerPhone: z.string().max(32).optional(),
   email: z.string().max(320).optional(),
@@ -51,11 +50,6 @@ export const PATCH = withAdmin(async (admin, req: Request, ctx: { params: Promis
   const after: Record<string, unknown> = {};
   const editedFields: string[] = [];
 
-  if (data.address !== undefined) {
-    editedFields.push("address");
-    before.address = existing.address;
-    after.address = patch.address = data.address;
-  }
   if (data.customerName !== undefined) {
     editedFields.push("customerName");
     before.customerName = existing.customerName;
@@ -75,9 +69,8 @@ export const PATCH = withAdmin(async (admin, req: Request, ctx: { params: Promis
   }
   if (data.customerPhone !== undefined) {
     // Same country-hint extraction as scripts/backfill-phone-e164.ts: the
-    // last comma-separated segment of the address ("…, London, , SW1A 1AA,
-    // United Kingdom"). Uses the address as edited in this same request, if any.
-    const address = patch.address ?? existing.address;
+    // last comma-separated segment of the stored address.
+    const address = existing.address;
     const country = address.split(",").map((s) => s.trim()).filter(Boolean).at(-1) ?? null;
     const e164 = normalizeIngestPhone(data.customerPhone, country);
     editedFields.push("customerPhone");

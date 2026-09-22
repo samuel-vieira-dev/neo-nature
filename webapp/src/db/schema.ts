@@ -422,3 +422,19 @@ export const refundRequests = pgTable("refund_requests", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("refund_request_user").on(t.userId), index("refund_request_updated").on(t.updatedAt)]);
+
+// Refund attempts and mock simulations; Konnektive remains the commerce source of truth.
+export const orderRefunds = pgTable("order_refunds", {
+  id: text("id").primaryKey(), // client request UUID / idempotency key
+  orderId: text("order_id").notNull().references(() => orders.id),
+  mode: text("mode").notNull(),
+  kind: text("kind").notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  reason: text("reason").notNull(),
+  adminUserId: text("admin_user_id").notNull(),
+  status: text("status").notNull(),
+  providerReference: text("provider_reference"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [index("order_refunds_order_mode").on(t.orderId, t.mode)]);
