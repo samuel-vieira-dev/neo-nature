@@ -5,8 +5,8 @@
 1. Em **Admin → Access**, criar ou editar uma conta com o perfil **Tauk**.
 2. Entrar com essa conta: o destino inicial é **Orders**. Account permite apenas gerenciar a própria senha.
 3. Buscar por número/ID da plataforma, nome, e-mail ou telefone. Abrir **Open order**.
-4. Conferir dados do pedido e destinatário; clicar **Enviar form de refund**.
-5. Enquanto o Mautic não estiver integrado, o aviso será `Erro ao enviar form para {email}. Integração não concluida`, fechando automaticamente após 5 segundos. Pode ser fechado manualmente.
+4. Conferir dados do pedido e destinatário; clicar **Send refund form**.
+5. Enquanto o Mautic não estiver integrado, o aviso será `Error sending refund form to {email}. Integration not complete`, fechando automaticamente após 5 segundos. Pode ser fechado manualmente.
 6. O botão fica bloqueado durante a requisição e quando o pedido não possui e-mail. E-mail inválido é rejeitado pelo servidor.
 
 O perfil Tauk pode consultar Orders e solicitar o envio do formulário. Não pode consultar o CRM, tickets ou a área de Refunds, editar pedidos, processar estornos financeiros, configurar formulários, administrar contas ou se passar pelo cliente. Admin e CS também podem enviar o formulário; o botão está nos detalhes da Order e nos cards de pedido do Customer 360.
