@@ -136,7 +136,7 @@ export default function AdminAccessPage() {
         <ShieldCheck className="h-6 w-6 text-[var(--accent)]" /> Access
       </h1>
       <p className="mt-1 text-sm text-muted">
-        Staff accounts and what each role can do. Admin has full access; Customer Support is scoped to customer-facing tasks.
+        Staff accounts and what each role can do. Admin has full access; Customer Support is scoped to customer-facing tasks; Tauk can view orders and send refund forms.
       </p>
 
       {/* accounts table */}
@@ -221,6 +221,7 @@ export default function AdminAccessPage() {
             className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm font-semibold"
           >
             <option value="cs">Customer Support</option>
+            <option value="tauk">Tauk</option>
             <option value="admin">Admin</option>
           </select>
           <input
@@ -275,6 +276,7 @@ export default function AdminAccessPage() {
                 className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm font-semibold"
               >
                 <option value="cs">Customer Support</option>
+            <option value="tauk">Tauk</option>
                 <option value="admin">Admin</option>
               </select>
               <label className="flex items-center gap-2 text-sm text-muted">

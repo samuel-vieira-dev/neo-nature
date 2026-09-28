@@ -21,7 +21,7 @@ function toPublic(u: AdminUser) {
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  role: z.enum(["admin", "cs"]).optional(),
+  role: z.enum(["admin", "cs", "tauk"]).optional(),
   active: z.boolean().optional(),
   password: z.string().min(1).optional(),
 });

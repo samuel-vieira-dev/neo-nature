@@ -15,6 +15,8 @@ export const PERMISSIONS = [
   "customers:impersonate", // "View as customer"
   "customers:export", // futuro (sem UI ainda)
   "tickets:write", // abrir ticket a partir do 360
+  "orders:read", // consultar pedidos sem acesso ao CRM de clientes
+  "orders:send-refund-form", // enviar link do formulário ao e-mail do pedido
   "orders:write", // editar os demais campos permitidos do pedido
   "orders:refund", // processar refund de pedidos Konnektive
   "analytics:read", // stats/receita no topo do CRM
@@ -27,17 +29,18 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export const ROLES = {
   admin: [...PERMISSIONS],
-  cs: ["customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"],
+  cs: ["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"],
+  tauk: ["orders:read", "orders:send-refund-form"],
 } as const satisfies Record<string, readonly Permission[]>;
 export type Role = keyof typeof ROLES;
 
-export const ROLE_LABELS: Record<Role, string> = { admin: "Admin", cs: "Customer Support" };
+export const ROLE_LABELS: Record<Role, string> = { admin: "Admin", cs: "Customer Support", tauk: "Tauk" };
 
 export function permissionsFor(role: Role): readonly Permission[] {
   return ROLES[role] ?? [];
 }
 export function hasPermission(role: Role, p: Permission): boolean {
-  return (ROLES[role] as readonly Permission[]).includes(p);
+  return permissionsFor(role).includes(p);
 }
 /** Which order fields this role may edit (see plan §2.1). */
 export function editableOrderFields(role: Role): readonly string[] {

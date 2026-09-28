@@ -8,7 +8,7 @@ describe("permissionsFor", () => {
 
   it("cs has the customer-support and full refund-management permissions", () => {
     expect(new Set(permissionsFor("cs"))).toEqual(
-      new Set(["customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"])
+      new Set(["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"])
     );
   });
 
@@ -39,5 +39,16 @@ describe("editableOrderFields", () => {
       "email",
       "shippingTrackingId",
     ]);
+  });
+});
+
+
+describe("Tauk access boundary", () => {
+  it("can only read orders and send the refund form", () => {
+    expect(permissionsFor("tauk")).toEqual(["orders:read", "orders:send-refund-form"]);
+    for (const permission of PERMISSIONS) {
+      expect(hasPermission("tauk", permission)).toBe(permission === "orders:read" || permission === "orders:send-refund-form");
+    }
+    expect(editableOrderFields("tauk")).toEqual([]);
   });
 });

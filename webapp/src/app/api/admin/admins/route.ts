@@ -25,7 +25,7 @@ export const GET = withAdmin(async () => {
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().toLowerCase().email(),
-  role: z.enum(["admin", "cs"]),
+  role: z.enum(["admin", "cs", "tauk"]),
   password: z.string().min(1),
 });
 

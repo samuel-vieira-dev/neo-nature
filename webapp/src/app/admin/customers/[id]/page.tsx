@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Store,
 } from "lucide-react";
+import SendRefundForm from "@/components/admin/SendRefundForm";
 import OrderRefund from "@/components/admin/OrderRefund";
 import { adminApi } from "@/lib/adminApi";
 import { useAdmin, useCan } from "@/components/AdminProvider";
@@ -290,6 +291,7 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
         </ul>
       )}
 
+      <SendRefundForm orderId={o.id} email={o.email} />
       <OrderRefund orderId={o.id} orderNumber={o.number} platformKey={o.platformKey} />
 
       {canEdit && (

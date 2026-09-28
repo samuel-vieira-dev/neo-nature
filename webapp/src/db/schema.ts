@@ -365,7 +365,7 @@ export const adminUsers = pgTable("admin_users", {
   id: text("id").primaryKey(), // uuid
   email: text("email").notNull().unique(), // lowercase
   name: text("name").notNull().default(""),
-  role: text("role").notNull().default("cs"), // admin | cs — see src/server/permissions.ts
+  role: text("role").notNull().default("cs"), // admin | cs | tauk — see src/server/permissions.ts
   passwordHash: text("password_hash").notNull(), // "scrypt$<salt>$<hash>"
   active: boolean("active").notNull().default(true),
   createdBy: text("created_by"), // admin_users.id of who created it (null on bootstrap)

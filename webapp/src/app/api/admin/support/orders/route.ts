@@ -15,4 +15,4 @@ export const GET = withAdmin(async (_admin, req: Request) => {
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get("limit") || "", 10) || DEFAULT_LIMIT));
 
   return Response.json(await getOrdersDesk({ status, problem, q, offset, limit }));
-}, "customers:read");
+}, "orders:read");

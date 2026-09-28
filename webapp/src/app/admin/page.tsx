@@ -8,6 +8,7 @@ import CrmPage from "@/components/admin/CrmPage";
 // guarantees a signed-in admin here, so this only needs the role check.
 export default async function AdminPage() {
   const admin = await getAdminUser();
+  if (admin?.role === "tauk") redirect("/admin/orders");
   if (!admin || !hasPermission(admin.role, "analytics:read")) redirect("/admin/support");
   return <CrmPage />;
 }

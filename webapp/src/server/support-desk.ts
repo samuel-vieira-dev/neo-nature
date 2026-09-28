@@ -306,6 +306,8 @@ export async function getOrdersDesk(opts: {
     const qConds = [
       ilike(orders.number, `%${q}%`),
       ilike(orders.buygoodsOrderId, `%${q}%`),
+      ilike(orders.konnektiveOrderId, `%${q}%`),
+      ilike(orders.id, `%${q}%`),
       ilike(orders.email, `%${q}%`),
       ilike(orders.customerName, `%${q}%`),
     ];

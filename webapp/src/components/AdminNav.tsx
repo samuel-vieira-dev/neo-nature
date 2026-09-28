@@ -8,8 +8,9 @@ import { useAdmin } from "./AdminProvider";
 import { ROLE_LABELS, type Permission } from "@/server/permissions";
 
 const links: { href: string; label: string; icon: React.ElementType; exact?: boolean; permission?: Permission }[] = [
-  { href: "/admin/support", label: "Support", icon: LifeBuoy },
+  { href: "/admin/support", label: "Support", icon: LifeBuoy, permission: "customers:read" },
   { href: "/admin", label: "Customers", icon: Users, exact: true, permission: "analytics:read" },
+  { href: "/admin/orders", label: "Orders", icon: ClipboardList, permission: "orders:read" },
   { href: "/admin/refunds", label: "Refunds", icon: ClipboardList, permission: "customers:read" },
   { href: "/admin/push", label: "Push", icon: Send, permission: "push:send" },
   { href: "/admin/banners", label: "Banners", icon: Megaphone, permission: "banners:write" },
