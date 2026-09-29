@@ -51,6 +51,7 @@ forecast, churn detection, tiers).
 | `TRACKING_URL_TEMPLATE` | Optional — customer-facing tracking link with a `{code}` placeholder (defaults to 17TRACK's public page). |
 | `N8N_WEBHOOK_BASE_URL` | Optional — base URL every BuyGoods IPN is also fanned out to (orders/refunds/chargebacks appended as `/buygoods-orders` etc., see `src/server/n8n-forward.ts`). Defaults to `https://n8n.neonature.online/webhook`. |
 | `N8N_FORWARD_ENABLED` | Optional override for the n8n fan-out above. Unset: forwarding is **on in production, off everywhere else** (dev/test never hit the client's real n8n with seeded or replayed data). Set to `true`/`false` to force it either way — e.g. a developer testing the real integration locally, or killing the fan-out in prod if the client's n8n is misbehaving. |
+| `REFUND_EMAIL_WEBHOOK_API_KEY` | Server-side API key for the n8n/Gmail refund-form email webhook. Without it, Admin returns `integration_not_configured` and sends no email. Configure in Railway; never expose it with a `NEXT_PUBLIC_` prefix. |
 | `ADMIN_PASSWORD` | **Bootstrap key only.** While `admin_users` is empty, `/admin-login` shows a *First access* form (name, email, password + this value as the "setup key") that creates the first account, always as `admin`. Once that first account exists this path is dead — every login after that is email + individual password (see "Admin panel access" below) and `ADMIN_PASSWORD` is inert. Still required to be set (unset → 503 on bootstrap); never commit the value. |
 
 ## Deploys and the "page with no CSS" bug

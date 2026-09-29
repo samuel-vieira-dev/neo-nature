@@ -29,17 +29,17 @@ describe("refund form email endpoint", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({ error: "integration_not_configured", email: "customer@example.com" });
-    expect(mocks.send).toHaveBeenCalledWith({ orderId: "kn-ABC", orderNumber: "42", customerName: "Test Customer", email: "customer@example.com", refundPath: "/refund?order_id=kn-ABC" });
+    expect(mocks.send).toHaveBeenCalledWith({ requestId: expect.any(String), orderId: "kn-ABC", orderNumber: "42", customerName: "Test Customer", email: "customer@example.com", refundPath: "/refund?order_id=kn-ABC" });
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ id: "agent" }), "order.refund_form_email", expect.objectContaining({ metadata: expect.objectContaining({ status: "not_configured" }) }));
   });
   it("only reports success after provider confirmation", async () => {
-    mocks.send.mockResolvedValue({ status: "sent", messageId: "mautic-1" });
+    mocks.send.mockResolvedValue({ status: "sent", messageId: "gmail-1" });
     const response = await POST(req(), ctx);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, email: "customer@example.com" });
   });
   it("does not encourage a duplicate send when auditing fails after delivery", async () => {
-    mocks.send.mockResolvedValue({ status: "sent", messageId: "mautic-1" });
+    mocks.send.mockResolvedValue({ status: "sent", messageId: "gmail-1" });
     mocks.audit.mockRejectedValue(new Error("audit unavailable"));
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await POST(req(), ctx)).status).toBe(200);

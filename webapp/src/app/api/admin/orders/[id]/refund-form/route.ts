@@ -15,7 +15,9 @@ export const POST = withAdmin(async (admin, _req: Request, ctx: { params: Promis
   if (!z.email().safeParse(email).success) {
     return Response.json({ error: "invalid_email", email }, { status: 422, headers });
   }
+  const requestId = crypto.randomUUID();
   const result = await sendRefundFormEmail({
+    requestId,
     orderId: order.id,
     orderNumber: order.number,
     customerName: order.customerName,
@@ -25,7 +27,7 @@ export const POST = withAdmin(async (admin, _req: Request, ctx: { params: Promis
 
   // A logging failure must not turn a confirmed send into a retryable failure.
   await logAdminAction(admin, "order.refund_form_email", { metadata: {
-    orderId: order.id, email, status: result.status,
+    orderId: order.id, email, requestId, status: result.status,
     ...(result.status === "sent" ? { messageId: result.messageId } : {}),
   } }).catch(() => console.error("[refund-form-email] Could not record delivery audit"));
 
