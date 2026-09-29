@@ -65,13 +65,16 @@ Every build names its CSS chunk by content hash and the prerendered HTML points 
 
 Staff sign in with an individual email + password (`admin_users` table, separate
 from the customer `users` table — see `src/server/permissions.ts` for the
-permission model). Two roles:
+permission model). Three roles:
 
 - **Admin** — full access: customers, orders, tickets, revenue/dashboards, push,
   banners, and `/admin/access` (create/edit/deactivate staff accounts, audit log).
 - **Customer Support (`cs`)** — customer search/360, "View as customer", opening
   tickets, and editing only the order address. No revenue data, no push/banners,
   no access management.
+- **Tauk (`tauk`)** — read-only Support and Refunds views, order lookup and
+  sending refund-form links. No Customer 360, review edits, form editing or
+  financial refund actions.
 
 `/admin/access` (permission `admins:manage`, admin only) is where accounts are
 created and roles/passwords/active status are managed; every write there — and

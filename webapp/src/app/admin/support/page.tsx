@@ -2,7 +2,7 @@
 
 // Support desk — the CS-facing operational view (plan PLANO-CS-DESK.md §3.1).
 // Unlike the admin CRM list (/admin, analytics:read only), this page never
-// shows revenue. The server layout requires customers:read; Tauk uses /admin/orders.
+// shows revenue. Access to this desk is separate from the Customer 360.
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
@@ -17,6 +17,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import OrdersPanel, { type OrdersInitial } from "@/components/admin/OrdersPanel";
+import { useCan } from "@/components/AdminProvider";
+import NoAccess from "@/components/NoAccess";
 import { adminApi } from "@/lib/adminApi";
 
 // ---------------------------------------------------------------------------
@@ -112,7 +114,8 @@ function StatCard({
 }
 
 function CustomerLink({ id, name, email }: { id: string | null; name: string | null; email: string | null }) {
-  if (!id) {
+  const canReadCustomers = useCan("customers:read");
+  if (!id || !canReadCustomers) {
     return (
       <div>
         <p className="font-semibold text-[var(--text)]">{name || "—"}</p>
@@ -333,6 +336,7 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
 
 function CustomersPanel() {
   const router = useRouter();
+  const canReadCustomers = useCan("customers:read");
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const params = new URLSearchParams();
@@ -377,8 +381,8 @@ function CustomersPanel() {
               {rows.map((c) => (
                 <tr
                   key={c.id ?? c.email}
-                  onClick={() => c.id && router.push(`/admin/customers/${c.id}`)}
-                  className={c.id ? "cursor-pointer hover:bg-[var(--surface)]" : ""}
+                  onClick={() => canReadCustomers && c.id && router.push(`/admin/customers/${c.id}`)}
+                  className={canReadCustomers && c.id ? "cursor-pointer hover:bg-[var(--surface)]" : ""}
                 >
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[var(--text)]">{c.name || "—"}</p>
@@ -547,6 +551,8 @@ function SupportPageInner() {
 }
 
 export default function SupportPage() {
+  const canRead = useCan("support:read");
+  if (!canRead) return <NoAccess />;
   return (
     <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
       <SupportPageInner />

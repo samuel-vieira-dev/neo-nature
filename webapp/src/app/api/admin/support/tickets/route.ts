@@ -12,4 +12,4 @@ export const GET = withAdmin(async (_admin, req: Request) => {
   const excludeStatusRaw = url.searchParams.get("excludeStatus") || undefined;
   const excludeStatus = excludeStatusRaw ? excludeStatusRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
   return Response.json(await getTicketQueue({ status, q, kind, priority, updatedFrom, updatedTo, excludeStatus }));
-}, "customers:read");
+}, "support:read");

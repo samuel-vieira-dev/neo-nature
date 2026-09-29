@@ -32,7 +32,7 @@ export const GET = withAdmin(async (_admin, req: Request) => {
     response: { version: row.formVersion, form: row.form, answers: row.answers, outcome: row.outcome, endPage: row.currentPageId },
     syncStatus: row.ticketId ? row.syncStatus : "not_sent", freshdeskId: row.freshdeskId,
   })), total: count.total });
-}, "customers:read");
+}, "refund-requests:read");
 
 const update = z.object({ id: z.string().min(1).max(100), status: z.enum(["new", "in_review", "awaiting_customer", "closed"]), notes: z.string().max(8000) });
 export const PATCH = withAdmin(async (admin, req: Request) => {

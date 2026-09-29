@@ -12,7 +12,7 @@ const outcomes: Record<string,string> = {draft:"In progress / abandoned",blocked
 const input = "w-full rounded-xl border border-[var(--border)] bg-white p-3 text-sm";
 const button = "rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50";
 export default function RefundsPage() {
-  const canRead = useCan("customers:read");
+  const canRead = useCan("refund-requests:read");
   const canEdit = useCan("refund-form:write");
   const [tab,setTab] = useState("requests");
   if (!canRead) return <NoAccess />;

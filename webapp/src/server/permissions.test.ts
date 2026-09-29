@@ -8,7 +8,7 @@ describe("permissionsFor", () => {
 
   it("cs has the customer-support and full refund-management permissions", () => {
     expect(new Set(permissionsFor("cs"))).toEqual(
-      new Set(["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "tickets:write", "orders:refund", "refund-form:write"])
+      new Set(["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "support:read", "refund-requests:read", "tickets:write", "orders:refund", "refund-form:write"])
     );
   });
 
@@ -44,10 +44,11 @@ describe("editableOrderFields", () => {
 
 
 describe("Tauk access boundary", () => {
-  it("can only read orders and send the refund form", () => {
-    expect(permissionsFor("tauk")).toEqual(["orders:read", "orders:send-refund-form"]);
+  it("can read orders, refunds and support without write or CRM access", () => {
+    const allowed: Permission[] = ["orders:read", "orders:send-refund-form", "support:read", "refund-requests:read"];
+    expect(permissionsFor("tauk")).toEqual(allowed);
     for (const permission of PERMISSIONS) {
-      expect(hasPermission("tauk", permission)).toBe(permission === "orders:read" || permission === "orders:send-refund-form");
+      expect(hasPermission("tauk", permission)).toBe(allowed.includes(permission));
     }
     expect(editableOrderFields("tauk")).toEqual([]);
   });

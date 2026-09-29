@@ -9,7 +9,7 @@
 5. Com a integração ativa, o aviso de sucesso confirma o envio. Se a chave não estiver configurada, aparece `Error sending refund form to {email}. Integration not complete`; falhas do webhook também exibem erro. Os avisos fecham após 5 segundos.
 6. O botão fica bloqueado durante a requisição e quando o pedido não possui e-mail. E-mail inválido é rejeitado pelo servidor.
 
-O perfil Tauk pode consultar Orders e solicitar o envio do formulário. Não pode consultar o CRM, tickets ou a área de Refunds, editar pedidos, processar estornos financeiros, configurar formulários, administrar contas ou se passar pelo cliente. Admin e CS também podem enviar o formulário; o botão está nos detalhes da Order e nos cards de pedido do Customer 360.
+O perfil Tauk pode consultar Orders, a fila Support (Tickets, Orders e Customers) e as solicitações na aba Refunds, incluindo respostas e anexos. Pode solicitar o envio do formulário ao cliente. Não pode abrir o Customer 360, editar tickets, pedidos, avaliações de refund ou formulários, processar estornos financeiros, administrar contas ou se passar pelo cliente. Admin e CS também podem enviar o formulário; o botão está nos detalhes da Order e nos cards de pedido do Customer 360.
 
 ## Integração de e-mail
 
