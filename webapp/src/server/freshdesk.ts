@@ -201,7 +201,9 @@ export type FreshdeskRecentListResult =
 export async function listRecentFreshdeskTickets({
   sinceDays = 90,
   maxPages = 10,
-}: { sinceDays?: number; maxPages?: number } = {}): Promise<FreshdeskRecentListResult> {
+  orderBy = "updated_at",
+  orderType = "desc",
+}: { sinceDays?: number; maxPages?: number; orderBy?: "created_at" | "updated_at"; orderType?: "asc" | "desc" } = {}): Promise<FreshdeskRecentListResult> {
   if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
   const domain = process.env.FRESHDESK_DOMAIN!;
   const apiKey = process.env.FRESHDESK_API_KEY!;
@@ -212,7 +214,7 @@ export async function listRecentFreshdeskTickets({
   let truncated = false;
   try {
     for (let page = 1; page <= maxPages; page++) {
-      const url = `https://${domain}.freshdesk.com/api/v2/tickets?include=requester&order_by=updated_at&per_page=100&updated_since=${encodeURIComponent(since)}&page=${page}`;
+      const url = `https://${domain}.freshdesk.com/api/v2/tickets?include=requester&order_by=${orderBy}&order_type=${orderType}&per_page=100&updated_since=${encodeURIComponent(since)}&page=${page}`;
       const res = await fetch(url, {
         headers: { Authorization: `Basic ${auth}` },
         signal: AbortSignal.timeout(5000),

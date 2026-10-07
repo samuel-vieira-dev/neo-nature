@@ -325,6 +325,63 @@ export const tickets = pgTable("tickets", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+// Email support is independent of app accounts: a sender need not have logged in.
+export const supportEmailConversations = pgTable("support_email_conversations", {
+  id: text("id").primaryKey(),
+  mailboxId: text("mailbox_id").notNull(),
+  threadId: text("thread_id").notNull(),
+  email: text("email").notNull(),
+  name: text("name").notNull().default(""),
+  subject: text("subject").notNull(),
+  tier: text("tier").notNull().default("T1"),
+  language: text("language").notNull().default("en"),
+  owner: text("owner").notNull().default("agent"),
+  status: text("status").notNull().default("queued"),
+  latestMessageId: text("latest_message_id"),
+  freshdeskId: integer("freshdesk_id"),
+  escalationReason: text("escalation_reason"),
+  firstRepliedAt: timestamp("first_replied_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [
+  uniqueIndex("support_email_thread").on(t.mailboxId, t.threadId),
+  index("support_email_updated").on(t.updatedAt, t.id),
+  uniqueIndex("support_email_freshdesk").on(t.freshdeskId),
+]);
+
+export const supportEmailMessages = pgTable("support_email_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull().references(() => supportEmailConversations.id),
+  dedupeKey: text("dedupe_key").notNull().unique(),
+  providerMessageId: text("provider_message_id").notNull(),
+  rfcMessageId: text("rfc_message_id"),
+  direction: text("direction").notNull(), // incoming | outgoing | human
+  subject: text("subject").notNull(),
+  text: text("text").notNull(),
+  references: jsonb("references").$type<string[]>().notNull().default([]),
+  attachments: jsonb("attachments").$type<{ id: string; name: string; contentType: string }[]>().notNull().default([]),
+  receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [index("support_email_message_thread").on(t.conversationId, t.createdAt)]);
+
+export const supportEmailJobs = pgTable("support_email_jobs", {
+  id: text("id").primaryKey(), // also the outbound idempotency requestId
+  conversationId: text("conversation_id").notNull().references(() => supportEmailConversations.id),
+  messageId: text("message_id").notNull().references(() => supportEmailMessages.id),
+  stage: text("stage").notNull().default("prepare"), // prepare | send | escalate | human_note
+  status: text("status").notNull().default("queued"),
+  runAt: timestamp("run_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  sendAfter: timestamp("send_after", { withTimezone: true, mode: "date" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  draft: jsonb("draft").$type<{ tier: "T1" | "T2" | "T3"; language: string; intent: string; needsHuman: boolean; reason: string; reply: string }>(),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [
+  uniqueIndex("support_email_job_message_stage").on(t.messageId, t.stage),
+  index("support_email_job_due").on(t.status, t.runAt),
+]);
+
 // -------- jobs bookkeeping (idempotency for /api/jobs/tick) --------
 
 export const jobRuns = pgTable("job_runs", {

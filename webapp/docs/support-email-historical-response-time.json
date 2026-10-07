@@ -1,0 +1,23 @@
+{
+  "period_start": "2026-07-13T21:01:01+00:00",
+  "period_end": "2026-08-12T21:01:01+00:00",
+  "basis": "58 answered customer threads with identifiable first archived incoming email and first old-support-agent reply, within the most recent 30 days of the supplied archive.",
+  "agent_identification": "Recurring named product-team signatures; the archive does not independently prove AI/vendor provenance.",
+  "time_basis": "Elapsed calendar minutes calculated from RFC Date headers, normalized to UTC; not business hours.",
+  "mean_minutes": 254.20086206896553,
+  "median_minutes": 32.83333333333333,
+  "answered_within_60_minutes": 44,
+  "answered_within_60_minutes_percent": 75.86206896551724,
+  "cases_over_24_hours": 5,
+  "excluded_noncustomer_pairs": 49,
+  "limits": [
+    "Unanswered threads are not included.",
+    "First archived reply per Gmail thread does not necessarily equal first reply of an entire customer case.",
+    "Sample estimate, not an official vendor SLA."
+  ],
+  "filters": [
+    "Exclude prior substantive support replies in the thread.",
+    "Exclude automated notices, vendor invoices, campaigns, sales solicitations and explicit test emails.",
+    "Require a direct In-Reply-To link to an incoming email and an original customer message in the thread."
+  ]
+}

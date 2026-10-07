@@ -7,7 +7,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   LifeBuoy,
   PackageX,
@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import OrdersPanel, { type OrdersInitial } from "@/components/admin/OrdersPanel";
+import SupportEmailPanel from "@/components/admin/SupportEmailPanel";
 import { useCan } from "@/components/AdminProvider";
 import NoAccess from "@/components/NoAccess";
 import { adminApi } from "@/lib/adminApi";
@@ -40,7 +41,7 @@ type StatsResp = {
 };
 
 type TicketRow = {
-  id: number;
+  id: number | string;
   subject: string;
   status: string;
   priority: string;
@@ -53,7 +54,7 @@ type TicketRow = {
   fromApp: boolean;
   kind: string | null;
 };
-type TicketsResp = { source: "freshdesk" | "local"; warning: string | null; truncated: boolean; tickets: TicketRow[] };
+type TicketsResp = { source: "freshdesk" | "local"; warning: string | null; truncated: boolean; tickets: TicketRow[]; offset: number; limit: number; hasMore: boolean };
 
 type DeskCustomerRow = {
   id: string | null;
@@ -162,6 +163,8 @@ type TicketsInitial = {
 };
 
 function TicketsPanel({ initial }: { initial: TicketsInitial }) {
+  const [orderBy, setOrderBy] = useState("updated");
+  const [direction, setDirection] = useState("desc");
   const [status, setStatus] = useState(initial.status ?? "");
   const [kind, setKind] = useState(initial.kind ?? "");
   const [priority, setPriority] = useState(initial.priority ?? "");
@@ -172,6 +175,8 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
   const dq = useDebounced(q);
 
   const params = new URLSearchParams();
+  params.set("orderBy", orderBy);
+  params.set("direction", direction);
   if (status) params.set("status", status);
   if (kind) params.set("kind", kind);
   if (priority) params.set("priority", priority);
@@ -180,10 +185,15 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
   if (excludeStatus) params.set("excludeStatus", excludeStatus);
   if (dq) params.set("q", dq);
 
-  const { data, isLoading, error } = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["support-tickets", params.toString()],
-    queryFn: () => adminApi<TicketsResp>(`/api/admin/support/tickets?${params.toString()}`),
+    initialPageParam: { offset: 0, limit: 10 },
+    queryFn: ({ pageParam }) => adminApi<TicketsResp>(`/api/admin/support/tickets?${params.toString()}&offset=${pageParam.offset}&limit=${pageParam.limit}`),
+    getNextPageParam: page => page.hasMore ? { offset: page.offset + page.limit, limit: page.offset === 0 ? 50 : 100 } : undefined,
   });
+  const { isLoading, error } = query;
+  const pages = query.data?.pages;
+  const data = pages?.length ? { ...pages[pages.length - 1], tickets: [...new Map(pages.flatMap(p => p.tickets).map(t => [t.id, t])).values()] } : undefined;
 
   const hasFilters = !!(status || kind || priority || updatedFrom || updatedTo || excludeStatus || q);
   const clearFilters = () => {
@@ -223,6 +233,8 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
         </select>
+        <select aria-label="Ticket sort date" value={orderBy} onChange={e => setOrderBy(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold"><option value="updated">Last activity</option><option value="created">Created date</option></select>
+        <select aria-label="Ticket sort direction" value={direction} onChange={e => setDirection(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select>
         <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-muted">
           Updated from
           <input
@@ -258,11 +270,12 @@ function TicketsPanel({ initial }: { initial: TicketsInitial }) {
         </p>
       )}
 
-      {data?.truncated && (
+      {data?.truncated && !query.hasNextPage && (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
           Showing the most recent tickets only — narrow the date range to see older ones.
         </p>
       )}
+      {query.hasNextPage && <button className="mt-4 rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold" disabled={query.isFetchingNextPage} onClick={() => query.fetchNextPage()}>{query.isFetchingNextPage ? "Loading…" : `Load ${pages?.length === 1 ? 50 : 100} more tickets`}</button>}
 
       {data?.warning && (
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{data.warning}</p>
@@ -442,6 +455,7 @@ function SupportPageInner() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab: Tab = tabParam === "orders" || tabParam === "customers" ? tabParam : "tickets";
+  const [ticketSource, setTicketSource] = useState<"freshdesk" | "email">("freshdesk");
 
   // Switching tabs by hand starts that tab with no filters — filters only
   // carry over when arriving via a stat card's own link (goTo below).
@@ -451,6 +465,7 @@ function SupportPageInner() {
   };
 
   const goTo = (next: Tab, filters: Record<string, string>) => {
+    setTicketSource("freshdesk");
     const params = new URLSearchParams();
     if (next !== "tickets") params.set("tab", next);
     for (const [k, v] of Object.entries(filters)) params.set(k, v);
@@ -542,7 +557,13 @@ function SupportPageInner() {
       </div>
 
       <div className="mt-4">
-        {tab === "tickets" && <TicketsPanel key={searchParams.toString()} initial={ticketsInitial} />}
+        {tab === "tickets" && <div>
+          <div className="mb-4 flex gap-2">
+            <button onClick={() => setTicketSource("freshdesk")} aria-pressed={ticketSource === "freshdesk"} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ticketSource === "freshdesk" ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] bg-white"}`}>Freshdesk tickets</button>
+            <button onClick={() => setTicketSource("email")} aria-pressed={ticketSource === "email"} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ticketSource === "email" ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] bg-white"}`}>Email agents</button>
+          </div>
+          {ticketSource === "email" ? <SupportEmailPanel /> : <TicketsPanel key={searchParams.toString()} initial={ticketsInitial} />}
+        </div>}
         {tab === "orders" && <OrdersPanel key={searchParams.toString()} initial={ordersInitial} />}
         {tab === "customers" && <CustomersPanel />}
       </div>

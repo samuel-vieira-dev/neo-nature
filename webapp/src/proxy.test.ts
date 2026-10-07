@@ -39,3 +39,9 @@ it("does not grant anonymous access to customer data", async () => {
   const response = await proxy(new NextRequest("https://example.com/api/orders"));
   expect(response.status).toBe(401);
 });
+
+it.each(["/api/webhooks/support-email", "/api/webhooks/support-email/freshdesk", "/api/jobs/support-email"])("allows integration route %s through the cookie gate for its own API-key validation", async (path) => {
+  const response = await proxy(new NextRequest(`https://example.com${path}`, { method: "POST" }));
+  expect(response.status).toBe(200);
+  expect(response.headers.get("location")).toBeNull();
+});

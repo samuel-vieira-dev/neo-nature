@@ -8,9 +8,9 @@
 // their own SQL here (paginated, not the whole-table fold crm.ts does).
 // ---------------------------------------------------------------------------
 
-import { and, count, desc, eq, gte, ilike, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db, rawSql } from "@/db";
-import { customers, orders, tickets } from "@/db/schema";
+import { customers, orders, tickets, users } from "@/db/schema";
 import { applyFilters, loadCustomers, type CustomerRow } from "@/server/crm";
 import {
   listRecentFreshdeskTickets,
@@ -57,9 +57,16 @@ export type TicketQueueResult = {
   warning: string | null;
   tickets: SupportTicket[];
   truncated: boolean;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 export type TicketQueueFilters = {
+  offset?: number;
+  limit?: number;
+  orderBy?: "created" | "updated";
+  direction?: "asc" | "desc";
   status?: string;
   q?: string;
   kind?: "support" | "refund" | "billing";
@@ -119,12 +126,13 @@ export function filterTicketQueue(list: SupportTicket[], opts: TicketQueueFilter
 }
 
 /** Pure — indexes the customer list for O(1) requester→customer matching. */
-export function buildCustomerIndexes(rows: CustomerRow[]): {
-  byEmail: Map<string, CustomerRow>;
-  byPhoneDigits: Map<string, CustomerRow>;
+type TicketCustomer = { id: string | null; email: string | null; phone: string | null; name: string };
+export function buildCustomerIndexes(rows: TicketCustomer[]): {
+  byEmail: Map<string, TicketCustomer>;
+  byPhoneDigits: Map<string, TicketCustomer>;
 } {
-  const byEmail = new Map<string, CustomerRow>();
-  const byPhoneDigits = new Map<string, CustomerRow>();
+  const byEmail = new Map<string, TicketCustomer>();
+  const byPhoneDigits = new Map<string, TicketCustomer>();
   for (const r of rows) {
     if (!r.id) continue; // legacy fallback rows have no customer id to link to
     if (r.email) byEmail.set(r.email.toLowerCase(), r);
@@ -139,9 +147,9 @@ export function buildCustomerIndexes(rows: CustomerRow[]): {
 /** Pure — matches a Freshdesk requester to a customer by email, else phone digits. */
 export function matchCustomerForRequester(
   requester: { email?: string | null; phone?: string | null },
-  byEmail: Map<string, CustomerRow>,
-  byPhoneDigits: Map<string, CustomerRow>
-): CustomerRow | null {
+  byEmail: Map<string, TicketCustomer>,
+  byPhoneDigits: Map<string, TicketCustomer>
+): TicketCustomer | null {
   const email = requester.email?.toLowerCase().trim();
   if (email && byEmail.has(email)) return byEmail.get(email)!;
   const digits = requester.phone ? digitsOf(requester.phone) : "";
@@ -155,22 +163,27 @@ export function matchCustomerForRequester(
 // (429) per minute. Single-instance deployment (Railway); best-effort only.
 const TICKET_CACHE_TTL_MS = 5 * 60_000;
 type RecentTicketsResult = Awaited<ReturnType<typeof listRecentFreshdeskTickets>>;
-let ticketCache: { at: number; result: RecentTicketsResult } | null = null;
+const ticketCache = new Map<string, { at: number; result: RecentTicketsResult }>();
+const ticketInFlight = new Map<string, Promise<RecentTicketsResult>>();
 /** Last result that actually carried tickets — served when a refresh fails. */
-let lastGoodTickets: { at: number; result: Extract<RecentTicketsResult, { ok: true }> } | null = null;
+const lastGoodTickets = new Map<string, { at: number; result: Extract<RecentTicketsResult, { ok: true }> }>();
 
-async function getRecentTicketsCached(): Promise<RecentTicketsResult> {
-  if (ticketCache && Date.now() - ticketCache.at < TICKET_CACHE_TTL_MS) return ticketCache.result;
-  const result = await listRecentFreshdeskTickets({ sinceDays: 90 });
-  ticketCache = { at: Date.now(), result };
-  if (result.ok) {
-    lastGoodTickets = { at: Date.now(), result };
-    return result;
-  }
-  // A transient failure (rate limit, blip) should not blank the queue while a
-  // recent good copy is still in memory.
-  if (lastGoodTickets && Date.now() - lastGoodTickets.at < 30 * 60_000) return lastGoodTickets.result;
-  return result;
+async function getRecentTicketsCached(maxPages: number, orderBy: "created_at" | "updated_at", orderType: "asc" | "desc"): Promise<RecentTicketsResult> {
+  const key = `${maxPages}:${orderBy}:${orderType}`;
+  const cached = ticketCache.get(key);
+  if (cached && Date.now() - cached.at < TICKET_CACHE_TTL_MS) return cached.result;
+  const pending = ticketInFlight.get(key);
+  if (pending) return pending;
+  const request = (async () => {
+    const result = await listRecentFreshdeskTickets({ sinceDays: 90, maxPages, orderBy, orderType });
+    if (result.ok) lastGoodTickets.set(key, { at: Date.now(), result });
+    const good = lastGoodTickets.get(key);
+    const value = !result.ok && good && Date.now() - good.at < 30 * 60_000 ? good.result : result;
+    ticketCache.set(key, { at: Date.now(), result: value });
+    return value;
+  })();
+  ticketInFlight.set(key, request);
+  try { return await request; } finally { ticketInFlight.delete(key); }
 }
 
 const LOCAL_STATUS_LABELS: Record<string, string> = { open: "Open", in_review: "Pending", resolved: "Resolved" };
@@ -183,11 +196,32 @@ const LOCAL_STATUS_LABELS: Record<string, string> = { open: "Open", in_review: "
  * configured or the live call fails.
  */
 export async function getTicketQueue(opts: TicketQueueFilters = {}): Promise<TicketQueueResult> {
-  const [fd, customerRows, localTicketRows] = await Promise.all([
-    getRecentTicketsCached(),
-    loadCustomers(),
-    db.query.tickets.findMany(),
-  ]);
+  const limit = Math.min(1000, Math.max(1, opts.limit ?? 10));
+  const offset = Math.max(0, opts.offset ?? 0);
+  const orderBy = opts.orderBy === "created" ? "created_at" : "updated_at";
+  const orderType = opts.direction ?? "desc";
+  // First render makes one upstream request. Filtered searches may scan the bounded history.
+  const filtered = !!(opts.q || opts.kind || opts.status || opts.excludeStatus?.length || opts.priority || opts.updatedFrom || opts.updatedTo);
+  const maxPages = filtered ? 10 : Math.min(10, Math.ceil((offset + limit) / 100));
+  const fd = await getRecentTicketsCached(maxPages, orderBy, orderType);
+  const sort = orderType === "asc" ? asc : desc;
+  const localTicketRows = await db.query.tickets.findMany({
+    where: fd.ok
+      ? (fd.tickets.length ? inArray(tickets.freshdeskId, fd.tickets.map(t => t.id)) : sql`false`)
+      : and(
+          opts.kind ? eq(tickets.kind, opts.kind) : undefined,
+          opts.status ? eq(tickets.status, ({ Open: "open", Pending: "in_review", Resolved: "resolved" } as Record<string, string>)[opts.status] ?? opts.status.toLowerCase()) : undefined,
+          opts.q ? or(ilike(tickets.subject, `%${opts.q}%`), ilike(tickets.email, `%${opts.q}%`), sql`exists (select 1 from users ticket_requester where ticket_requester.id = ${tickets.userId} and coalesce(nullif(ticket_requester.full_name, ''), ticket_requester.name) ilike ${`%${opts.q}%`})`) : undefined,
+          opts.updatedFrom ? gte(tickets.createdAt, new Date(`${opts.updatedFrom}T00:00:00Z`)) : undefined,
+          opts.updatedTo ? lt(tickets.createdAt, new Date(new Date(`${opts.updatedTo}T00:00:00Z`).getTime() + 86_400_000)) : undefined,
+          opts.excludeStatus?.length ? sql`${tickets.status} not in (${sql.join(opts.excludeStatus.map(s => sql`${({ open: "open", pending: "in_review", resolved: "resolved", closed: "resolved" } as Record<string, string>)[s.toLowerCase()] ?? s.toLowerCase()}`), sql`, `)})` : undefined,
+        ),
+    orderBy: [sort(tickets.createdAt), sort(tickets.id)],
+    ...(fd.ok ? {} : { limit: offset + limit + 1 }),
+  });
+  const emails = fd.ok ? fd.tickets.flatMap(t => t.requester.email ? [t.requester.email.toLowerCase()] : []) : localTicketRows.map(t => t.email.toLowerCase());
+  const phones = fd.ok ? fd.tickets.flatMap(t => t.requester.phone ? [digitsOf(t.requester.phone)] : []).filter(p => p.length >= 7) : [];
+  const customerRows = emails.length || phones.length ? await db.select({ id: customers.id, email: customers.primaryEmail, phone: customers.primaryPhone, name: customers.name }).from(customers).where(or(emails.length ? inArray(customers.primaryEmail, emails) : undefined, phones.length ? inArray(customers.primaryPhone, phones.map(p => `+${p}`)) : undefined)) : [];
 
   let source: "freshdesk" | "local";
   let warning: string | null = null;
@@ -221,7 +255,9 @@ export async function getTicketQueue(opts: TicketQueueFilters = {}): Promise<Tic
   } else {
     source = "local";
     warning = "Showing app tickets only — Freshdesk unavailable";
-    const byUserId = new Map(customerRows.filter((r) => r.userId).map((r) => [r.userId as string, r]));
+    const userIds = [...new Set(localTicketRows.map(t => t.userId))];
+    const accounts = userIds.length ? await db.query.users.findMany({ where: inArray(users.id, userIds), columns: { id: true, customerId: true, name: true, fullName: true } }) : [];
+    const byUserId = new Map(accounts.map(u => [u.id, { id: u.customerId, name: u.fullName || u.name }]));
     const domain = process.env.FRESHDESK_DOMAIN;
     list = localTicketRows.map((t) => {
       const customer = t.userId ? byUserId.get(t.userId) ?? null : null;
@@ -244,9 +280,10 @@ export async function getTicketQueue(opts: TicketQueueFilters = {}): Promise<Tic
   }
 
   list = filterTicketQueue(list, opts);
-  list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const field = opts.orderBy === "created" ? "createdAt" : "updatedAt";
+  list.sort((a, b) => (orderType === "asc" ? 1 : -1) * (a[field].localeCompare(b[field]) || String(a.id).localeCompare(String(b.id))));
 
-  return { source, warning, tickets: list, truncated };
+  return { source, warning, tickets: list.slice(offset, offset + limit), truncated, offset, limit, hasMore: list.length > offset + limit || (source === "freshdesk" && truncated && maxPages < 10) };
 }
 
 // ---------------------------------- orders ----------------------------------
@@ -451,7 +488,7 @@ export type SupportStats = {
  */
 export async function getSupportStats(): Promise<SupportStats> {
   const [queue, refundRequestsLocalRows, awaitingRows, chargebackRows] = await Promise.all([
-    getTicketQueue(),
+    getTicketQueue({ limit: 100 }),
     db
       .select({ n: count() })
       .from(tickets)
