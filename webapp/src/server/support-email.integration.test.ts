@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import EmbeddedPostgres from "embedded-postgres";
 import { adminUsers, adminActionLogs, supportEmailTone, supportKnowledgeArticles, supportKnowledgeRevisions, supportTicketAttachments, orders, users, tickets, supportEmailConversations as conversations, supportEmailMessages as messages, supportEmailJobs as jobs } from "@/db/schema";
+import { EmailReplyRejected } from "./support-email-ai";
+import { eq } from "drizzle-orm";
 import { emailInboundSchema } from "./support-email-contract";
 
 const { generate } = vi.hoisted(() => ({ generate: vi.fn() }));
@@ -61,11 +63,12 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     await expect(tone.saveSupportEmailTone({ instructions: "Stale edit", version: 1 }, admin)).rejects.toHaveProperty("status", 409);
     expect(await database.db.select().from(adminActionLogs)).toHaveLength(2);
   });
-  it("ignores a generated acknowledgement when human review is required", async () => {
+  it("ignores model needsHuman for T1/T2 and keeps its reply", async () => {
     vi.stubEnv("SUPPORT_TICKETING_BACKEND", "internal"); vi.stubGlobal("fetch", vi.fn());
-    generate.mockResolvedValue({ tier: "T2", language: "en", intent: "other", needsHuman: true, reason: "Staff action", reply: "", acknowledgement: "We understand your concern." });
+    generate.mockResolvedValue({ tier: "T2", language: "en", intent: "other", needsHuman: true, reason: "Staff action", reply: "This action has not been performed.", acknowledgement: "We understand your concern." });
     await service.receiveSupportEmail(input("tone-handoff", "Need help with the order")); await service.runSupportEmailJobs(); await service.runSupportEmailJobs();
-    expect((await database.db.select().from(conversations))[0]).toMatchObject({ requiresHuman: true, owner: "human" });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ requiresHuman: false, owner: "agent" });
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "send", status: "review", draft: { needsHuman: false, reply: "This action has not been performed." } });
     expect((await database.db.select().from(messages)).filter(m=>m.direction==="outgoing")).toHaveLength(0);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -109,7 +112,16 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     generate.mockResolvedValue({tier:"T3",language:"en",intent:"other",needsHuman:false,reason:"Complex issue",reply:"This must not be sent"});
     await service.receiveSupportEmail(input("gmail-staff", "Please help with this issue"));await service.runSupportEmailJobs();await service.runSupportEmailJobs();
     expect((await database.db.select().from(conversations))[0]).toMatchObject({tier:"T3",requiresHuman:true});
-    expect((await database.db.select().from(jobs)).some(j=>j.stage==="send")).toBe(false);expect(fetch).not.toHaveBeenCalled();
+    const [suggestion] = await database.db.select().from(jobs);
+    expect(suggestion).toMatchObject({ stage: "escalate", draft: { needsHuman: true, reply: "This must not be sent" } });
+    await database.db.update(jobs).set({ status: "review" }).where(eq(jobs.id, suggestion.id));
+    const [c] = await database.db.select().from(conversations);
+    await expect(service.supportEmailAction(c.id, "approve", suggestion.id)).rejects.toHaveProperty("status", 409);
+    // Even a corrupted queued send cannot deliver a T3 suggestion.
+    await database.db.update(jobs).set({ stage: "send", status: "queued", runAt: new Date(0) }).where(eq(jobs.id, suggestion.id));
+    await service.runSupportEmailJobs();
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ status: "cancelled", error: "human_response_required" });
+    expect(fetch).not.toHaveBeenCalled();
   });
   it("cancels pending replies when the customer sends another message", async () => {
     await service.receiveSupportEmail(input()); await service.runSupportEmailJobs();
@@ -347,6 +359,145 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     await database.db.insert(messages).values(Array.from({length:120},(_,i)=>({id:crypto.randomUUID(),conversationId:receipt.conversationId!,dedupeKey:`history-${i}`,providerMessageId:`history-${i}`,direction:"note",subject:"History",text:`Message ${i}`,createdAt:new Date(1000+i),receivedAt:new Date(1000+i)})));
     const first=await service.supportEmailDetails(receipt.conversationId!);const second=await service.supportEmailDetails(receipt.conversationId!,first.messages[0].id);
     expect(first.messages).toHaveLength(100);expect(first.hasMoreMessages).toBe(true);expect(second.messages).toHaveLength(21);expect(second.hasMoreMessages).toBe(false);expect(new Set([...first.messages,...second.messages].map(m=>m.id)).size).toBe(121);
+  });
+
+  const rejected = () => new EmailReplyRejected("Reply contains an unverified link", { tier: "T2", language: "en", intent: "cancel", needsHuman: false, reason: "", reply: "Use https://unverified.example" });
+  const retryDue = () => database.db.update(jobs).set({ runAt: new Date(0) });
+  it("regenerates after rejection with feedback on the second attempt", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    generate.mockRejectedValueOnce(rejected());
+    await service.receiveSupportEmail(input("retry-feedback", "Please cancel my order"));
+    await service.runSupportEmailJobs();
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "prepare", status: "queued", attempts: 1, error: "reply_rejected: Reply contains an unverified link", draft: rejected().draft });
+    await retryDue(); await service.runSupportEmailJobs();
+    expect(generate.mock.calls[1][0].previousRejection).toEqual({ reason: rejected().reason, reply: rejected().draft.reply });
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "send", status: "review", error: null });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "agent", requiresHuman: false });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(["draft", "pilot", "live"])("keeps three rejections in review without sending in %s", async mode => {
+    vi.stubEnv("SUPPORT_EMAIL_MODE", mode); vi.stubGlobal("fetch", vi.fn());
+    generate.mockRejectedValue(rejected());
+    const receipt = await service.receiveSupportEmail(input());
+    for (let attempt = 0; attempt < 3; attempt++) { await retryDue(); await service.runSupportEmailJobs(); }
+    const [job] = await database.db.select().from(jobs);
+    expect(job).toMatchObject({ stage: "send", status: "review", attempts: 3, error: "reply_rejected: Reply contains an unverified link", draft: rejected().draft });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "agent", requiresHuman: false, status: "draft_needs_review", escalationReason: rejected().reason });
+    expect(generate.mock.calls[2][0].previousRejection).toEqual({ reason: rejected().reason, reply: rejected().draft.reply });
+    await retryDue(); await service.runSupportEmailJobs();
+    expect((await database.db.select().from(messages)).filter(m => m.direction === "outgoing")).toHaveLength(0);
+    expect(fetch).not.toHaveBeenCalled();
+    if (mode === "draft") await expect(service.supportEmailAction(receipt.conversationId!, "approve", job.id)).rejects.toHaveProperty("status", 409);
+    else {
+      await service.supportEmailAction(receipt.conversationId!, "approve", job.id);
+      expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "send", status: "queued" });
+    }
+  });
+  it("leaves exhausted generation errors retryable without human handoff", async () => {
+    generate.mockRejectedValue(new Error("llm_http_503")); vi.stubGlobal("fetch", vi.fn());
+    const receipt = await service.receiveSupportEmail(input());
+    for (let attempt = 0; attempt < 3; attempt++) { await retryDue(); await service.runSupportEmailJobs(); }
+    const [job] = await database.db.select().from(jobs);
+    expect(job).toMatchObject({ stage: "prepare", status: "failed", attempts: 3, error: "generation_failed" });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "agent", requiresHuman: false, status: "generation_failed" });
+    await service.supportEmailAction(receipt.conversationId!, "retry", job.id);
+    generate.mockResolvedValue({ tier: "T1", language: "en", intent: "faq", needsHuman: false, reason: "", reply: "Thanks for your question." });
+    await service.runSupportEmailJobs();
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "send", status: "review", attempts: 0 });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("uses the final attempt failure type after mixed rejection and transport failures", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    generate.mockRejectedValueOnce(rejected()).mockRejectedValue(new Error("llm_http_503"));
+    await service.receiveSupportEmail(input());
+    for (let attempt = 0; attempt < 3; attempt++) { await retryDue(); await service.runSupportEmailJobs(); }
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "prepare", status: "failed", error: "generation_failed", draft: rejected().draft });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "agent", requiresHuman: false, status: "generation_failed" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("keeps configuration errors blocked after three attempts", async () => {
+    generate.mockRejectedValue(new Error("openai_not_configured"));
+    await service.receiveSupportEmail(input());
+    for (let attempt = 0; attempt < 3; attempt++) { await retryDue(); await service.runSupportEmailJobs(); }
+    expect((await database.db.select().from(jobs))[0]).toMatchObject({ stage: "prepare", status: "blocked", error: "llm_configuration_missing" });
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "agent", requiresHuman: false });
+  });
+  it("preserves takeover ownership on subsequent T1/T2 staff requests", async () => {
+    const receipt = await service.receiveSupportEmail(input());
+    await service.supportEmailAction(receipt.conversationId!, "takeover");
+    await service.receiveSupportEmail(input("after-takeover", "Please update my shipping address"));
+    expect((await database.db.select().from(conversations))[0]).toMatchObject({ owner: "human", requiresHuman: true, escalationReason: "Staff took over" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("bridges T1/T2 staff keywords as agent-owned but preserves refund, history and missing email flows", async () => {
+    const { bridgeAppTicket } = await import("./support-ticket-bridge");
+    const userId = crypto.randomUUID();
+    await database.db.insert(users).values({ id: userId, email: "", name: "Bridge test" });
+    for (const sample of [
+      { subject: "Please update my shipping address", kind: "support", human: false },
+      { subject: "Are there supplement interactions?", kind: "support", human: false },
+      { subject: "Refund request", kind: "refund", human: true },
+      { subject: "Historical address change", kind: "support", historical: true, human: true },
+      { subject: "Help", kind: "support", email: "", human: true },
+    ]) {
+      const [ticket] = await database.db.insert(tickets).values({ id: crypto.randomUUID(), userId, subject: sample.subject, kind: sample.kind, email: sample.email ?? "bridge@example.com" }).returning();
+      const c = await bridgeAppTicket(ticket, sample.subject, sample.historical);
+      expect(c).toMatchObject({ owner: sample.human ? "human" : "agent", requiresHuman: sample.human });
+    }
+  });
+  it("dry-runs maintenance selection and applies/reset jobs only to eligible handoffs", async () => {
+    const { reprocessT1T2Handoffs } = await import("../../scripts/reprocess-t1-t2-handoffs");
+    const userId = crypto.randomUUID();
+    await database.db.insert(users).values({ id: userId, email: "maintenance@example.com", name: "Maintenance" });
+    const [bridgeTicket] = await database.db.insert(tickets).values({ id: crypto.randomUUID(), userId, email: "maintenance@example.com", subject: "Support" }).returning();
+    const [refundTicket] = await database.db.insert(tickets).values({ id: crypto.randomUUID(), userId, email: "maintenance@example.com", subject: "Refund", kind: "refund" }).returning();
+    const [noEmailTicket] = await database.db.insert(tickets).values({ id: crypto.randomUUID(), userId, email: "", subject: "Support" }).returning();
+    const eligibleIds: string[] = [];
+    for (const sample of [
+      { label: "native", tier: "T1", eligible: true },
+      { label: "bridge", source: "webapp", legacyTicketId: bridgeTicket.id, local: true, eligible: true },
+      { label: "T3", tier: "T3" },
+      { label: "resolved", ticketStatus: "resolved" },
+      { label: "closed", ticketStatus: "closed" },
+      { label: "freshdesk", source: "freshdesk" },
+      { label: "import-message", dedupe: "freshdesk-import:123" },
+      { label: "import-metadata", freshdeskImportUpdatedAt: new Date() },
+      { label: "takeover", escalationReason: "Staff took over" },
+      { label: "local", local: true },
+      { label: "legacy", legacyTicketId: "historical-legacy" },
+      { label: "refund", source: "webapp", legacyTicketId: refundTicket.id, kind: "refund", local: true },
+      { label: "no-email", source: "webapp", legacyTicketId: noEmailTicket.id, email: "", local: true },
+      { label: "processing", processing: true },
+      { label: "already-agent", requiresHuman: false },
+      { label: "unknown", unknown: true },
+      { label: "historical", direction: "note" },
+    ]) {
+      const id = crypto.randomUUID(), messageId = crypto.randomUUID();
+      await database.db.insert(conversations).values({ id, mailboxId: "test", threadId: sample.local ? `local:${id}` : id, email: sample.email ?? "maintenance@example.com", subject: "Support", tier: sample.tier ?? "T2", source: sample.source ?? "email", legacyTicketId: sample.legacyTicketId, kind: sample.kind ?? "support", ticketStatus: sample.ticketStatus ?? "open", owner: "human", requiresHuman: sample.requiresHuman ?? true, escalationReason: sample.escalationReason ?? "Old handoff", latestMessageId: messageId, freshdeskImportUpdatedAt: sample.freshdeskImportUpdatedAt });
+      await database.db.insert(messages).values({ id: messageId, conversationId: id, dedupeKey: sample.dedupe ?? id, providerMessageId: id, direction: sample.direction ?? "incoming", subject: "Support", text: "Help", receivedAt: new Date() });
+      await database.db.insert(jobs).values({ id: crypto.randomUUID(), conversationId: id, messageId, stage: "escalate", status: sample.unknown ? "unknown" : sample.processing ? "processing" : "queued", sendAfter: new Date() });
+      if (sample.eligible) eligibleIds.push(id);
+      if (sample.label === "bridge") await database.db.insert(jobs).values({ id: crypto.randomUUID(), conversationId: id, messageId, stage: "prepare", status: "failed", attempts: 3, error: "old", sendAfter: new Date() });
+    }
+    const beforeConversations = await database.db.select().from(conversations);
+    const beforeJobs = await database.db.select().from(jobs);
+    const dryRun = await reprocessT1T2Handoffs(database.db);
+    const expectedNumbers = beforeConversations.filter(c => eligibleIds.includes(c.id)).map(c => c.ticketNumber).sort((a, b) => a - b);
+    expect(dryRun).toMatchObject({ apply: false, selected: 2, cancelledJobs: 0, insertedPrepareJobs: 0, resetPrepareJobs: 0, ticketNumbers: expectedNumbers });
+    expect(await database.db.select().from(conversations)).toEqual(beforeConversations);
+    expect(await database.db.select().from(jobs)).toEqual(beforeJobs);
+    expect(await reprocessT1T2Handoffs(database.db, true)).toMatchObject({ apply: true, selected: 2, cancelledJobs: 2, insertedPrepareJobs: 1, resetPrepareJobs: 1, ticketNumbers: expectedNumbers });
+    for (const c of await database.db.select().from(conversations)) {
+      if (eligibleIds.includes(c.id)) expect(c).toMatchObject({ owner: "agent", requiresHuman: false, status: "queued", escalationReason: null });
+      else expect(c).toEqual(beforeConversations.find(previous => previous.id === c.id));
+    }
+    const afterJobs = await database.db.select().from(jobs);
+    for (const id of eligibleIds) {
+      expect(afterJobs.find(j => j.conversationId === id && j.stage === "escalate")).toMatchObject({ status: "cancelled", error: "reprocess_t1_t2" });
+      expect(afterJobs.find(j => j.conversationId === id && j.stage === "prepare")).toMatchObject({ status: "queued", attempts: 0, error: null });
+    }
+    expect((await reprocessT1T2Handoffs(database.db, true)).selected).toBe(0);
   });
 
 });

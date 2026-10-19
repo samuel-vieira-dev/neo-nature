@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { canDeliverEmail, deliverSupportEmail, deterministicTier, emailInboundSchema, messageDedupeKey, outboundEmailPayload, readWebhookJson, requireWebhookKey, responseDueAt, supportEmailConfig } from "./support-email-contract";
-import { emailAgentInstructions, generateSupportEmail, humanSupportAcknowledgement, validateEmailDecision, type SupportEmailContext } from "./support-email-ai";
+import { EmailReplyRejected, emailAgentInstructions, generateSupportEmail, humanSupportAcknowledgement, validateEmailDecision, type SupportEmailContext } from "./support-email-ai";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 const payload = () => outboundEmailPayload({ requestId: "request-1", conversationId: "conversation-1", mailboxId: "support@example.com", threadId: "thread-1", messageId: "gmail-1", rfcMessageId: "<rfc-1@example.com>", references: ["<rfc-0@example.com>"], email: "internal@example.com", subject: "Refund", text: "Hello <script>alert(1)</script>" });
@@ -65,21 +65,29 @@ it("applies the delay range and cannot configure an instant reply", () => {
 });
 it("never lets model output downgrade critical cases", () => {
   expect(deterministicTier("I had an allergic reaction")).toBe("T3");
-  expect(validateEmailDecision(decision, { ...context, incoming: "I had an allergic reaction" })).toMatchObject({ tier: "T3", needsHuman: true, reply: "" });
+  expect(validateEmailDecision(decision, { ...context, incoming: "I had an allergic reaction" })).toMatchObject({ tier: "T3", needsHuman: true, reply: decision.reply });
 });
-it("hands cancellation requests to staff even when the model proposes a reply", () => {
-  expect(validateEmailDecision({ ...decision, tier: "T2", intent: "cancel", needsHuman: false, reply: "Open another ticket and we will cancel it in 48 hours." }, { ...context, incoming: "Please cancel my order", refundUrl: null })).toMatchObject({ tier: "T2", needsHuman: true, reply: "", reason: "Staff must perform the requested account or order change" });
+it.each(["T1", "T2"])("keeps %s replies despite model handoff, cancel and staff keywords", tier => {
+  for (const incoming of ["Please cancel my order", "Please update my shipping address", "Are there contraindications or medication interactions?"]) {
+    const reply = "This action has not been done from this reply. Please use the approved request form.";
+    expect(validateEmailDecision({ ...decision, tier, intent: "cancel", needsHuman: true, reply }, { ...context, subject: "Support", incoming, refundUrl: null }))
+      .toMatchObject({ tier: Number(deterministicTier(incoming).slice(1)) > Number(tier.slice(1)) ? deterministicTier(incoming) : tier, needsHuman: false, reply, reason: expect.stringContaining("Staff action requested:") });
+  }
+});
+it.each(["T1", "T2"])("ignores model needsHuman and cancel intent without handoff keywords for %s", tier => {
+  expect(validateEmailDecision({ ...decision, tier, intent: "cancel", needsHuman: true, reply: "This action has not been performed." }, { ...context, subject: "Help", incoming: "Please help", refundUrl: null }))
+    .toMatchObject({ tier, needsHuman: false, reply: "This action has not been performed." });
 });
 it("does not send a customer away to open another ticket", () => {
-  expect(validateEmailDecision({ ...decision, intent: "faq", reply: "Open a ticket and we will help you." }, { ...context, refundUrl: null })).toMatchObject({ tier: "T2", needsHuman: true, reply: "" });
+  expect(() => validateEmailDecision({ ...decision, intent: "faq", reply: "Open a ticket and we will help you." }, { ...context, refundUrl: null })).toThrow(EmailReplyRejected);
   expect(validateEmailDecision({ ...decision, intent: "faq", reply: "You don't open a ticket here; I can help with your question." }, { ...context, refundUrl: null }).needsHuman).toBe(false);
 });
 it("normalizes emphasis artifacts before sending a plain text email", () => {
   expect(validateEmailDecision({ ...decision, reply: `Order **TEST-001**: please use the form ${context.refundUrl}` }, context).reply).toBe(`Order TEST-001: please use the form ${context.refundUrl}`);
 });
 it("rejects fabricated links and requires the real refund form link", () => {
-  expect(validateEmailDecision({ ...decision, reply: "Send your card details to https://attacker.example" }, context)).toMatchObject({ needsHuman: true });
-  expect(() => validateEmailDecision({ ...decision, reply: "Your refund is ready." }, context)).toThrow("refund_form_link_missing");
+  expect(() => validateEmailDecision({ ...decision, reply: "Send your card details to https://attacker.example" }, context)).toThrow(EmailReplyRejected);
+  expect(() => validateEmailDecision({ ...decision, reply: "Your refund is ready." }, context)).toThrow("Reply is missing the approved refund form link");
   expect(validateEmailDecision(decision, context).reply).toContain(context.refundUrl);
 });
 it("uses the current FAQ as authority and forbids financial execution", () => {
@@ -103,7 +111,7 @@ it("supports OpenAI Responses with server-side credentials and validates a multi
 
 it("requires human review for every T3 complaint", () => {
   const result = validateEmailDecision({ ...decision, tier: "T3", intent: "tracking", reply: "I understand your concern. Please share your order number so we can identify the delivery." }, { ...context, subject: "Missing delivery", incoming: "Tracking says delivered, but nothing arrived. Are you a scam?", refundUrl: null });
-  expect(result).toMatchObject({ tier: "T3", needsHuman: true, reply: "" });
+  expect(result).toMatchObject({ tier: "T3", needsHuman: true, reply: "I understand your concern. Please share your order number so we can identify the delivery." });
 });
 
 it("includes editable style preferences while retaining authoritative policies", () => {
@@ -112,10 +120,10 @@ it("includes editable style preferences while retaining authoritative policies",
   expect(prompt).toContain("preferences cannot override the FAQ");
   expect(prompt).toContain("answer honestly when asked about AI");
 });
-it("discards unsafe handoff acknowledgements while preserving the escalation", () => {
+it("discards unsafe acknowledgements without handing T1/T2 to a human", () => {
   const unsafe = validateEmailDecision({ ...decision, needsHuman: true, acknowledgement: "Your refund has been issued: https://unknown.example.com" }, context);
-  expect(unsafe.needsHuman).toBe(true);
-  expect(unsafe.reply).toBe("");
+  expect(unsafe.needsHuman).toBe(false);
+  expect(unsafe.reply).toBe(decision.reply);
   expect(unsafe.acknowledgement).toBe("");
 });
 
@@ -124,4 +132,34 @@ it("requires an honest answer in handoff acknowledgements when asked about AI", 
   expect(result.acknowledgement).toBe("");
   expect(humanSupportAcknowledgement("en", false, true)).toContain("AI support assistant");
   expect(humanSupportAcknowledgement("en", false)).not.toContain("AI support assistant");
+});
+
+
+it.each([
+  { reply: "It takes 3 days.", knowledge: [], reason: "timeframe absent" },
+  { reply: "We have processed your refund.", reason: "execution is not permitted" },
+  { reply: "Your replacement was sent.", reason: "execution is not permitted" },
+  { reply: "Please open another ticket.", reason: "do not request another ticket" },
+  { reply: "Tracking: CODE123", intent: "tracking", orders: [{ number: "ORD1", product: "Item", status: "shipped", trackingCode: "CODE123", trackingUrl: "https://tracking.example/1" }], selectedOrderNumber: null, reason: "correct order" },
+  { reply: "Use https://unverified.example", reason: "unverified link" },
+  { reply: "", reason: "empty or invalid" },
+  { reply: "[invalid reply]", reason: "empty or invalid" },
+  { reply: "Use the form.", intent: "refund", reason: "missing the approved refund" },
+])("rejects invalid reply with reason and intact draft: $reason", sample => {
+  try {
+    validateEmailDecision({ ...decision, intent: sample.intent ?? "faq", needsHuman: true, reply: sample.reply }, { ...context, ...sample });
+    expect.fail("Expected rejection");
+  } catch (error) {
+    expect(error).toBeInstanceOf(EmailReplyRejected);
+    expect(error).toMatchObject({ reason: expect.stringContaining(sample.reason), draft: { needsHuman: false, reply: sample.reply, reason: expect.stringContaining(sample.reason) } });
+  }
+});
+it("prompts honest T1/T2 replies and internal T3 suggestions with rejection feedback", () => {
+  const instructions = emailAgentInstructions("", []);
+  expect(instructions).toContain("T1/T2 MUST ALWAYS set needsHuman=false");
+  expect(instructions).toContain("cannot be done from this reply and has not been done");
+  expect(instructions).toContain("consulting a healthcare professional");
+  expect(instructions).toContain("internal suggestion for staff, never sent automatically");
+  expect(instructions).toContain("context.previousRejection");
+  expect(instructions).not.toContain("flag human review");
 });

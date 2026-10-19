@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { orders, adminUsers, tickets, supportTicketAttachments, supportEmailConversations as conversations, supportEmailMessages as messages, supportEmailJobs as jobs } from "@/db/schema";
 import { buildTrackingUrl } from "@/lib/tracking";
 import { refundFormPath } from "./refund-form-email";
-import { generateSupportEmail, type SupportEmailContext } from "./support-email-ai";
+import { EmailReplyRejected, generateSupportEmail, type SupportEmailContext } from "./support-email-ai";
 import { canDeliverEmail, deliverSupportEmail, deterministicTier, requiredHumanHandoff, messageDedupeKey, outboundEmailPayload, responseDueAt, supportEmailConfig, type EmailInbound, freshdeskEmailEventSchema } from "./support-email-contract";
 import { readSupportEmailTone, voicePreferences } from "./support-email-tone";
 import { internalSupportEnabled, type TicketStatus } from "@/lib/support-tickets";
@@ -57,8 +57,8 @@ export async function receiveSupportEmail(input: EmailInbound): Promise<EmailRec
     await tx.update(jobs).set({ status: "cancelled", error: "new_customer_message" }).where(and(eq(jobs.conversationId, c.id), inArray(jobs.stage, ["prepare", "send"]), inArray(jobs.status, ["queued", "blocked", "review", "failed"])));
     const uncertain = await tx.query.supportEmailJobs.findFirst({ where: and(eq(jobs.conversationId, c.id), eq(jobs.status, "unknown")) });
     const handoff = requiredHumanHandoff(`${input.subject}\n${input.text}`);
-    const human = tier === "T3" || c.owner === "human" || !!handoff || !!uncertain;
-    await tx.update(conversations).set({ latestMessageId: m.id, subject: input.subject, tier, requiresHuman: human, ticketStatus: c.latestMessageId ? "open" : "new", owner: human ? "human" : "agent", status: uncertain ? "delivery_unknown" : human ? "awaiting_human" : "queued", escalationReason: uncertain ? "Reconcile the previous uncertain delivery before responding" : handoff || c.escalationReason, updatedAt: now }).where(eq(conversations.id, c.id));
+    const human = tier === "T3" || c.owner === "human" || !!uncertain;
+    await tx.update(conversations).set({ latestMessageId: m.id, subject: input.subject, tier, requiresHuman: human, ticketStatus: c.latestMessageId ? "open" : "new", owner: human ? "human" : "agent", status: uncertain ? "delivery_unknown" : human ? "awaiting_human" : "queued", escalationReason: uncertain ? "Reconcile the previous uncertain delivery before responding" : tier === "T3" ? handoff : c.owner === "human" ? c.escalationReason : null, updatedAt: now }).where(eq(conversations.id, c.id));
     await tx.insert(jobs).values({ id: crypto.randomUUID(), conversationId: c.id, messageId: m.id, stage: human ? (c.freshdeskId ? "human_note" : "escalate") : "prepare", runAt: now, sendAfter: human || c.firstRepliedAt ? now : responseDueAt(now, Math.random(), { minDelay: tone.minDelayMinutes, maxDelay: tone.maxDelayMinutes }) });
     return { accepted: true, deduped: false, conversationId: c.id, messageId: m.id, tier };
   });
@@ -107,17 +107,18 @@ async function blockBehindUncertainDelivery(tx: Transaction, job: Job) {
 
 async function prepareJob(job: Job, c: Conversation, incoming: Message) {
   const context = await supportEmailContext(c, incoming);
+  if (job.error?.startsWith("reply_rejected:") && job.draft) context.previousRejection = { reason: job.draft.reason, reply: job.draft.reply };
   const tone = await readSupportEmailTone();
   const draft = await generateSupportEmail(context, voicePreferences(tone));
-  if (draft.tier === "T3" || draft.needsHuman) { draft.needsHuman = true; draft.reply = ""; }
+  draft.needsHuman = draft.tier === "T3";
   return withConversationLock(c.id, async (tx, current) => {
     if (current.owner !== "agent" || current.latestMessageId !== incoming.id) {
       await tx.update(jobs).set({ status: "cancelled", error: "conversation_changed" }).where(eq(jobs.id, job.id));
       return;
     }
-    const human = draft.tier === "T3" || draft.needsHuman;
+    const human = draft.tier === "T3";
     await tx.update(conversations).set({ tier: draft.tier, language: draft.language, requiresHuman: human, ticketStatus: human ? "open" : current.ticketStatus, owner: human ? "human" : "agent", status: human ? "awaiting_human" : "draft_ready", escalationReason: human ? draft.reason : null, updatedAt: new Date() }).where(eq(conversations.id, c.id));
-    await tx.update(jobs).set({ draft, stage: draft.reply ? "send" : "escalate", status: draft.reply && !canDeliverEmail(current.email) ? "review" : "queued", runAt: draft.reply ? job.sendAfter : new Date(), attempts: 0, startedAt: null, error: null }).where(eq(jobs.id, job.id));
+    await tx.update(jobs).set({ draft, stage: human ? (current.freshdeskId ? "human_note" : "escalate") : "send", status: !human && !canDeliverEmail(current.email) ? "review" : "queued", runAt: human ? new Date() : job.sendAfter, attempts: 0, startedAt: null, error: null }).where(eq(jobs.id, job.id));
   });
 }
 
@@ -230,16 +231,27 @@ export async function runSupportEmailJobs(limit = 3) {
       const configuration = /not_configured|unsupported_llm_provider|invalid_public_app_url/.test(message);
       if (job.stage !== "prepare") {
         await db.update(jobs).set({ status: "unknown", error: "external_write_not_confirmed" }).where(eq(jobs.id, job.id));
-      } else if (job.attempts >= 3 && !configuration) {
+      } else {
+        const rejection = error instanceof EmailReplyRejected ? error : null;
         await withConversationLock(job.conversationId, async (tx, c) => {
           if (c.latestMessageId !== job.messageId || c.owner !== "agent") {
             await tx.update(jobs).set({ status: "cancelled", error: "conversation_changed" }).where(eq(jobs.id, job.id));
             return;
           }
-          await tx.update(conversations).set({ owner: "human", requiresHuman: true, ticketStatus: "open", status: "awaiting_human", escalationReason: "AI generation failed after three attempts", updatedAt: new Date() }).where(eq(conversations.id, c.id));
-          await tx.update(jobs).set({ stage: "escalate", status: "queued", attempts: 0, runAt: new Date(), error: "generation_failed" }).where(eq(jobs.id, job.id));
+          const exhausted = job.attempts >= 3 && !configuration;
+          const failure = rejection ? `reply_rejected: ${rejection.reason}` : configuration ? "llm_configuration_missing" : "generation_failed";
+          await tx.update(jobs).set({
+            ...(rejection ? { draft: rejection.draft } : {}),
+            stage: exhausted && rejection ? "send" : "prepare",
+            status: configuration ? "blocked" : exhausted ? rejection ? "review" : "failed" : "queued",
+            error: failure, startedAt: null, runAt: new Date(Date.now() + (rejection ? 60_000 : 5 * 60_000)),
+          }).where(eq(jobs.id, job.id));
+          if (exhausted) await tx.update(conversations).set({
+            requiresHuman: false, status: rejection ? "draft_needs_review" : "generation_failed",
+            escalationReason: rejection ? rejection.reason : null, updatedAt: new Date(),
+          }).where(eq(conversations.id, c.id));
         });
-      } else await db.update(jobs).set({ status: configuration ? "blocked" : "queued", error: configuration ? "llm_configuration_missing" : "generation_failed", runAt: new Date(Date.now() + 5 * 60_000) }).where(eq(jobs.id, job.id));
+      }
     }
   }
   return { mode, processed };
