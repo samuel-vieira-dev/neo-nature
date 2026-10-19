@@ -4,7 +4,7 @@ import { EmailReplyRejected, emailAgentInstructions, generateSupportEmail, human
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 const payload = () => outboundEmailPayload({ requestId: "request-1", conversationId: "conversation-1", mailboxId: "support@example.com", threadId: "thread-1", messageId: "gmail-1", rfcMessageId: "<rfc-1@example.com>", references: ["<rfc-0@example.com>"], email: "internal@example.com", subject: "Refund", text: "Hello <script>alert(1)</script>" });
-const context: SupportEmailContext = { history: [], subject: "Refund", incoming: "Please refund my order", hasAttachments: false, orders: [], refundUrl: "https://app.beneonature.com/refund?order_id=test" };
+const context: SupportEmailContext = { today: "2026-10-19", history: [], subject: "Refund", incoming: "Please refund my order", hasAttachments: false, orders: [], refundUrl: "https://app.beneonature.com/refund?order_id=test" };
 const decision = { tier: "T2", language: "en", intent: "refund", needsHuman: false, reason: "", reply: `Please complete the form: ${context.refundUrl}` };
 
 it("requires an independently configured secret without cookie authentication", () => {
@@ -140,7 +140,7 @@ it.each([
   { reply: "We have processed your refund.", reason: "execution is not permitted" },
   { reply: "Your replacement was sent.", reason: "execution is not permitted" },
   { reply: "Please open another ticket.", reason: "do not request another ticket" },
-  { reply: "Tracking: CODE123", intent: "tracking", orders: [{ number: "ORD1", product: "Item", status: "shipped", trackingCode: "CODE123", trackingUrl: "https://tracking.example/1" }], selectedOrderNumber: null, reason: "correct order" },
+  { reply: "Tracking: CODE123", intent: "tracking", orders: [{ number: "ORD1", product: "Item", status: "shipped", daysSinceShipped: null, daysSinceLastTrackingEvent: null, trackingCode: "CODE123", trackingUrl: "https://tracking.example/1" }], selectedOrderNumber: null, reason: "correct order" },
   { reply: "Use https://unverified.example", reason: "unverified link" },
   { reply: "", reason: "empty or invalid" },
   { reply: "[invalid reply]", reason: "empty or invalid" },

@@ -6,7 +6,7 @@ it.each(examples)("classifies $tier: $subject", sample => {
   expect(deterministicTier(`${sample.subject}\n${sample.body}`)).toBe(sample.tier);
   if(sample.tier==="T3") expect(requiredHumanHandoff(sample.body+sample.subject)).toBeTruthy();
 });
-const context:SupportEmailContext={subject:"Where is order A12345?",incoming:"Please send tracking",history:[],hasAttachments:false,orders:[{number:"A12345",product:"Product",status:"shipped",trackingCode:"ABC123456789",trackingUrl:"https://tracking.example/ABC123456789"}],refundUrl:null,selectedOrderNumber:"A12345"};
+const context:SupportEmailContext={today:"2026-10-19",subject:"Where is order A12345?",incoming:"Please send tracking",history:[],hasAttachments:false,orders:[{number:"A12345",product:"Product",status:"shipped",daysSinceShipped:null,daysSinceLastTrackingEvent:null,trackingCode:"ABC123456789",trackingUrl:"https://tracking.example/ABC123456789"}],refundUrl:null,selectedOrderNumber:"A12345"};
 const draft={tier:"T1",language:"en",intent:"tracking",needsHuman:false,reason:"",reply:"Your order is on its way."};
 it("includes both the verified code and link in a tracking answer",()=>{
   const result=validateEmailDecision(draft,context);

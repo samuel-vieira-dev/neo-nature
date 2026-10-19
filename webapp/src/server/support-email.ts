@@ -4,7 +4,7 @@ import { orders, adminUsers, tickets, supportTicketAttachments, supportEmailConv
 import { buildTrackingUrl } from "@/lib/tracking";
 import { refundFormPath } from "./refund-form-email";
 import { EmailReplyRejected, generateSupportEmail, type SupportEmailContext } from "./support-email-ai";
-import { canDeliverEmail, deliverSupportEmail, deterministicTier, requiredHumanHandoff, messageDedupeKey, outboundEmailPayload, responseDueAt, supportEmailConfig, type EmailInbound, freshdeskEmailEventSchema } from "./support-email-contract";
+import { isAutomatedEmail, supportEmailOrderTiming, canDeliverEmail, deliverSupportEmail, deterministicTier, requiredHumanHandoff, messageDedupeKey, outboundEmailPayload, responseDueAt, supportEmailConfig, type EmailInbound, freshdeskEmailEventSchema } from "./support-email-contract";
 import { readSupportEmailTone, voicePreferences } from "./support-email-tone";
 import { internalSupportEnabled, type TicketStatus } from "@/lib/support-tickets";
 import { publishedKnowledge } from "./support-knowledge";
@@ -20,10 +20,10 @@ const lock = (tx: Transaction, key: string) => tx.execute(sql`select pg_advisory
 
 export type EmailReceipt = { accepted: boolean; deduped?: boolean; ignored?: boolean; reason?: string; conversationId?: string; messageId?: string; tier?: string };
 export async function receiveSupportEmail(input: EmailInbound): Promise<EmailReceipt> {
+  if (isAutomatedEmail(input)) return { accepted: true, ignored: true, reason: "automated_sender" };
   const now = new Date();
   const tone = await readSupportEmailTone();
   if (new Date(input.receivedAt).getTime() > now.getTime() + 5 * 60_000) throw Response.json({ error: "received_at_in_future" }, { status: 400 });
-  if (input.spam || input.autoSubmitted || input.from.email === input.mailboxId) return { accepted: true, ignored: true, reason: "automated_spam_or_self_message" };
   const dedupeKey = messageDedupeKey(input.mailboxId, input.messageId);
   return db.transaction(async tx => {
     await lock(tx, lockKey(input));
@@ -65,6 +65,7 @@ export async function receiveSupportEmail(input: EmailInbound): Promise<EmailRec
 }
 
 export async function supportEmailContext(c: Conversation, incoming: Message): Promise<SupportEmailContext> {
+  const today = new Date().toISOString().slice(0, 10);
   const [history, purchaseRows] = await Promise.all([
     db.query.supportEmailMessages.findMany({ where: and(eq(messages.conversationId, c.id), inArray(messages.direction, ["incoming", "outgoing"])), orderBy: [desc(messages.receivedAt), desc(messages.id)], limit: 20 }),
     db.query.orders.findMany({ where: sql`lower(${orders.email}) = ${c.email}`, orderBy: [desc(orders.placedAt)], limit: 21, columns: { id: true, number: true, buygoodsOrderId: true, konnektiveOrderId: true, productName: true, status: true, shippingTrackingId: true, shippingStatus: true, fulfilledAt: true, trackingSteps: true, source: true, total: true, currency: true, placedAt: true } }),
@@ -79,9 +80,9 @@ export async function supportEmailContext(c: Conversation, incoming: Message): P
   const refundUrl = selected ? new URL(refundFormPath(selected.id), publicUrl).toString() : null;
   if (refundUrl && !refundUrl.startsWith("https://")) throw new Error("invalid_public_app_url");
   return {
-    customerEmail: c.email, subject: incoming.subject, incoming: incoming.text, hasAttachments: incoming.attachments.length > 0,
+    today, customerEmail: c.email, subject: incoming.subject, incoming: incoming.text, hasAttachments: incoming.attachments.length > 0,
     history: history.reverse().map(m => ({ direction: m.direction, text: m.text.slice(0, 4000) })),
-    orders: purchaseRows.map(o => ({ number: o.buygoodsOrderId || o.konnektiveOrderId || o.number, product: o.productName, status: o.status, total: o.total, currency: o.currency, placedAt: o.placedAt.toISOString(), trackingCode: o.shippingTrackingId, shippingStatus: o.shippingStatus, fulfilledAt: o.fulfilledAt?.toISOString() ?? null, trackingEvents: o.trackingSteps, source: o.source, trackingUrl: o.shippingTrackingId ? buildTrackingUrl(o.shippingTrackingId) : null })),
+    orders: purchaseRows.map(o => ({ ...supportEmailOrderTiming(o.fulfilledAt, o.trackingSteps, today), number: o.buygoodsOrderId || o.konnektiveOrderId || o.number, product: o.productName, status: o.status, total: o.total, currency: o.currency, placedAt: o.placedAt.toISOString(), trackingCode: o.shippingTrackingId, shippingStatus: o.shippingStatus, fulfilledAt: o.fulfilledAt?.toISOString() ?? null, trackingEvents: o.trackingSteps, source: o.source, trackingUrl: o.shippingTrackingId ? buildTrackingUrl(o.shippingTrackingId) : null })),
     refundUrl, selectedOrderNumber: selected ? selected.buygoodsOrderId || selected.konnektiveOrderId || selected.number : null,
     knowledge: await publishedKnowledge("email"),
   };

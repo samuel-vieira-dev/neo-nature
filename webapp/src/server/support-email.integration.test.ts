@@ -48,6 +48,49 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     await database.db.delete(supportEmailTone); await database.db.delete(adminActionLogs); await database.db.delete(adminUsers);
     await database.db.delete(jobs); await database.db.delete(messages); await database.db.delete(conversations); await database.db.delete(orders);
   });
+  it("ignores automated mail before creating conversations, messages or jobs", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const automated: Partial<ReturnType<typeof input>>[] = [
+      { spam: true }, { autoSubmitted: true }, { from: { email: "support@example.com", name: "Self" } },
+      { from: { email: "agent@tenant.freshdesk.com", name: "Helpdesk" } }, { from: { email: "no-reply@example.com", name: "Robot" } },
+      { subject: "Ticket Received - 123" }, { headers: { "Auto-Submitted": "auto-replied" } }, { headers: { Precedence: "bulk" } },
+    ];
+    for (const overrides of automated) {
+      expect(await service.receiveSupportEmail({ ...input(), ...overrides })).toEqual({ accepted: true, ignored: true, reason: "automated_sender" });
+    }
+    expect(await database.db.select().from(conversations)).toHaveLength(0);
+    expect(await database.db.select().from(messages)).toHaveLength(0);
+    expect(await database.db.select().from(jobs)).toHaveLength(0);
+    expect(await database.db.select().from(supportEmailTone)).toHaveLength(0);
+    expect(generate).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  });
+  it("persists a Gmail customer's Re: Ticket Received reply normally", async () => {
+    const receipt = await service.receiveSupportEmail({ ...input(), from: { email: "real.customer@gmail.com", name: "Customer" }, subject: "Re: Ticket Received - 123" });
+    expect(receipt).toMatchObject({ accepted: true, deduped: false });
+    expect(await database.db.select().from(conversations)).toHaveLength(1);
+    expect(await database.db.select().from(messages)).toHaveLength(1);
+    expect(await database.db.select().from(jobs)).toHaveLength(1);
+  });
+  it("populates today's date and verified order elapsed days, with nulls for undated orders", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await database.db.insert(orders).values([
+      { id: "timing-shipped", number: "SHIP123", email: "internal@example.com", placedAt: new Date("2026-09-20"), status: "shipped", total: "99.00", fulfilledAt: new Date("2026-10-01T23:00:00Z"), trackingSteps: [
+        { label: "Carrier update", detail: "USPS in transit", date: "Oct 4, 2026", done: true },
+        { label: "Invalid update", detail: "", date: "invalid", done: true },
+        { label: "Earlier update", detail: "", date: "2026-10-02", done: true },
+      ] },
+      { id: "timing-unshipped", number: "WAIT123", email: "internal@example.com", placedAt: new Date(), status: "confirmed", total: "99.00" },
+    ]);
+    await service.receiveSupportEmail(input());
+    const [c] = await database.db.select().from(conversations); const [m] = await database.db.select().from(messages);
+    const context = await service.supportEmailContext(c, m);
+    expect(context.today).toBe(today);
+    expect(context.orders.find(order => order.number === "SHIP123")).toMatchObject({
+      daysSinceShipped: (Date.parse(today) - Date.parse("2026-10-01")) / 86_400_000,
+      daysSinceLastTrackingEvent: (Date.parse(today) - Date.parse("2026-10-04")) / 86_400_000,
+    });
+    expect(context.orders.find(order => order.number === "WAIT123")).toMatchObject({ daysSinceShipped: null, daysSinceLastTrackingEvent: null });
+  });
   it("persists voice edits with audit and rejects concurrent overwrites", async () => {
     const tone = await import("./support-email-tone");
     const [staff] = await database.db.insert(adminUsers).values({ id: "tone-editor", email: "cs@example.com", name: "CS tester", role: "cs", passwordHash: "unused" }).returning();

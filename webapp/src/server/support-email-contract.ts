@@ -17,10 +17,39 @@ export const emailInboundSchema = z.object({
   text: z.string().trim().min(1).max(32_000),
   receivedAt: z.iso.datetime({ offset: true }),
   attachments: z.array(z.object({ id: identifier, name: z.string().max(250), contentType: z.string().max(150) })).max(20).default([]),
+  headers: z.record(z.string().max(150), z.string().max(2000)).optional(),
   autoSubmitted: z.boolean().default(false),
   spam: z.boolean().default(false),
 });
 export type EmailInbound = z.infer<typeof emailInboundSchema>;
+/** Filter loops before any intake persistence. Reply prefixes exempt only subject matching. */
+export function isAutomatedEmail(input: EmailInbound): boolean {
+  if (input.spam || input.autoSubmitted || input.from.email.toLowerCase() === input.mailboxId.toLowerCase()) return true;
+  const [local, domain] = input.from.email.toLowerCase().split("@");
+  if (domain === "freshdesk.com" || domain.endsWith(".freshdesk.com") || /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster)\b/i.test(local)) return true;
+  const headers = Object.fromEntries(Object.entries(input.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value.trim().toLowerCase()]));
+  if (headers["auto-submitted"] && headers["auto-submitted"].split(";")[0].trim() !== "no") return true;
+  if (/^(?:bulk|auto_reply|junk)\b/i.test(headers.precedence ?? "")) return true;
+  const subject = input.subject.trim();
+  if (/^(re|aw|fw|fwd|wg|sv|tr|rv)\s*:/i.test(subject)) return false;
+  // Use a Unicode boundary for localized acknowledgement subjects.
+  return /^(?:we have received your request|ticket received|eingangsbestätigung|auto-?reply|automatic reply|out of office|abwesenheitsnotiz|réponse automatique|respuesta automática|resposta automática)(?![\p{L}\p{N}_])/iu.test(subject);
+}
+
+/** UTC calendar days, consistent with context.today; never guess an unparseable date. */
+export function supportEmailOrderTiming(fulfilledAt: Date | null, trackingEvents: unknown, today: string) {
+  const daysSince = (value: unknown): number | null => {
+    if (!(value instanceof Date) && (typeof value !== "string" || !value.trim())) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    return Math.max(0, Math.round((Date.parse(today) - Date.parse(date.toISOString().slice(0, 10))) / 86_400_000));
+  };
+  const eventDays = (Array.isArray(trackingEvents) ? trackingEvents : [])
+    .map(event => daysSince(event && typeof event === "object" ? event.date : null))
+    .filter((days): days is number => days !== null);
+  return { daysSinceShipped: daysSince(fulfilledAt), daysSinceLastTrackingEvent: eventDays.length ? Math.min(...eventDays) : null };
+}
+
 export const freshdeskEmailEventSchema = z.object({
   schemaVersion: z.literal(1),
   eventId: identifier,
