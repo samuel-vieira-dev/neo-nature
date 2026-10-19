@@ -1,6 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
+import { internalSupportEnabled } from "@/lib/support-tickets";
+import { customerTicketHistory } from "@/server/support-ticket-bridge";
 import { tickets } from "@/db/schema";
 import { withUser, requirePurchaseEmailConfirmation } from "@/server/session";
 import { createTicketForUser, serializeTicket } from "@/server/tickets";
@@ -19,7 +21,7 @@ export const GET = withUser(async (user) => {
     where: eq(tickets.userId, user.id),
     orderBy: [desc(tickets.createdAt)],
   });
-  return Response.json({ tickets: rows.map(serializeTicket) });
+  return Response.json({ tickets: rows.map(serializeTicket), messages: internalSupportEnabled() ? await customerTicketHistory(user.id) : [] });
 });
 
 export const POST = withUser(async (user, request: Request) => {

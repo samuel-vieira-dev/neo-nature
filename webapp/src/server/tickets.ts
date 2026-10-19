@@ -1,6 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tickets } from "@/db/schema";
+import { internalSupportEnabled } from "@/lib/support-tickets";
+import { bridgeAppTicket } from "./support-ticket-bridge";
 import { createFreshdeskTicket } from "@/server/freshdesk";
 
 // ---------------------------------------------------------------------------
@@ -28,7 +30,7 @@ export const serializeTicket = (t: typeof tickets.$inferSelect) => ({
  * format (it shows up in our copy and in Freshdesk ticket descriptions).
  */
 async function nextTicketId() {
-  const [row] = await db.execute<{ n: string }>(sql`select nextval('ticket_id_seq') as n`);
+  const [row] = await db.execute<{ n: string }>(sql`select nextval(${sql.raw(internalSupportEnabled() ? "'support_ticket_number_seq'" : "'ticket_id_seq'")}) as n`);
   return `T-${row.n}`;
 }
 
@@ -96,6 +98,7 @@ export async function createTicketForUser(input: CreateTicketInput): Promise<Cre
     if (!existing || existing.userId !== input.userId) {
       return { ok: false, error: "duplicate_request" };
     }
+    if (internalSupportEnabled()) await bridgeAppTicket(existing, input.description);
     return {
       ok: true,
       ticket: serializeTicket(existing),
@@ -106,6 +109,11 @@ export async function createTicketForUser(input: CreateTicketInput): Promise<Cre
   }
 
   const row = inserted;
+  if (internalSupportEnabled()) {
+    await bridgeAppTicket(row, input.description);
+    await db.update(tickets).set({ syncStatus: "internal" }).where(eq(tickets.id, row.id));
+    return { ok: true, ticket: serializeTicket({ ...row, syncStatus: "internal" }), deduped: false, freshdeskId: row.freshdeskId, syncStatus: "internal" };
+  }
 
   // 2) Push to Freshdesk (system of record). Failure degrades gracefully:
   //    the ticket stays local with sync_status so ops can reconcile.

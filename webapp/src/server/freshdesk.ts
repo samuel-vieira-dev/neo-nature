@@ -1,3 +1,7 @@
+import { db } from "@/db";
+import { desc, inArray } from "drizzle-orm";
+import { supportEmailConversations } from "@/db/schema";
+import { internalSupportEnabled, TICKET_STATUS_LABELS, type TicketStatus } from "@/lib/support-tickets";
 // ---------------------------------------------------------------------------
 // Freshdesk integration (push-only). The app creates tickets in Freshdesk via
 // the REST v2 API; the customer follows the conversation over email. Freshdesk
@@ -155,6 +159,10 @@ export type FreshdeskListResult =
  * page must render even when Freshdesk is down.
  */
 export async function listFreshdeskTickets(emails: string[]): Promise<FreshdeskListResult> {
+  if (internalSupportEnabled()) {
+    const rows = emails.length ? await db.select().from(supportEmailConversations).where(inArray(supportEmailConversations.email, emails.map(e=>e.toLowerCase()))).orderBy(desc(supportEmailConversations.updatedAt)).limit(100) : [];
+    return { ok: true, tickets: rows.map(t=>({ id: t.ticketNumber < 0 && t.freshdeskId ? t.freshdeskId : t.ticketNumber, subject:t.subject, status: TICKET_STATUS_LABELS[t.ticketStatus as TicketStatus] || t.ticketStatus, priority:t.requiresHuman ? "High" : "Normal", createdAt:t.createdAt.toISOString(),updatedAt:t.updatedAt.toISOString(),url:`/admin/support?ticket=${t.id}` })) };
+  }
   if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
   const domain = process.env.FRESHDESK_DOMAIN!;
   const apiKey = process.env.FRESHDESK_API_KEY!;
@@ -250,6 +258,7 @@ export type FreshdeskResult =
 
 /** Creates the ticket in Freshdesk. Never throws — returns a typed result. */
 export async function createFreshdeskTicket(input: FreshdeskTicketInput): Promise<FreshdeskResult> {
+  if(internalSupportEnabled()) return {ok:false,reason:"not_configured"};
   if (!isFreshdeskConfigured()) return { ok: false, reason: "not_configured" };
 
   const domain = process.env.FRESHDESK_DOMAIN!;

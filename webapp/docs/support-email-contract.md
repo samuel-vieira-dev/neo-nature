@@ -1,6 +1,6 @@
 # Contrato de atendimento por e-mail — Jef / n8n
 
-Versão 1. Publicado no Webapp em **07/10/2026**, com as tabelas migradas e `SUPPORT_EMAIL_MODE=draft`. Recebimento, deduplicação e geração de rascunho foram verificados no domínio público com um e-mail fictício. O processamento foi acionado manualmente no teste; configurar o agendamento descrito na seção 4 para processar automaticamente os próximos e-mails. Não desligar a Launch antes de validar o fluxo completo e retirar seu roteamento de resposta.
+Versão 1. Publicado no Webapp em **07/10/2026**, com as tabelas migradas. O piloto permite geração e envio somente para `williamamade@gmail.com` (`SUPPORT_EMAIL_MODE=pilot` e lista exata de destinatários). Recebimento, deduplicação e geração de rascunho foram verificados no domínio público com um e-mail fictício. O serviço `support-email-worker` no Railway processa a fila automaticamente a cada cinco minutos, conforme a seção 4. Não desligar a Launch antes de validar o fluxo completo e retirar seu roteamento de resposta.
 
 ## 1. n8n → Neo Nature: e-mail recebido
 
@@ -88,7 +88,7 @@ Se comprovadamente **não enviou**, retornar:
 
 Isso permite uma nova tentativa manual pelo admin. Timeout, confirmação incompleta, HTTP 5xx ou resultado incerto suspendem repetições automáticas. A equipe deve verificar no n8n/Gmail e registrar o resultado no painel. `success: true` confirma aceitação pelo provedor, não entrega na caixa do destinatário.
 
-## 3. Freshdesk / n8n → Neo Nature: atendimento humano
+## 3. Legado Freshdesk / n8n → Neo Nature (desativado no modo interno)
 
 `POST https://app.beneonature.com/api/webhooks/support-email/freshdesk`
 
@@ -115,13 +115,15 @@ Em caso de resultado incerto na criação do ticket, verificar sua existência p
 
 ## 4. Processamento agendado
 
-O n8n (Schedule Trigger a cada minuto) ou um worker chama:
+Em produção, o serviço `support-email-worker` no Railway inicia a cada cinco minutos (mínimo da plataforma). Cada execução verifica a fila cinco vezes, nos minutos 0–4, chamando:
 
 `POST https://app.beneonature.com/api/jobs/support-email`
 
-Header `X-API-Key: <SUPPORT_EMAIL_JOB_KEY>`. Essa chave é separada da chave de recebimento. Não é necessário body. Cada chamada processa um lote pequeno; os jobs ficam no Postgres, com deduplicação e recuperação de interrupções. O cron de retenção antigo não processa esta fila.
+Header `X-API-Key: <SUPPORT_EMAIL_JOB_KEY>`. Essa chave é separada da chave de recebimento. Não é necessário body. Cada chamada processa um lote pequeno; os jobs ficam no Postgres, com deduplicação e recuperação de interrupções. O cron de retenção antigo não processa esta fila. Código do cron em `ops/support-email-worker/`; ele recebe somente a URL do app e uma referência à chave do worker, sem credenciais de banco ou LLM. O agendamento foi aplicado explicitamente nas configurações do serviço Railway. O envio ocorre na primeira verificação da fila após o horário mínimo configurado.
 
-O intervalo de primeira resposta começa na recepção do webhook: padrão 15–45 minutos, configurável. Uma mensagem nova cancela rascunhos antigos; uma intervenção humana cancela envios pendentes. Casos críticos identificados na entrada são escalados sem esse atraso. Uma requisição de envio já aceita pelo provedor não pode ser desfeita.
+O intervalo de primeira resposta começa na recepção do webhook: padrão 15–45 minutos, configurável. Uma mensagem nova cancela rascunhos antigos; uma intervenção humana cancela envios pendentes. Encaminhamentos humanos obrigatórios identificados na entrada, como reações adversas e reclamações legais, são escalados sem esse atraso. Uma requisição de envio já aceita pelo provedor não pode ser desfeita.
+
+T1 e T2 podem receber respostas automáticas dentro das regras aprovadas. Todo T3 exige uma resposta humana: `requiresHuman=true`, `owner=human`, com tag evidente no painel e sem resposta/acolhimento automático. T1/T2 também podem exigir humano para ações exclusivas de staff, interações entre suplementos ou dados insuficientes. A IA não executa ações financeiras nem inventa investigações, prazos ou resultados. Com `SUPPORT_TICKETING_BACKEND=internal`, os encaminhamentos ficam no painel e os eventos antigos do Freshdesk são ignorados. Ver [ticketagem interna](internal-support.md) para operação e migração.
 
 ## 5. Configuração do Webapp
 
@@ -166,20 +168,20 @@ Modos:
 
 O suporte envia o formulário existente `/refund?order_id=...`, sem login de conta; o cliente confirma o e-mail da compra no formulário. O agente encontra pedidos somente pelo e-mail original do remetente. Com múltiplos pedidos, precisa identificar o pedido informado ou pedir esclarecimento. Não processa reembolso, cancela pedido ou assinatura. A FAQ atual prevalece sobre políticas antigas; o histórico contribui apenas para estilo e contexto.
 
-Painel: **Admin → Support → Tickets → Email agents**. Mostra histórico, T1–T3, idioma, responsável, rascunho, horário mínimo de envio e falhas. Admin/CS podem assumir, aprovar e reconciliar; Tauk permanece somente leitura. Filas mostram 10 itens inicialmente, depois lotes de 50 e 100. A lista Freshdesk mantém a janela de 90 dias e o limite de 1.000 registros, com aviso quando a busca precisa ser refinada; os indicadores incompletos usam `+`.
+Painel: **Admin → Support → Tickets**. Mostra histórico, T1–T3, idioma, responsável, rascunho, horário mínimo de envio e falhas. Admin/CS podem assumir, aprovar e reconciliar; Tauk permanece somente leitura. Filas mostram 10 itens inicialmente, depois lotes de 50 e 100. A fila interna é paginada diretamente no banco, sem a janela de 90 dias do adaptador antigo.
 
 ## 6. Roteiro da validação interna — 07/10/2026
 
 1. Migrar banco de teste, publicar serviço e configurar worker/chaves. Começar em `draft`.
 2. Enviar solicitação T1 de rastreio com pedido de teste e confirmar dados, idioma e contexto.
 3. Solicitar reembolso T2: conferir link do pedido certo, abertura sem login e confirmação do e-mail da compra; verificar que nenhum estorno aconteceu.
-4. Testar T3 com uma reclamação crítica fictícia; configurar grupo e eventos do Freshdesk.
+4. Testar T3 com uma reclamação crítica fictícia: esperar tag de resposta humana e nenhum envio automático.
 5. Repetir o mesmo webhook e executar workers concorrentes: esperar uma mensagem/job e um envio apenas.
 6. Testar inglês, português, espanhol e francês; revisar conteúdo e tom com a equipe.
 7. Ativar `pilot` com a lista interna, aprovar os rascunhos e conferir atraso e reply na mesma thread. Para acelerar o teste, usar temporariamente 1–2 minutos; restaurar 15–45 antes da operação.
 8. Enviar nova mensagem ou assumir com humano antes do prazo: resposta anterior deve ser cancelada.
 9. Simular falha/timeout do envio e conferir suspensão de repetição. Verificar entrega antes de reconciliar no painel.
-10. Validar notificações e respostas humanas no Freshdesk. Desligar o roteamento de resposta da Launch, conferir ausência de respostas duplicadas e só então ativar `live`. Para interromper envios, mudar para `off`.
+10. Validar respostas humanas pelo painel interno e a confirmação do provedor. Desligar o roteamento de resposta da Launch, conferir ausência de respostas duplicadas e só então ativar `live`. Para interromper envios, mudar para `off`.
 
 ## 7. Simulação local com o modelo real
 
@@ -196,3 +198,9 @@ npx tsx --env-file=.env.local scripts/simulate-support-email.ts --live
 ```
 
 O relatório `docs/support-email-simulation.json` contém respostas, idiomas, tiers, encaminhamentos e verificações automáticas. As verificações são heurísticas; a equipe ainda precisa revisar clareza, tom e adequação das respostas. O caso crítico é barrado pela regra de entrada, sem chamada ao modelo. Nenhum e-mail, ticket ou alteração de pedido é realizado nesta simulação. Para testar apenas um caso, adicionar, por exemplo, `--case=pt-refund --output=/private/tmp/support-email-pt-refund.json`.
+
+## Editable voice
+
+In Admin → Support → Tickets, Admin and CS can save up to 4,000 characters of additional voice instructions. These are loaded from the database for each newly generated response, including handoff acknowledgements. Existing drafts and sent emails are unchanged. Empty instructions restore the default voice. Saving records the staff member and version in the audit log; concurrent edits return 409 rather than overwriting a colleague’s changes. Current FAQ, customer language, truthful answers about automation, verified facts, refund permissions and human escalation rules always take priority over style preferences. The pilot recipient restriction remains unchanged.
+
+Deployment: run `scripts/add-support-email-tone.ts` against the target database before deploying. This creates only the additive `support_email_tone` table.

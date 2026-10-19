@@ -469,7 +469,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
     onError: (e: Error) =>
       setTicketError(
         e.message === "no_contact"
-          ? "This customer has no email or phone on file — open the ticket in Freshdesk directly."
+          ? "This customer has no email or phone on file. Add one to the customer record to open a ticket; replies then go through Support → Tickets."
           : "Couldn't open the ticket — try again."
       ),
   });
@@ -836,13 +836,13 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
           </div>
         )}
 
-        <p className="mt-4 text-xs font-semibold text-muted">Freshdesk (live)</p>
+        <p className="mt-4 text-xs font-semibold text-muted">Support tickets</p>
         {!c.freshdesk || (c.freshdesk.ok === false && c.freshdesk.reason === "not_configured") ? (
-          <p className="mt-1 text-sm text-muted">Freshdesk is not configured.</p>
+          <p className="mt-1 text-sm text-muted">Support tickets are not configured.</p>
         ) : c.freshdesk.ok === false ? (
-          <p className="mt-1 text-sm text-amber-700">Freshdesk is unavailable right now — try again in a minute.</p>
+          <p className="mt-1 text-sm text-amber-700">Support tickets are unavailable right now — try again in a minute.</p>
         ) : c.freshdesk.tickets.length === 0 ? (
-          <p className="mt-1 text-sm text-muted">No Freshdesk tickets for this customer.</p>
+          <p className="mt-1 text-sm text-muted">No support tickets for this customer.</p>
         ) : (
           <div className="mt-1 space-y-2">
             {c.freshdesk.tickets.map((t) => (

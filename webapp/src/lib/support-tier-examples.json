@@ -1,0 +1,147 @@
+[
+  {
+    "tier": "T1",
+    "subject": "Order Confirmation & Tracking for Hero Up",
+    "body": "Hi there, I ordered the 3-bottle bundle of Hero Up 3 days ago. Could you please send me my tracking link so I can see when it arrives?"
+  },
+  {
+    "tier": "T1",
+    "subject": "How to take Slim Force drops?",
+    "body": "Good morning, I received my bottle of Slim Force today. Is it better to take the drops before breakfast or directly with my meals? Thanks!"
+  },
+  {
+    "tier": "T1",
+    "subject": "Change shipping address for NerveCalm",
+    "body": "Hello support, I placed an order for NerveCalm about an hour ago, but noticed my apartment number was missing in the shipping address. Can someone update it before it ships out?"
+  },
+  {
+    "tier": "T1",
+    "subject": "Neuro Sharp product packaging question",
+    "body": "Hello, I just opened my Neuro Sharp shipment and noticed the cap color is slightly darker than what was shown in the video. Is this normal packaging variance?"
+  },
+  {
+    "tier": "T1",
+    "subject": "Receipt request for ZenSulin order",
+    "body": "Hi team, I bought ZenSulin last Friday for my records. Could you please email me a detailed invoice/receipt for my purchase?"
+  },
+  {
+    "tier": "T1",
+    "subject": "Sight Easy dosage frequency",
+    "body": "Hi, the label on Sight Easy says two capsules daily. Should I take them together in the morning or split them between morning and evening?"
+  },
+  {
+    "tier": "T1",
+    "subject": "Tracking link shows pending - Burn Boost",
+    "body": "Good day, I received my tracking link for Burn Boost yesterday, but the carrier status still says 'Pending acceptance'. How long does it usually take to update?"
+  },
+  {
+    "tier": "T1",
+    "subject": "Vital Greens shelf life inquiry",
+    "body": "Hello Neo Nature, I bought the 6-jar package of Vital Greens. Could you tell me what the expiration date/shelf life is if kept unopened in a cool pantry?"
+  },
+  {
+    "tier": "T1",
+    "subject": "SilentEar ingredients list verification",
+    "body": "Hi, could you send me the full supplement facts panel for SilentEar? I want to show it to my audiologist before starting the regimen."
+  },
+  {
+    "tier": "T1",
+    "subject": "Order status inquiry - Gut Renew",
+    "body": "Hi support team, I ordered Gut Renew on Monday. Just checking in to see if the warehouse has fulfilled the package yet. Thank you!"
+  },
+  {
+    "tier": "T2",
+    "subject": "Missing bottle in Hero Up 6-pack order",
+    "body": "I ordered the 6-bottle pack of Hero Up, but the box arrived with only 5 bottles inside. Please check fulfillment and send the missing bottle as soon as possible."
+  },
+  {
+    "tier": "T2",
+    "subject": "Refund request under 90-day guarantee - Slim Force",
+    "body": "I have taken Slim Force consistently for 5 weeks as directed, but I have not experienced any changes. I'd like to initiate a return under your money-back guarantee."
+  },
+  {
+    "tier": "T2",
+    "subject": "Portal login error - Vigor Fuel account",
+    "body": "I am trying to log into app.beneonature.com/support to track my recurring Vigor Fuel order, but the portal keeps saying 'User not found'. Can you reset my portal access?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Turmeric Power & NerveCalm compatibility",
+    "body": "Hello, I started taking Turmeric Power last week and want to add NerveCalm. Are there any known digestive interactions or contraindications between taking both together?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Tracking stuck in transit for 10 days - GlycoFree",
+    "body": "My GlycoFree package has been stuck at the regional sorting facility without an update since last week. Can you file an investigation with the carrier or reship it?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Wrong flavor received - Burn Boost",
+    "body": "I specifically selected the Berry flavor for Burn Boost during the checkout upsell, but I received the Citrus blend instead. How can I get the correct flavor sent out?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Duplicate order confirmation received for Elite Extreme",
+    "body": "I submitted my order for Elite Extreme and immediately received two identical confirmation emails with different subject lines. Was my credit card charged twice?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Package marked delivered but not received - Sight Easy",
+    "body": "My carrier tracking states that my package of Sight Easy was delivered to the porch yesterday afternoon, but nothing is here. I checked with neighbors and found nothing."
+  },
+  {
+    "tier": "T2",
+    "subject": "Return request for unopened bottles of Neuro Sharp",
+    "body": "I ordered 3 bottles of Neuro Sharp but my doctor wants me on a different regimen. Two bottles are completely unopened and factory-sealed. What is the RMA procedure?"
+  },
+  {
+    "tier": "T2",
+    "subject": "Billing question regarding recurring charge - ZenSulin",
+    "body": "I noticed a recurring charge on my statement this morning for ZenSulin. I thought I only purchased a one-time order. Can you clarify my subscription status and cancel auto-renew?"
+  },
+  {
+    "tier": "T3",
+    "subject": "FRAUDULENT CHARGE & SCAM PRODUCT - SILENTEAR REFUND NOW",
+    "body": "This SilentEar did not work at all and your video claims are outright deceitful. I demand an immediate full refund back to my Visa within 24 hours or I am filing a fraud claim with my bank and the FTC."
+  },
+  {
+    "tier": "T3",
+    "subject": "DANGEROUS HAZARD: Broken glass and damaged capsules in Gut Renew",
+    "body": "I opened my parcel of Gut Renew today and the bottle was shattered with powder and sharp glass all over the interior packaging. This is completely hazardous negligence. I demand a replacement and immediate supervisor contact."
+  },
+  {
+    "tier": "T3",
+    "subject": "FINAL NOTICE: Ignoring my support tickets regarding Elite Xtreme Prostate",
+    "body": "I have emailed your helpdesk three times from my business account and keep getting generic auto-replies while my order remains lost. If a real manager does not call or email me today, I am contacting my state Attorney General."
+  },
+  {
+    "tier": "T3",
+    "subject": "Severe allergic reaction to Slim Force - Immediate Escalation",
+    "body": "Shortly after taking the recommended dosage of Slim Force, I developed severe hives and shortness of breath requiring an urgent care visit. You failed to properly disclose common allergen warnings. Put me in touch with legal immediately."
+  },
+  {
+    "tier": "T3",
+    "subject": "BBB COMPLAINT FILED - Refusal to honor 90-day guarantee for Hero Up",
+    "body": "Your agent refused my refund for Hero Up claiming I missed an arbitrary form deadline. Your VSL clearly advertised a no-questions-asked 90-day money-back guarantee. Cancel this charge immediately or face BBB escalation."
+  },
+  {
+    "tier": "T3",
+    "subject": "UNAUTHORIZED CHARGE OF $240 ON MY CARD - REFUND IMMEDIATELY",
+    "body": "I never authorized the recurring 3-month supply charge on my account for ZenSulin! Reverse this unauthorized transaction immediately or I will initiate a formal chargeback dispute for unauthorized credit card theft."
+  },
+  {
+    "tier": "T3",
+    "subject": "Package tampered with and safety seal missing on NerveCalm",
+    "body": "The safety neck band on my NerveCalm bottle was sliced open and the inner induction seal was pulled off. I will not consume tampered supplements. I expect an immediate overnight replacement sent or a complete refund."
+  },
+  {
+    "tier": "T3",
+    "subject": "SCAM BILLING - Sent Elite Extreme instead of Blends and double-billed",
+    "body": "I ordered the new Blends formula and was billed twice, receiving only Elite Extreme with a packaging slip referencing a different company. This entire operation looks fraudulent. Fix this immediately or I am taking this to social media."
+  },
+  {
+    "tier": "T3",
+    "subject": "Refusal of RMA form - Return money immediately for Neuro Sharp",
+    "body": "I refuse to fill out your tedious RMA forms or jump through bureaucratic hoops just to get my money back. I am mailing the bottles back to your corporate address and filing a dispute with Amex if you don't refund my account today."
+  }
+]

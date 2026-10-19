@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -325,8 +326,18 @@ export const tickets = pgTable("tickets", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+export const supportTicketNumberSeq = pgSequence("support_ticket_number_seq", { startWith: 10000 });
+
 // Email support is independent of app accounts: a sender need not have logged in.
 export const supportEmailConversations = pgTable("support_email_conversations", {
+  ticketNumber: integer("ticket_number").notNull().default(sql`nextval('support_ticket_number_seq')`).unique(),
+  ticketStatus: text("ticket_status").notNull().default("new"),
+  source: text("source").notNull().default("email"),
+  legacyTicketId: text("legacy_ticket_id").unique(),
+  freshdeskImportUpdatedAt: timestamp("freshdesk_import_updated_at", { withTimezone: true, mode: "date" }),
+  assignedAdminId: text("assigned_admin_id"),
+  kind: text("kind").notNull().default("support"),
+  requiresHuman: boolean("requires_human").notNull().default(false),
   id: text("id").primaryKey(),
   mailboxId: text("mailbox_id").notNull(),
   threadId: text("thread_id").notNull(),
@@ -355,19 +366,22 @@ export const supportEmailMessages = pgTable("support_email_messages", {
   dedupeKey: text("dedupe_key").notNull().unique(),
   providerMessageId: text("provider_message_id").notNull(),
   rfcMessageId: text("rfc_message_id"),
-  direction: text("direction").notNull(), // incoming | outgoing | human
+  authorAdminId: text("author_admin_id"),
+  direction: text("direction").notNull(), // incoming | outgoing | human | note | audit
   subject: text("subject").notNull(),
   text: text("text").notNull(),
   references: jsonb("references").$type<string[]>().notNull().default([]),
   attachments: jsonb("attachments").$type<{ id: string; name: string; contentType: string }[]>().notNull().default([]),
   receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-}, t => [index("support_email_message_thread").on(t.conversationId, t.createdAt)]);
+}, t => [index("support_email_message_thread").on(t.conversationId, t.createdAt), index("support_email_received_history").on(t.conversationId,t.receivedAt,t.id)]);
 
 export const supportEmailJobs = pgTable("support_email_jobs", {
   id: text("id").primaryKey(), // also the outbound idempotency requestId
   conversationId: text("conversation_id").notNull().references(() => supportEmailConversations.id),
   messageId: text("message_id").notNull().references(() => supportEmailMessages.id),
+  actorAdminId: text("actor_admin_id"),
+  replyStatus: text("reply_status"),
   stage: text("stage").notNull().default("prepare"), // prepare | send | escalate | human_note
   status: text("status").notNull().default("queued"),
   runAt: timestamp("run_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -378,7 +392,7 @@ export const supportEmailJobs = pgTable("support_email_jobs", {
   startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, t => [
-  uniqueIndex("support_email_job_message_stage").on(t.messageId, t.stage),
+  uniqueIndex("support_email_job_message_stage").on(t.messageId, t.stage).where(sql`${t.stage} <> 'manual_send'`),
   index("support_email_job_due").on(t.status, t.runAt),
 ]);
 
@@ -430,6 +444,17 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 export type AdminUser = typeof adminUsers.$inferSelect;
+
+export const supportEmailTone = pgTable("support_email_tone", {
+  id: text("id").primaryKey(),
+  instructions: text("instructions").notNull().default(""),
+  avoidInstructions: text("avoid_instructions").notNull().default(""),
+  minDelayMinutes: integer("min_delay_minutes"),
+  maxDelayMinutes: integer("max_delay_minutes"),
+  version: integer("version").notNull().default(1),
+  updatedBy: text("updated_by").references(() => adminUsers.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
 
 export type Customer = typeof customers.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -495,3 +520,26 @@ export const orderRefunds = pgTable("order_refunds", {
   message: text("message").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, t => [index("order_refunds_order_mode").on(t.orderId, t.mode)]);
+
+
+export type KnowledgeSnapshot = { title: string; content: string; category: string; channels: ("email" | "webapp")[] };
+export const supportKnowledgeArticles = pgTable("support_knowledge_articles", {
+  id: text("id").primaryKey(), title: text("title").notNull(), content: text("content").notNull(),
+  category: text("category").notNull().default("General"),
+  channels: jsonb("channels").$type<("email" | "webapp")[]>().notNull().default(["email", "webapp"]),
+  published: jsonb("published").$type<KnowledgeSnapshot>(),
+  version: integer("version").notNull().default(1), updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+export const supportKnowledgeRevisions = pgTable("support_knowledge_revisions", {
+  id: serial("id").primaryKey(), articleId: text("article_id").notNull().references(() => supportKnowledgeArticles.id),
+  version: integer("version").notNull(), snapshot: jsonb("snapshot").$type<KnowledgeSnapshot>().notNull(),
+  action: text("action").notNull(), adminId: text("admin_id"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [uniqueIndex("support_knowledge_revision").on(t.articleId, t.version)]);
+
+export const supportTicketAttachments = pgTable("support_ticket_attachments", {
+  id: text("id").primaryKey(), messageId: text("message_id").notNull().references(() => supportEmailMessages.id),
+  filename: text("filename").notNull(), contentType: text("content_type").notNull(),
+  size: integer("size").notNull(), data: text("data").notNull(), sourceKey: text("source_key").notNull().unique(),
+});

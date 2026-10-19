@@ -87,16 +87,23 @@ export function canDeliverEmail(email: string) {
   return config.mode === "live" || (config.mode === "pilot" && config.allowedRecipients.includes(email.toLowerCase()));
 }
 
-export function responseDueAt(now: Date, random = Math.random()) {
-  const { minDelay, maxDelay } = supportEmailConfig();
+export function responseDueAt(now: Date, random = Math.random(), delays?: { minDelay: number; maxDelay: number }) {
+  const { minDelay, maxDelay } = delays ?? supportEmailConfig();
   const minutes = minDelay + Math.min(1, Math.max(0, random)) * (maxDelay - minDelay);
   return new Date(now.getTime() + minutes * 60_000);
 }
 
 export function deterministicTier(text: string): "T1" | "T2" | "T3" {
-  if (/chargeback|\bfraud|\bscam|\bBBB\b|better business bureau|lawsuit|attorney|allerg|side effects?|chest pain|difficulty breathing|hospital|reaction|reaç|reac[cç]i[oó]n|effets? secondaires|avocat|advogado|procon|unauthori[sz]ed|não autoriz|no autoriz/i.test(text)) return "T3";
-  if (/refund|return|cancel|reembolso|devolu|rembours|annul|cobrança|overcharg|duplicate charge/i.test(text)) return "T2";
+  if (/chargeback|\bfraud|\bscam|\bBBB\b|better business bureau|lawsuit|attorney|\bFTC\b|allerg|side effects?|chest pain|shortness of breath|difficulty breathing|hospital|urgent care|reaction|reaç|reac[cç]i[oó]n|effets? secondaires|avocat|advogado|procon|unauthori[sz]ed|não autoriz|no autoriz|broken glass|shattered|sharp glass|hazard|tamper|safety seal|seal.*(?:missing|pulled|broken)|refus(?:e|al).*?(?:RMA|form)|(?:RMA|form).*?refus/i.test(text)) return "T3";
+  if (/refund|return|cancel|reembolso|devolu|rembours|annul|cobrança|overcharg|duplicate|charged twice|missing bottle|wrong (?:flavor|item|product)|not received|stuck.*transit|reship|investigation|recurring charge|subscription|portal|login|contraindication|interactions?|compatibility/i.test(text)) return "T2";
   return "T1";
+}
+
+export function requiredHumanHandoff(text: string): string | null {
+  if (deterministicTier(text) === "T3") return "T3 requires a human response";
+  if (/contraindication|interactions?|compatibility|(?:take|taking).*(?:together|medication)|intera[cç][aã]o|contraindica/i.test(text)) return "Supplement interactions require qualified human review";
+  if (/(?:change|update|correct|changing).{0,45}(?:shipping address|address)|(?:cancel|stop|disable).{0,45}(?:order|subscription|auto.?renew|recurring)|(?:reset|restore).{0,35}(?:access|account|portal)/i.test(text)) return "Staff must perform the requested account or order change";
+  return null;
 }
 
 export function escapeEmailHtml(text: string) {
@@ -114,7 +121,7 @@ function emailParagraph(text: string) {
 export function outboundEmailPayload(input: { requestId: string; conversationId: string; mailboxId: string; threadId: string; messageId: string; rfcMessageId: string | null; references: string[]; email: string; subject: string; text: string }) {
   return {
     schemaVersion: 1,
-    event: "email.reply",
+    event: "email.reply" as const,
     requestId: input.requestId,
     conversationId: input.conversationId,
     mailboxId: input.mailboxId,
@@ -131,6 +138,7 @@ export function outboundEmailPayload(input: { requestId: string; conversationId:
 
 export async function deliverSupportEmail(payload: ReturnType<typeof outboundEmailPayload>) {
   if (!canDeliverEmail(payload.to)) return { status: "blocked" as const, error: "delivery_disabled_for_recipient" };
+  if (payload.event !== "email.reply" || !payload.threadId.trim() || payload.threadId.startsWith("local:") || !payload.inboundMessageId.trim()) return { status: "blocked" as const, error: "email_thread_required" };
   const url = process.env.SUPPORT_EMAIL_OUTBOUND_WEBHOOK_URL;
   const key = process.env.SUPPORT_EMAIL_OUTBOUND_API_KEY;
   if (!url || !key) return { status: "blocked" as const, error: "outbound_not_configured" };

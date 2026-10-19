@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send, Phone } from "lucide-react";
 import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
-import { faqs } from "@/lib/data";
+import { useQuery } from "@tanstack/react-query";
 
 const suggestions = ["When will I feel results?", "What's this charge on my card?", "What's your refund policy?"];
 
@@ -103,6 +103,10 @@ function AskAI() {
 }
 
 const ticketStatus = {
+  new: { tone: "amber" as const, label: "New", icon: CircleDot },
+  pending: { tone: "blue" as const, label: "Pending", icon: Clock },
+  on_hold: { tone: "blue" as const, label: "On hold", icon: Clock },
+  closed: { tone: "green" as const, label: "Closed", icon: CheckCircle2 },
   open: { tone: "amber" as const, label: "Open", icon: CircleDot },
   in_review: { tone: "blue" as const, label: "In review", icon: Clock },
   resolved: { tone: "green" as const, label: "Resolved", icon: CheckCircle2 },
@@ -111,6 +115,8 @@ const ticketStatus = {
 export default function SupportPage() {
   const { data } = useTickets();
   const tickets = data?.tickets ?? [];
+  const knowledge = useQuery({ queryKey: ["published-faq"], queryFn: async () => { const res=await fetch("/api/faq"); if(!res.ok) throw new Error("faq_unavailable"); return res.json() as Promise<{articles:{id:string;title:string;content:string}[]}>; } });
+  const faqs=(knowledge.data?.articles ?? []).map(a=>({q:a.title,a:a.content}));
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
@@ -145,7 +151,7 @@ export default function SupportPage() {
         ) : (
           <div className="space-y-3">
             {tickets.map((t) => {
-              const s = ticketStatus[t.status];
+              const s = ticketStatus[t.status as keyof typeof ticketStatus] ?? { tone: "blue" as const, label: t.status.replaceAll("_", " "), icon: Clock };
               return (
                 <div key={t.id} className="card rounded-2xl p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -157,9 +163,7 @@ export default function SupportPage() {
                     </div>
                     <Chip tone={s.tone}>{s.label}</Chip>
                   </div>
-                  <p className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-muted">
-                    <span className="font-semibold text-[var(--accent)]">Neo Nature team:</span> {t.lastMessage}
-                  </p>
+                  {(data?.messages ?? []).filter(m=>m.legacyTicketId===t.id).length ? <details className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm"><summary className="cursor-pointer font-semibold">View conversation</summary><div className="mt-3 space-y-3">{data!.messages.filter(m=>m.legacyTicketId===t.id).map(m=><article key={m.id}><p className="text-xs text-muted">{m.direction==="incoming" ? "You" : "Neo Nature team"} · {new Date(m.receivedAt).toLocaleString()}</p><p className="whitespace-pre-wrap">{m.text}</p></article>)}</div></details> : <p className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-muted"><span className="font-semibold text-[var(--accent)]">Neo Nature team:</span> {t.lastMessage}</p>}
                 </div>
               );
             })}

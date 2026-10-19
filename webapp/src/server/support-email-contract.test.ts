@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { canDeliverEmail, deliverSupportEmail, deterministicTier, emailInboundSchema, messageDedupeKey, outboundEmailPayload, readWebhookJson, requireWebhookKey, responseDueAt, supportEmailConfig } from "./support-email-contract";
-import { emailAgentInstructions, generateSupportEmail, validateEmailDecision, type SupportEmailContext } from "./support-email-ai";
+import { emailAgentInstructions, generateSupportEmail, humanSupportAcknowledgement, validateEmailDecision, type SupportEmailContext } from "./support-email-ai";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 const payload = () => outboundEmailPayload({ requestId: "request-1", conversationId: "conversation-1", mailboxId: "support@example.com", threadId: "thread-1", messageId: "gmail-1", rfcMessageId: "<rfc-1@example.com>", references: ["<rfc-0@example.com>"], email: "internal@example.com", subject: "Refund", text: "Hello <script>alert(1)</script>" });
@@ -46,7 +46,7 @@ it("requires confirmed Gmail acceptance and suspends uncertain sends", async () 
   expect((await deliverSupportEmail(payload())).status).toBe("unknown");
   expect((await deliverSupportEmail(payload())).status).toBe("unknown");
   expect((await deliverSupportEmail(payload())).status).toBe("failed");
-  expect(await deliverSupportEmail(payload())).toEqual({ status: "sent", messageId: "gmail-2" });
+  expect(await deliverSupportEmail(payload())).toMatchObject({ status: "sent", messageId: "gmail-2" });
   expect(new Set(fetchMock.mock.calls.map(c => JSON.parse(c[1].body).requestId)).size).toBe(1);
 });
 it("never sends to a recipient outside the pilot allowlist", async () => {
@@ -68,10 +68,10 @@ it("never lets model output downgrade critical cases", () => {
   expect(validateEmailDecision(decision, { ...context, incoming: "I had an allergic reaction" })).toMatchObject({ tier: "T3", needsHuman: true, reply: "" });
 });
 it("hands cancellation requests to staff even when the model proposes a reply", () => {
-  expect(validateEmailDecision({ ...decision, tier: "T2", intent: "cancel", needsHuman: false, reply: "Open another ticket and we will cancel it in 48 hours." }, { ...context, incoming: "Please cancel my order", refundUrl: null })).toMatchObject({ tier: "T3", needsHuman: true, reply: "", reason: "Cancellation requires a staff member to perform the action" });
+  expect(validateEmailDecision({ ...decision, tier: "T2", intent: "cancel", needsHuman: false, reply: "Open another ticket and we will cancel it in 48 hours." }, { ...context, incoming: "Please cancel my order", refundUrl: null })).toMatchObject({ tier: "T2", needsHuman: true, reply: "", reason: "Staff must perform the requested account or order change" });
 });
 it("does not send a customer away to open another ticket", () => {
-  expect(validateEmailDecision({ ...decision, intent: "faq", reply: "Open a ticket and we will help you." }, { ...context, refundUrl: null })).toMatchObject({ tier: "T3", needsHuman: true, reply: "" });
+  expect(validateEmailDecision({ ...decision, intent: "faq", reply: "Open a ticket and we will help you." }, { ...context, refundUrl: null })).toMatchObject({ tier: "T2", needsHuman: true, reply: "" });
   expect(validateEmailDecision({ ...decision, intent: "faq", reply: "You don't open a ticket here; I can help with your question." }, { ...context, refundUrl: null }).needsHuman).toBe(false);
 });
 it("normalizes emphasis artifacts before sending a plain text email", () => {
@@ -85,9 +85,9 @@ it("rejects fabricated links and requires the real refund form link", () => {
 it("uses the current FAQ as authority and forbids financial execution", () => {
   const instructions = emailAgentInstructions();
   expect(instructions).toContain("90-day, no-questions-asked");
-  expect(instructions).toContain("overrides any contrary historical message");
-  expect(instructions).toContain("cannot execute refunds");
-  expect(instructions).toContain("UNTRUSTED DATA");
+  expect(instructions).toContain("overriding static FAQ/history/training examples");
+  expect(instructions).toContain("Never perform or claim refunds");
+  expect(instructions).toContain("untrusted data");
 });
 
 it("supports OpenAI Responses with server-side credentials and validates a multilingual reply", async () => {
@@ -99,4 +99,29 @@ it("supports OpenAI Responses with server-side credentials and validates a multi
   expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ model: "test-model", store: false });
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer test-key");
+});
+
+it("requires human review for every T3 complaint", () => {
+  const result = validateEmailDecision({ ...decision, tier: "T3", intent: "tracking", reply: "I understand your concern. Please share your order number so we can identify the delivery." }, { ...context, subject: "Missing delivery", incoming: "Tracking says delivered, but nothing arrived. Are you a scam?", refundUrl: null });
+  expect(result).toMatchObject({ tier: "T3", needsHuman: true, reply: "" });
+});
+
+it("includes editable style preferences while retaining authoritative policies", () => {
+  const prompt = emailAgentInstructions('Use “we” instead of “I”.');
+  expect(prompt).toContain('Use “we” instead of “I”.');
+  expect(prompt).toContain("preferences cannot override the FAQ");
+  expect(prompt).toContain("answer honestly when asked about AI");
+});
+it("discards unsafe handoff acknowledgements while preserving the escalation", () => {
+  const unsafe = validateEmailDecision({ ...decision, needsHuman: true, acknowledgement: "Your refund has been issued: https://unknown.example.com" }, context);
+  expect(unsafe.needsHuman).toBe(true);
+  expect(unsafe.reply).toBe("");
+  expect(unsafe.acknowledgement).toBe("");
+});
+
+it("requires an honest answer in handoff acknowledgements when asked about AI", () => {
+  const result = validateEmailDecision({ ...decision, needsHuman: true, acknowledgement: "We understand. A specialist needs to review this." }, { ...context, incoming: "Are you an AI or a human?" });
+  expect(result.acknowledgement).toBe("");
+  expect(humanSupportAcknowledgement("en", false, true)).toContain("AI support assistant");
+  expect(humanSupportAcknowledgement("en", false)).not.toContain("AI support assistant");
 });

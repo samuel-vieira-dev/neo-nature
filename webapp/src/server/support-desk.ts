@@ -10,13 +10,14 @@
 
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db, rawSql } from "@/db";
-import { customers, orders, tickets, users } from "@/db/schema";
+import { customers, orders, tickets, users, supportEmailConversations as supportTickets } from "@/db/schema";
 import { applyFilters, loadCustomers, type CustomerRow } from "@/server/crm";
 import {
   listRecentFreshdeskTickets,
   type FreshdeskTicketWithRequester,
 } from "@/server/freshdesk";
 import { buildTrackingUrl, humanizeStatus } from "@/lib/tracking";
+import { internalSupportEnabled, TICKET_STATUS_LABELS, type TicketStatus } from "@/lib/support-tickets";
 import { purchaseOriginOf } from "@/server/sales-platform";
 
 const digitsOf = (s: string) => s.replace(/\D/g, "");
@@ -196,6 +197,18 @@ const LOCAL_STATUS_LABELS: Record<string, string> = { open: "Open", in_review: "
  * configured or the live call fails.
  */
 export async function getTicketQueue(opts: TicketQueueFilters = {}): Promise<TicketQueueResult> {
+  if (internalSupportEnabled()) {
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 10)); const offset = Math.max(0, opts.offset ?? 0);
+    const normalize = (s: string) => s.toLowerCase().replaceAll(" ", "_");
+    const where = and(opts.status ? eq(supportTickets.ticketStatus, normalize(opts.status)) : undefined, opts.kind ? eq(supportTickets.kind, opts.kind) : undefined,
+      opts.q ? or(ilike(supportTickets.subject, `%${opts.q}%`), ilike(supportTickets.email, `%${opts.q}%`), ilike(supportTickets.name, `%${opts.q}%`), sql`${supportTickets.ticketNumber}::text = ${opts.q.replace(/^#/, "")}`) : undefined,
+      opts.updatedFrom ? gte(supportTickets.updatedAt, new Date(`${opts.updatedFrom}T00:00:00Z`)) : undefined,
+      opts.updatedTo ? lt(supportTickets.updatedAt, new Date(new Date(`${opts.updatedTo}T00:00:00Z`).getTime()+86400000)) : undefined,
+      opts.excludeStatus?.length ? sql`${supportTickets.ticketStatus} not in (${sql.join(opts.excludeStatus.map(s=>sql`${normalize(s)}`),sql`,`)})` : undefined);
+    const sort = opts.direction === "asc" ? asc : desc;
+    const rows = await db.select().from(supportTickets).where(where).orderBy(sort(opts.orderBy === "created" ? supportTickets.createdAt : supportTickets.updatedAt), sort(supportTickets.id)).limit(limit+1).offset(offset);
+    return { source: "local", warning: null, truncated: false, offset, limit, hasMore: rows.length > limit, tickets: rows.slice(0,limit).map(t => ({ id: t.ticketNumber < 0 && t.freshdeskId ? t.freshdeskId : t.ticketNumber, subject: t.subject, status: TICKET_STATUS_LABELS[t.ticketStatus as TicketStatus] || t.ticketStatus, priority: t.requiresHuman ? "High" : "Normal", createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString(), url: `/admin/support?ticket=${t.id}`, requester: { name: t.name, email: t.email, phone: null }, customerId: null, customerName: t.name || null, fromApp: t.source === "webapp", kind: t.kind as SupportTicket["kind"] })) };
+  }
   const limit = Math.min(1000, Math.max(1, opts.limit ?? 10));
   const offset = Math.max(0, opts.offset ?? 0);
   const orderBy = opts.orderBy === "created" ? "created_at" : "updated_at";
@@ -450,8 +463,7 @@ export async function searchCustomersDesk(q?: string): Promise<SupportCustomer[]
   // it's a deliberate lookup, not a browse list.
   const limited = filtered.slice(0, q ? SEARCH_CUSTOMERS_LIMIT : DEFAULT_CUSTOMERS_LIMIT);
 
-  const ticketCounts = await rawSql<{ user_id: string | null; email: string; cnt: string }[]>`
-    SELECT user_id, email, count(*)::text cnt FROM tickets WHERE status <> 'resolved' GROUP BY 1, 2`;
+  const ticketCounts = internalSupportEnabled() ? await rawSql<{ user_id: string | null; email: string; cnt: string }[]>`select null::text user_id,email,count(*)::text cnt from support_email_conversations where ticket_status not in ('resolved','closed') group by email` : await rawSql<{ user_id: string | null; email: string; cnt: string }[]>`SELECT user_id, email, count(*)::text cnt FROM tickets WHERE status not in ('resolved','closed') GROUP BY 1, 2`;
   const byUserId = new Map<string, number>();
   const byEmail = new Map<string, number>();
   for (const r of ticketCounts) {
@@ -487,6 +499,15 @@ export type SupportStats = {
  * straight from the local `tickets` table mirror, same as before.
  */
 export async function getSupportStats(): Promise<SupportStats> {
+  if (internalSupportEnabled()) {
+    const [active, refunds, awaiting, chargebacks] = await Promise.all([
+      db.select({ n: count() }).from(supportTickets).where(sql`${supportTickets.ticketStatus} not in ('resolved','closed')`),
+      db.select({ n: count() }).from(supportTickets).where(and(eq(supportTickets.kind,"refund"),sql`${supportTickets.ticketStatus} not in ('resolved','closed')`)),
+      db.select({ n: count() }).from(orders).where(and(eq(orders.status,"confirmed"),isNull(orders.fulfilledAt),lt(orders.placedAt,new Date(Date.now()-AWAITING_SHIPMENT_MS)))),
+      db.select({ n: count() }).from(orders).where(gte(orders.chargebackAt,new Date(Date.now()-CHARGEBACK_WINDOW_MS))),
+    ]);
+    return { openTickets: active[0].n, refundRequests: refunds[0].n, awaitingShipment: awaiting[0].n, chargebacks7d: chargebacks[0].n, source:"local", ticketsTruncated:false };
+  }
   const [queue, refundRequestsLocalRows, awaitingRows, chargebackRows] = await Promise.all([
     getTicketQueue({ limit: 100 }),
     db

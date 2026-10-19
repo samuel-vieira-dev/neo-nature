@@ -5,16 +5,14 @@
 // shows revenue. Access to this desk is separate from the Customer 360.
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   LifeBuoy,
   PackageX,
   RotateCcw,
   ShieldAlert,
   Search,
-  ExternalLink,
 } from "lucide-react";
 import OrdersPanel, { type OrdersInitial } from "@/components/admin/OrdersPanel";
 import SupportEmailPanel from "@/components/admin/SupportEmailPanel";
@@ -39,22 +37,6 @@ type StatsResp = {
       counters are a floor, not an exact total — shown as "400+". */
   ticketsTruncated?: boolean;
 };
-
-type TicketRow = {
-  id: number | string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  updatedAt: string;
-  url: string;
-  requester: { name: string; email: string; phone: string };
-  customerId: string | null;
-  customerName: string | null;
-  fromApp: boolean;
-  kind: string | null;
-};
-type TicketsResp = { source: "freshdesk" | "local"; warning: string | null; truncated: boolean; tickets: TicketRow[]; offset: number; limit: number; hasMore: boolean };
 
 type DeskCustomerRow = {
   id: string | null;
@@ -113,239 +95,6 @@ function StatCard({
     </button>
   );
 }
-
-function CustomerLink({ id, name, email }: { id: string | null; name: string | null; email: string | null }) {
-  const canReadCustomers = useCan("customers:read");
-  if (!id || !canReadCustomers) {
-    return (
-      <div>
-        <p className="font-semibold text-[var(--text)]">{name || "—"}</p>
-        {email && <p className="text-xs text-muted">{email}</p>}
-      </div>
-    );
-  }
-  return (
-    <Link href={`/admin/customers/${id}`} className="block hover:underline">
-      <p className="font-semibold text-[var(--accent)]">{name || email || "Customer"}</p>
-      {email && <p className="text-xs text-muted">{email}</p>}
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tickets tab
-// ---------------------------------------------------------------------------
-
-const TICKET_STATUSES = ["", "Open", "Pending", "Resolved", "Closed"];
-const TICKET_KINDS: { value: string; label: string }[] = [
-  { value: "", label: "Any kind" },
-  { value: "support", label: "Support" },
-  { value: "refund", label: "Refund" },
-  { value: "billing", label: "Billing" },
-];
-const TICKET_PRIORITIES: { value: string; label: string }[] = [
-  { value: "", label: "Any priority" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "urgent", label: "Urgent" },
-];
-
-type TicketsInitial = {
-  status?: string;
-  kind?: string;
-  priority?: string;
-  updatedFrom?: string;
-  updatedTo?: string;
-  /** Set only when arriving via a stat card whose counter excludes resolved/closed
-   *  tickets (Open tickets, Refund requests) — not a manual filter control. */
-  excludeStatus?: string;
-};
-
-function TicketsPanel({ initial }: { initial: TicketsInitial }) {
-  const [orderBy, setOrderBy] = useState("updated");
-  const [direction, setDirection] = useState("desc");
-  const [status, setStatus] = useState(initial.status ?? "");
-  const [kind, setKind] = useState(initial.kind ?? "");
-  const [priority, setPriority] = useState(initial.priority ?? "");
-  const [updatedFrom, setUpdatedFrom] = useState(initial.updatedFrom ?? "");
-  const [updatedTo, setUpdatedTo] = useState(initial.updatedTo ?? "");
-  const [excludeStatus, setExcludeStatus] = useState(initial.excludeStatus ?? "");
-  const [q, setQ] = useState("");
-  const dq = useDebounced(q);
-
-  const params = new URLSearchParams();
-  params.set("orderBy", orderBy);
-  params.set("direction", direction);
-  if (status) params.set("status", status);
-  if (kind) params.set("kind", kind);
-  if (priority) params.set("priority", priority);
-  if (updatedFrom) params.set("updatedFrom", updatedFrom);
-  if (updatedTo) params.set("updatedTo", updatedTo);
-  if (excludeStatus) params.set("excludeStatus", excludeStatus);
-  if (dq) params.set("q", dq);
-
-  const query = useInfiniteQuery({
-    queryKey: ["support-tickets", params.toString()],
-    initialPageParam: { offset: 0, limit: 10 },
-    queryFn: ({ pageParam }) => adminApi<TicketsResp>(`/api/admin/support/tickets?${params.toString()}&offset=${pageParam.offset}&limit=${pageParam.limit}`),
-    getNextPageParam: page => page.hasMore ? { offset: page.offset + page.limit, limit: page.offset === 0 ? 50 : 100 } : undefined,
-  });
-  const { isLoading, error } = query;
-  const pages = query.data?.pages;
-  const data = pages?.length ? { ...pages[pages.length - 1], tickets: [...new Map(pages.flatMap(p => p.tickets).map(t => [t.id, t])).values()] } : undefined;
-
-  const hasFilters = !!(status || kind || priority || updatedFrom || updatedTo || excludeStatus || q);
-  const clearFilters = () => {
-    setStatus("");
-    setKind("");
-    setPriority("");
-    setUpdatedFrom("");
-    setUpdatedTo("");
-    setExcludeStatus("");
-    setQ("");
-  };
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3">
-          <Search className="h-4 w-4 text-muted" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search subject, name or email"
-            className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
-          />
-        </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
-          {TICKET_STATUSES.map((s) => (
-            <option key={s} value={s}>{s || "All statuses"}</option>
-          ))}
-        </select>
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
-          {TICKET_KINDS.map((k) => (
-            <option key={k.value} value={k.value}>{k.label}</option>
-          ))}
-        </select>
-        <select value={priority} onChange={(e) => setPriority(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
-          {TICKET_PRIORITIES.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
-        <select aria-label="Ticket sort date" value={orderBy} onChange={e => setOrderBy(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold"><option value="updated">Last activity</option><option value="created">Created date</option></select>
-        <select aria-label="Ticket sort direction" value={direction} onChange={e => setDirection(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select>
-        <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-muted">
-          Updated from
-          <input
-            type="date"
-            value={updatedFrom}
-            onChange={(e) => setUpdatedFrom(e.target.value)}
-            className="bg-transparent text-sm text-[var(--text)] focus:outline-none"
-          />
-        </label>
-        <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-muted">
-          Updated to
-          <input
-            type="date"
-            value={updatedTo}
-            onChange={(e) => setUpdatedTo(e.target.value)}
-            className="bg-transparent text-sm text-[var(--text)] focus:outline-none"
-          />
-        </label>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold text-muted hover:text-[var(--text)]"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
-
-      {excludeStatus && (
-        <p className="mt-3 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
-          Excluding {excludeStatus.split(",").join(" and ").toLowerCase()} tickets — matches the counter you clicked.
-        </p>
-      )}
-
-      {data?.truncated && !query.hasNextPage && (
-        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-          Showing the most recent tickets only — narrow the date range to see older ones.
-        </p>
-      )}
-      {query.hasNextPage && <button className="mt-4 rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold" disabled={query.isFetchingNextPage} onClick={() => query.fetchNextPage()}>{query.isFetchingNextPage ? "Loading…" : `Load ${pages?.length === 1 ? 50 : 100} more tickets`}</button>}
-
-      {data?.warning && (
-        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{data.warning}</p>
-      )}
-
-      {error ? (
-        <p className="mt-4 text-sm text-rose-600">Couldn&apos;t load tickets — try again.</p>
-      ) : isLoading ? (
-        <p className="mt-4 text-sm text-muted">Loading…</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Ticket</th>
-                <th className="px-4 py-3 font-semibold">Customer</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Priority</th>
-                <th className="px-4 py-3 font-semibold">Updated</th>
-                <th className="px-4 py-3 font-semibold">Source</th>
-                <th className="px-4 py-3 font-semibold"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {(data?.tickets ?? []).map((t) => (
-                <tr key={t.id} className="hover:bg-[var(--surface)]">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-[var(--text)]">#{t.id} · {t.subject}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <CustomerLink id={t.customerId} name={t.customerName ?? t.requester.name} email={t.requester.email} />
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text)]">{t.status}</td>
-                  <td className="px-4 py-3 text-muted">{t.priority}</td>
-                  <td className="px-4 py-3 text-muted">{shortDate(t.updatedAt)}</td>
-                  <td className="px-4 py-3">
-                    {t.fromApp && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">App</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <a
-                      href={t.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
-                    >
-                      Open in Freshdesk <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </td>
-                </tr>
-              ))}
-              {(data?.tickets ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted">No tickets match these filters.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Orders tab
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Customers tab
-// ---------------------------------------------------------------------------
 
 function CustomersPanel() {
   const router = useRouter();
@@ -455,7 +204,7 @@ function SupportPageInner() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab: Tab = tabParam === "orders" || tabParam === "customers" ? tabParam : "tickets";
-  const [ticketSource, setTicketSource] = useState<"freshdesk" | "email">("freshdesk");
+
 
   // Switching tabs by hand starts that tab with no filters — filters only
   // carry over when arriving via a stat card's own link (goTo below).
@@ -465,7 +214,6 @@ function SupportPageInner() {
   };
 
   const goTo = (next: Tab, filters: Record<string, string>) => {
-    setTicketSource("freshdesk");
     const params = new URLSearchParams();
     if (next !== "tickets") params.set("tab", next);
     for (const [k, v] of Object.entries(filters)) params.set(k, v);
@@ -477,14 +225,6 @@ function SupportPageInner() {
     queryFn: () => adminApi<StatsResp>("/api/admin/support/stats"),
   });
 
-  const ticketsInitial: TicketsInitial = {
-    status: searchParams.get("status") ?? "",
-    kind: searchParams.get("kind") ?? "",
-    priority: searchParams.get("priority") ?? "",
-    updatedFrom: searchParams.get("updatedFrom") ?? "",
-    updatedTo: searchParams.get("updatedTo") ?? "",
-    excludeStatus: searchParams.get("excludeStatus") ?? "",
-  };
   const ordersInitial: OrdersInitial = {
     status: searchParams.get("status") ?? "",
     problem: searchParams.get("problem") ?? "",
@@ -557,13 +297,7 @@ function SupportPageInner() {
       </div>
 
       <div className="mt-4">
-        {tab === "tickets" && <div>
-          <div className="mb-4 flex gap-2">
-            <button onClick={() => setTicketSource("freshdesk")} aria-pressed={ticketSource === "freshdesk"} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ticketSource === "freshdesk" ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] bg-white"}`}>Freshdesk tickets</button>
-            <button onClick={() => setTicketSource("email")} aria-pressed={ticketSource === "email"} className={`rounded-xl px-4 py-2 text-sm font-semibold ${ticketSource === "email" ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] bg-white"}`}>Email agents</button>
-          </div>
-          {ticketSource === "email" ? <SupportEmailPanel /> : <TicketsPanel key={searchParams.toString()} initial={ticketsInitial} />}
-        </div>}
+        {tab === "tickets" && <SupportEmailPanel key={searchParams.toString()} initialTicket={searchParams.get("ticket")} initialStatus={searchParams.get("status") ?? ""} initialKind={searchParams.get("kind") ?? ""} initialExcludeStatus={searchParams.get("excludeStatus") ?? ""} />}
         {tab === "orders" && <OrdersPanel key={searchParams.toString()} initial={ordersInitial} />}
         {tab === "customers" && <CustomersPanel />}
       </div>

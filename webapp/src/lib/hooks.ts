@@ -200,13 +200,13 @@ export type TicketDto = {
   subject: string;
   orderNumber: string;
   kind: "support" | "refund" | "billing";
-  status: "open" | "in_review" | "resolved";
+  status: "new" | "open" | "in_review" | "pending" | "on_hold" | "resolved" | "closed";
   lastMessage: string;
   date: string;
 };
 
 export function useTickets() {
-  return useQuery({ queryKey: ["tickets"], queryFn: () => api<{ tickets: TicketDto[] }>("/api/tickets") });
+  return useQuery({ queryKey: ["tickets"], queryFn: () => api<{ tickets: TicketDto[]; messages: {id:string;text:string;direction:string;receivedAt:string;legacyTicketId:string|null}[] }>("/api/tickets") });
 }
 
 export function useCreateTicket() {
