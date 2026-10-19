@@ -2,3 +2,6 @@
 
 # agent worktrees — nested checkouts, never part of the repo
 **/.claude/worktrees/
+
+# root-level installs are not part of the app (webapp has its own)
+/node_modules/
