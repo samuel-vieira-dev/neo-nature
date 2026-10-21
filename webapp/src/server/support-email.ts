@@ -107,6 +107,16 @@ async function blockBehindUncertainDelivery(tx: Transaction, job: Job) {
   return true;
 }
 
+async function partialT1Index(tx: Transaction, job: Job): Promise<number> {
+  if (job.draft?.partialRolloutT1Index !== undefined) return job.draft.partialRolloutT1Index;
+  // Existing JSONB stores the decision, including held/cancelled jobs. No DDL or
+  // historical backfill: the sequence starts with decisions made by this version.
+  // Serialize counting AND persistence (the caller writes before committing).
+  await lock(tx, "support-email:partial-t1-sequence");
+  const [processed] = await tx.select({ n: count() }).from(jobs).where(sql`${jobs.draft}->>'partialRolloutT1Index' is not null`);
+  return processed.n;
+}
+
 async function prepareJob(job: Job, c: Conversation, incoming: Message) {
   const context = await supportEmailContext(c, incoming);
   if (job.error?.startsWith("reply_rejected:") && job.draft) context.previousRejection = { reason: job.draft.reason, reply: job.draft.reply };
@@ -122,9 +132,12 @@ async function prepareJob(job: Job, c: Conversation, incoming: Message) {
       return;
     }
     const human = draft.needsHuman;
-    const send = !human && canAutoDeliverEmail(current.email, current.id, draft.tier, tone);
+    const storedDraft: NonNullable<Job["draft"]> = { ...draft };
+    if (job.draft?.partialRolloutT1Index !== undefined) storedDraft.partialRolloutT1Index = job.draft.partialRolloutT1Index;
+    if (partial && !human && draft.tier === "T1") storedDraft.partialRolloutT1Index = await partialT1Index(tx, job);
+    const send = !human && canAutoDeliverEmail(current.email, storedDraft.partialRolloutT1Index, draft.tier, tone);
     await tx.update(conversations).set({ tier: draft.tier, language: draft.language, requiresHuman: human, ticketStatus: human ? "open" : current.ticketStatus, owner: human ? "human" : "agent", status: human ? "awaiting_human" : partial && !send ? "ai_draft_not_sent" : "draft_ready", escalationReason: human ? partial ? `${draft.tier}: Human required during partial rollout` : draft.reason : null, updatedAt: new Date() }).where(eq(conversations.id, c.id));
-    await tx.update(jobs).set({ draft, stage: human && !partial ? (current.freshdeskId ? "human_note" : "escalate") : "send", status: partial ? send ? "queued" : "review" : !human && !send ? "review" : "queued", runAt: human ? new Date() : job.sendAfter, attempts: 0, startedAt: null, error: null }).where(eq(jobs.id, job.id));
+    await tx.update(jobs).set({ draft: storedDraft, stage: human && !partial ? (current.freshdeskId ? "human_note" : "escalate") : "send", status: partial ? send ? "queued" : "review" : !human && !send ? "review" : "queued", runAt: human ? new Date() : job.sendAfter, attempts: 0, startedAt: null, error: null }).where(eq(jobs.id, job.id));
   });
 }
 
@@ -135,7 +148,7 @@ async function recordOutgoing(tx: Transaction, c: Conversation, job: Job, incomi
   if (job.stage !== "manual_send" && job.draft?.needsHuman && c.owner === "human" && c.latestMessageId === job.messageId) {
     await tx.insert(jobs).values({ id: crypto.randomUUID(), conversationId: c.id, messageId: incoming.id, stage: "escalate", sendAfter: new Date() }).onConflictDoNothing();
   }
-  await tx.update(conversations).set({ requiresHuman: job.stage === "manual_send" ? false : c.requiresHuman, ticketStatus: (job.stage === "manual_send" ? job.replyStatus || "pending" : "pending") as TicketStatus, status: c.owner === "agent" && c.latestMessageId === job.messageId ? "replied" : c.status === "delivery_unknown" ? "awaiting_human" : c.status, firstRepliedAt: c.firstRepliedAt ?? new Date(), updatedAt: new Date() }).where(eq(conversations.id, c.id));
+  await tx.update(conversations).set({ requiresHuman: job.stage === "manual_send" ? false : c.requiresHuman, ticketStatus: (job.stage === "manual_send" ? job.replyStatus || "pending" : "pending") as TicketStatus, status: c.latestMessageId === job.messageId ? "replied" : c.status === "delivery_unknown" ? "awaiting_human" : c.status, firstRepliedAt: c.firstRepliedAt ?? new Date(), updatedAt: new Date() }).where(eq(conversations.id, c.id));
 }
 
 async function deliverJob(job: Job, incoming: Message) {
@@ -152,7 +165,12 @@ async function deliverJob(job: Job, incoming: Message) {
       await tx.update(jobs).set({ status: "cancelled", error: "conversation_changed" }).where(eq(jobs.id, job.id));
       return;
     }
-    if (!manual && partial && (!canAutoDeliverEmail(c.email, c.id, c.tier, tone) || job.draft && !canAutoDeliverEmail(c.email, c.id, job.draft.tier, tone))) {
+    // Queued drafts from the previous hash implementation get one persisted slot.
+    if (!manual && partial && c.tier === "T1" && !c.requiresHuman && c.owner === "agent" && job.draft?.tier === "T1" && !job.draft.needsHuman && job.draft.partialRolloutT1Index === undefined) {
+      job.draft = { ...job.draft, partialRolloutT1Index: await partialT1Index(tx, job) };
+      await tx.update(jobs).set({ draft: job.draft }).where(eq(jobs.id, job.id));
+    }
+    if (!manual && partial && (!canAutoDeliverEmail(c.email, job.draft?.partialRolloutT1Index, c.tier, tone) || job.draft && !canAutoDeliverEmail(c.email, job.draft.partialRolloutT1Index, job.draft.tier, tone))) {
       const human = c.tier !== "T1" || !!job.draft && job.draft.tier !== "T1" || c.requiresHuman || c.owner === "human";
       await tx.update(jobs).set({ status: "review", error: human ? "human_response_required" : "t1_not_sampled" }).where(eq(jobs.id, job.id));
       await tx.update(conversations).set({ requiresHuman: human, owner: human ? "human" : "agent", status: human ? "awaiting_human" : "ai_draft_not_sent", updatedAt: new Date() }).where(eq(conversations.id, c.id));
@@ -270,7 +288,7 @@ export async function runSupportEmailJobs(limit = 3) {
           const exhausted = job.attempts >= 3 && !configuration;
           const failure = rejection ? `reply_rejected: ${rejection.reason}` : configuration ? "llm_configuration_missing" : "generation_failed";
           await tx.update(jobs).set({
-            ...(rejection ? { draft: rejection.draft } : {}),
+            ...(rejection ? { draft: { ...rejection.draft, ...(job.draft?.partialRolloutT1Index !== undefined ? { partialRolloutT1Index: job.draft.partialRolloutT1Index } : {}) } } : {}),
             stage: exhausted && rejection ? "send" : "prepare",
             status: configuration ? "blocked" : exhausted ? rejection ? "review" : "failed" : "queued",
             error: failure, startedAt: null, runAt: new Date(Date.now() + (rejection ? 60_000 : 5 * 60_000)),
@@ -341,7 +359,8 @@ export async function supportEmailDetails(id: string, before?: string) {
   const context = latest ? await supportEmailContext(c, latest) : null;
   const tone = await readSupportEmailTone();
   const staff = await db.select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email }).from(adminUsers).where(and(eq(adminUsers.active, true), inArray(adminUsers.role, ["admin", "cs"])));
-  return { conversation: c, hasMoreMessages: historyRows.length > 100, messages: history.reverse().map(m=>({...m, attachments: [...m.attachments, ...storedAttachments.filter(a=>a.messageId===m.id).map(a=>({id:a.id,name:a.name,local:true}))]})), jobs: queue, orders: context?.orders ?? [], staff, config: { ...supportEmailReadiness(), ...tone }, canAutoDeliver: !c.requiresHuman && canAutoDeliverEmail(c.email, c.id, c.tier, tone), canDeliver: canDeliverEmail(c.email, tone) && !c.threadId.startsWith("local:") };
+  const latestDraft = queue.find(job => job.messageId === c.latestMessageId && job.stage === "send")?.draft;
+  return { conversation: c, hasMoreMessages: historyRows.length > 100, messages: history.reverse().map(m=>({...m, attachments: [...m.attachments, ...storedAttachments.filter(a=>a.messageId===m.id).map(a=>({id:a.id,name:a.name,local:true}))]})), jobs: queue, orders: context?.orders ?? [], staff, config: { ...supportEmailReadiness(), ...tone }, canAutoDeliver: !c.requiresHuman && canAutoDeliverEmail(c.email, latestDraft?.partialRolloutT1Index, c.tier, tone), canDeliver: canDeliverEmail(c.email, tone) && !c.threadId.startsWith("local:") };
 }
 
 export async function supportEmailAction(id: string, action: "takeover" | "resume" | "approve" | "retry" | "confirm_sent" | "confirm_not_sent" | "confirm_synced", jobId?: string, providerMessageId?: string, confirmedFreshdeskId?: number) {
@@ -385,7 +404,7 @@ export async function supportEmailAction(id: string, action: "takeover" | "resum
           await tx.update(conversations).set({ status: c.owner === "human" ? "awaiting_human" : "queued", updatedAt: now }).where(eq(conversations.id, c.id));
           return { ok: true };
         }
-        if (job.stage === "send" && partial && !canAutoDeliverEmail(c.email, c.id, c.tier, tone)) throw Response.json({ error: "partial_rollout_requires_human_reply" }, { status: 409 });
+        if (job.stage === "send" && partial && !canAutoDeliverEmail(c.email, job.draft?.partialRolloutT1Index, c.tier, tone)) throw Response.json({ error: "partial_rollout_requires_human_reply" }, { status: 409 });
         if (action === "approve" && (c.tier === "T3" || c.requiresHuman)) throw Response.json({error:"human_response_required"},{status:409});
         if (action === "approve" && !canDeliverEmail(c.email, tone)) throw Response.json({ error: "enable_pilot_for_this_recipient_first" }, { status: 409 });
         await tx.update(jobs).set({ status: "queued", error: null, attempts: 0, startedAt: null, runAt: ["send", "manual_send"].includes(job.stage) && job.sendAfter > now ? job.sendAfter : now }).where(eq(jobs.id, job.id));

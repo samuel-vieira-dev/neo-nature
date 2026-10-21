@@ -388,7 +388,7 @@ export const supportEmailJobs = pgTable("support_email_jobs", {
   runAt: timestamp("run_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   sendAfter: timestamp("send_after", { withTimezone: true, mode: "date" }).notNull(),
   attempts: integer("attempts").notNull().default(0),
-  draft: jsonb("draft").$type<{ tier: "T1" | "T2" | "T3"; language: string; intent: string; needsHuman: boolean; reason: string; reply: string }>(),
+  draft: jsonb("draft").$type<{ tier: "T1" | "T2" | "T3"; language: string; intent: string; needsHuman: boolean; reason: string; reply: string; partialRolloutT1Index?: number }>(),
   error: text("error"),
   startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

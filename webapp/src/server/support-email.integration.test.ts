@@ -7,6 +7,7 @@ import EmbeddedPostgres from "embedded-postgres";
 import { adminUsers, adminActionLogs, supportEmailTone, supportKnowledgeArticles, supportKnowledgeRevisions, supportTicketAttachments, orders, users, tickets, supportEmailConversations as conversations, supportEmailMessages as messages, supportEmailJobs as jobs } from "@/db/schema";
 import { EmailReplyRejected } from "./support-email-ai";
 import { eq } from "drizzle-orm";
+import { emailNotAnswered } from "@/lib/support-tickets";
 import { sampledT1Ticket, emailInboundSchema } from "./support-email-contract";
 
 const { generate } = vi.hoisted(() => ({ generate: vi.fn() }));
@@ -55,7 +56,7 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     vi.stubEnv("SUPPORT_EMAIL_OUTBOUND_WEBHOOK_URL", "https://n8n.example.com/send"); vi.stubEnv("SUPPORT_EMAIL_OUTBOUND_API_KEY", "test-key");
     vi.stubEnv("FRESHDESK_DOMAIN", "test"); vi.stubEnv("FRESHDESK_API_KEY", "test-key"); vi.stubEnv("SUPPORT_EMAIL_FRESHDESK_GROUP_ID", "42");
     vi.unstubAllGlobals(); generate.mockReset();
-    generate.mockResolvedValue({ tier: "T1", language: "en", intent: "tracking", needsHuman: false, reason: "", reply: "Thank you. Your order is confirmed." });
+    generate.mockImplementation(async () => ({ tier: "T1", language: "en", intent: "tracking", needsHuman: false, reason: "", reply: "Thank you. Your order is confirmed." }));
     await database.db.delete(supportTicketAttachments); await database.db.delete(supportKnowledgeRevisions); await database.db.delete(supportKnowledgeArticles);
     await database.db.delete(supportEmailTone); await database.db.delete(adminActionLogs); await database.db.delete(adminUsers);
     await database.db.delete(jobs); await database.db.delete(messages); await database.db.delete(conversations); await database.db.delete(orders);
@@ -436,13 +437,16 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     for (let i = 0; i < 8; i++) receipts.push(await service.receiveSupportEmail(realInput(`cohort-${i}`)));
     await service.runSupportEmailJobs(10);
     const prepared = await database.db.select().from(jobs);
+    expect(prepared.map(job => job.draft?.partialRolloutT1Index).sort((a, b) => a! - b!)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     for (const receipt of receipts) {
-      const selected = sampledT1Ticket(receipt.conversationId!, percent);
-      expect(prepared.find(j => j.conversationId === receipt.conversationId)?.status).toBe(selected ? "queued" : "review");
+      const job = prepared.find(j => j.conversationId === receipt.conversationId)!;
+      const selected = sampledT1Ticket(job.draft?.partialRolloutT1Index, percent);
+      expect(job.status).toBe(selected ? "queued" : "review");
       const details = await service.supportEmailDetails(receipt.conversationId!);
       expect(details.canDeliver).toBe(true); // Human composer remains available.
       if (!selected) {
         expect(details.conversation.status).toBe("ai_draft_not_sent");
+        expect(emailNotAnswered(details.conversation)).toBe(true);
         expect(details.jobs[0].draft?.reply).toBeTruthy();
         await expect(service.supportEmailAction(receipt.conversationId!, "approve", details.jobs[0].id)).rejects.toHaveProperty("status", 409);
       }
@@ -450,10 +454,75 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     await service.runSupportEmailJobs(10); expect(send).not.toHaveBeenCalled();
     await database.db.update(jobs).set({ runAt: new Date(0), sendAfter: new Date(0) });
     await service.runSupportEmailJobs(10);
-    const selectedCount = receipts.filter(r => sampledT1Ticket(r.conversationId!, percent)).length;
+    const selectedCount = Math.floor(receipts.length * percent / 100);
     expect(send).toHaveBeenCalledTimes(selectedCount);
     expect((await database.db.select().from(messages)).filter(m => m.direction === "outgoing")).toHaveLength(selectedCount);
     expect((await database.db.select().from(jobs)).filter(j => j.status === "succeeded")).toHaveLength(selectedCount);
+    for (const receipt of receipts) {
+      const details = await service.supportEmailDetails(receipt.conversationId!);
+      const selected = sampledT1Ticket(details.jobs[0].draft?.partialRolloutT1Index, percent);
+      expect(emailNotAnswered(details.conversation)).toBe(!selected);
+    }
+  });
+  it("serializes concurrent T1 decisions and retains their slots through delivery and retries", async () => {
+    await enablePartial(50); const send = mockDelivery();
+    const first = await service.receiveSupportEmail(realInput("concurrent-first"));
+    const second = await service.receiveSupportEmail(realInput("concurrent-second"));
+    let started!: () => void;
+    let release!: () => void;
+    const generating = new Promise<void>(resolve => { started = resolve; });
+    const resume = new Promise<void>(resolve => { release = resolve; });
+    generate.mockImplementationOnce(async () => {
+      started(); await resume;
+      return { tier: "T1", language: "en", intent: "tracking", needsHuman: false, reason: "", reply: "Safe reply" };
+    });
+    const worker = service.runSupportEmailJobs(1);
+    await generating;
+    try { await service.runSupportEmailJobs(1); } finally { release(); }
+    await worker;
+    const prepared = await database.db.select().from(jobs);
+    expect(prepared.map(job => job.draft?.partialRolloutT1Index).sort()).toEqual([0, 1]);
+    const selected = prepared.find(job => job.draft?.partialRolloutT1Index === 1)!;
+    const held = prepared.find(job => job.draft?.partialRolloutT1Index === 0)!;
+    expect(selected.status).toBe("queued"); expect(held.status).toBe("review");
+    expect((await service.supportEmailDetails(selected.conversationId)).canAutoDeliver).toBe(true);
+    expect((await service.supportEmailDetails(held.conversationId)).canAutoDeliver).toBe(false);
+    await database.db.update(jobs).set({ runAt: new Date(0), sendAfter: new Date(0) });
+    send.mockResolvedValueOnce(Response.json({ success: false, sent: false, requestId: selected.id }));
+    await service.runSupportEmailJobs(10);
+    await service.supportEmailAction(selected.conversationId, "retry", selected.id);
+    await service.runSupportEmailJobs(10);
+    const finished = await database.db.select().from(jobs);
+    expect(finished.find(job => job.id === selected.id)).toMatchObject({ status: "succeeded", draft: { partialRolloutT1Index: 1 } });
+    expect(finished.find(job => job.id === held.id)).toMatchObject({ status: "review", draft: { partialRolloutT1Index: 0 } });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect([first.conversationId, second.conversationId]).toContain(selected.conversationId);
+  });
+  it("excludes testers and human tiers, counts cancelled decisions, and does not reset on percentage edits", async () => {
+    await enablePartial(50); mockDelivery();
+    await service.receiveSupportEmail(input());
+    await service.receiveSupportEmail(realInput("excluded-t2", "I want a refund"));
+    const first = await service.receiveSupportEmail(realInput("eligible-first"));
+    await service.runSupportEmailJobs(10);
+    expect((await service.supportEmailDetails(first.conversationId!)).jobs[0].draft?.partialRolloutT1Index).toBe(0);
+    await database.db.update(supportEmailTone).set({ t1SendPercent: 37 });
+    await service.receiveSupportEmail({ ...realInput("eligible-followup"), threadId: "eligible-first" });
+    await service.runSupportEmailJobs(10);
+    const slots = (await database.db.select().from(jobs)).filter(job => job.draft?.partialRolloutT1Index !== undefined);
+    expect(slots.map(job => job.draft!.partialRolloutT1Index).sort()).toEqual([0, 1]);
+    expect(slots.find(job => job.draft?.partialRolloutT1Index === 0)?.status).toBe("cancelled");
+    expect(slots.find(job => job.draft?.partialRolloutT1Index === 1)?.status).toBe("review");
+  });
+  it("assigns a stable sequence slot to a legacy queued draft without DDL", async () => {
+    await enablePartial(50); const send = mockDelivery();
+    const receipt = await service.receiveSupportEmail(realInput("legacy-queued"));
+    const [job] = await database.db.select().from(jobs);
+    await database.db.update(jobs).set({ stage: "send", draft: { tier: "T1", language: "en", intent: "tracking", needsHuman: false, reason: "", reply: "Legacy safe reply" }, runAt: new Date(0), sendAfter: new Date(0) }).where(eq(jobs.id, job.id));
+    await service.runSupportEmailJobs();
+    const details = await service.supportEmailDetails(receipt.conversationId!);
+    expect(details.jobs[0]).toMatchObject({ status: "review", draft: { partialRolloutT1Index: 0 } });
+    expect(emailNotAnswered(details.conversation)).toBe(true);
+    expect(send).not.toHaveBeenCalled();
   });
   it.each([
     ["T2", "I want a refund"], ["T3", "This caused side effects"],
@@ -464,6 +533,8 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     await service.runSupportEmailJobs();
     const details = await service.supportEmailDetails(receipt.conversationId!);
     expect(details.conversation).toMatchObject({ tier, requiresHuman: true, owner: "human", status: "awaiting_human" });
+    expect(emailNotAnswered(details.conversation)).toBe(true);
+    expect(details.jobs[0].draft?.partialRolloutT1Index).toBeUndefined();
     expect(details.jobs[0]).toMatchObject({ stage: "send", status: "review", draft: { tier, needsHuman: true, reply: expect.any(String) } });
     await expect(service.supportEmailAction(receipt.conversationId!, "approve", details.jobs[0].id)).rejects.toHaveProperty("status", 409);
     await expect(service.supportEmailAction(receipt.conversationId!, "resume")).rejects.toHaveProperty("status", 409);
@@ -514,6 +585,8 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     for (let i = 0; i < 3; i++) { await retryDue(); await service.runSupportEmailJobs(); }
     const [job] = await database.db.select().from(jobs);
     expect(job.status).toBe("review");
+    expect(emailNotAnswered((await service.supportEmailDetails(receipt.conversationId!)).conversation)).toBe(true);
+    expect(job.draft?.partialRolloutT1Index).toBeUndefined();
     await expect(service.supportEmailAction(receipt.conversationId!, "approve", job.id)).rejects.toHaveProperty("status", 409);
     await database.db.update(jobs).set({ status: "queued", runAt: new Date(0), sendAfter: new Date(0) });
     await service.runSupportEmailJobs(); expect(send).not.toHaveBeenCalled();
@@ -555,6 +628,7 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     const queue = await database.db.select().from(jobs);
     expect(queue.find(j => j.stage === "send")?.status).toBe("cancelled");
     expect(queue.find(j => j.stage === "manual_send")?.status).toBe("succeeded");
+    expect(emailNotAnswered((await service.supportEmailDetails(receipt.conversationId!)).conversation)).toBe(false);
   });
   it("persists rollout settings with audit and concurrency protection", async () => {
     const { saveSupportEmailTone, readSupportEmailTone } = await import("./support-email-tone");

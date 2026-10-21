@@ -118,16 +118,17 @@ export function usesPartialEmailRollout(email: string, rollout: PartialEmailRoll
   return rollout.partialRolloutEnabled && !supportEmailConfig().allowedRecipients.includes(email.toLowerCase());
 }
 
-/** Stable, nested cohorts: increasing the percentage never removes a selected ticket. */
-export function sampledT1Ticket(ticketId: string, percent: number) {
+/** Spread sends evenly over eligible T1 decisions: at 50%, hold/send alternate. */
+export function sampledT1Ticket(processedT1Count: number | undefined, percent: number) {
   if (!Number.isInteger(percent) || percent < 0 || percent > 100) return false;
-  const bucket = createHash("sha256").update(`support-email-t1:v1:${ticketId}`).digest().readUInt32BE(0) % 100;
-  return bucket < percent;
+  if (processedT1Count === undefined || !Number.isSafeInteger(processedT1Count) || processedT1Count < 0) return false;
+  const n = processedT1Count % 100;
+  return Math.floor((n + 1) * percent / 100) > Math.floor(n * percent / 100);
 }
 
-export function canAutoDeliverEmail(email: string, ticketId: string, tier: string, rollout: PartialEmailRollout) {
+export function canAutoDeliverEmail(email: string, processedT1Count: number | undefined, tier: string, rollout: PartialEmailRollout) {
   if (usesPartialEmailRollout(email, rollout)) {
-    return supportEmailConfig().mode !== "off" && tier === "T1" && sampledT1Ticket(ticketId, rollout.t1SendPercent);
+    return supportEmailConfig().mode !== "off" && tier === "T1" && sampledT1Ticket(processedT1Count, rollout.t1SendPercent);
   }
   return tier !== "T3" && canDeliverEmail(email);
 }
