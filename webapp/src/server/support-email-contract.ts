@@ -111,8 +111,30 @@ export function supportEmailConfig() {
   };
 }
 
-export function canDeliverEmail(email: string) {
+export type PartialEmailRollout = { partialRolloutEnabled: boolean; t1SendPercent: number };
+
+/** Exact pilot allowlist keeps its original behavior even during partial rollout. */
+export function usesPartialEmailRollout(email: string, rollout: PartialEmailRollout) {
+  return rollout.partialRolloutEnabled && !supportEmailConfig().allowedRecipients.includes(email.toLowerCase());
+}
+
+/** Stable, nested cohorts: increasing the percentage never removes a selected ticket. */
+export function sampledT1Ticket(ticketId: string, percent: number) {
+  if (!Number.isInteger(percent) || percent < 0 || percent > 100) return false;
+  const bucket = createHash("sha256").update(`support-email-t1:v1:${ticketId}`).digest().readUInt32BE(0) % 100;
+  return bucket < percent;
+}
+
+export function canAutoDeliverEmail(email: string, ticketId: string, tier: string, rollout: PartialEmailRollout) {
+  if (usesPartialEmailRollout(email, rollout)) {
+    return supportEmailConfig().mode !== "off" && tier === "T1" && sampledT1Ticket(ticketId, rollout.t1SendPercent);
+  }
+  return tier !== "T3" && canDeliverEmail(email);
+}
+
+export function canDeliverEmail(email: string, rollout?: PartialEmailRollout) {
   const config = supportEmailConfig();
+  if (rollout && usesPartialEmailRollout(email, rollout)) return config.mode !== "off";
   return config.mode === "live" || (config.mode === "pilot" && config.allowedRecipients.includes(email.toLowerCase()));
 }
 
@@ -165,8 +187,8 @@ export function outboundEmailPayload(input: { requestId: string; conversationId:
   };
 }
 
-export async function deliverSupportEmail(payload: ReturnType<typeof outboundEmailPayload>) {
-  if (!canDeliverEmail(payload.to)) return { status: "blocked" as const, error: "delivery_disabled_for_recipient" };
+export async function deliverSupportEmail(payload: ReturnType<typeof outboundEmailPayload>, rollout?: PartialEmailRollout) {
+  if (!canDeliverEmail(payload.to, rollout)) return { status: "blocked" as const, error: "delivery_disabled_for_recipient" };
   if (payload.event !== "email.reply" || !payload.threadId.trim() || payload.threadId.startsWith("local:") || !payload.inboundMessageId.trim()) return { status: "blocked" as const, error: "email_thread_required" };
   const url = process.env.SUPPORT_EMAIL_OUTBOUND_WEBHOOK_URL;
   const key = process.env.SUPPORT_EMAIL_OUTBOUND_API_KEY;

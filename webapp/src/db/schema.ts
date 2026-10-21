@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  check,
   text,
   integer,
   serial,
@@ -449,12 +450,14 @@ export const supportEmailTone = pgTable("support_email_tone", {
   id: text("id").primaryKey(),
   instructions: text("instructions").notNull().default(""),
   avoidInstructions: text("avoid_instructions").notNull().default(""),
+  partialRolloutEnabled: boolean("partial_rollout_enabled").notNull().default(false),
+  t1SendPercent: integer("t1_send_percent").notNull().default(0),
   minDelayMinutes: integer("min_delay_minutes"),
   maxDelayMinutes: integer("max_delay_minutes"),
   version: integer("version").notNull().default(1),
   updatedBy: text("updated_by").references(() => adminUsers.id),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-});
+}, (table) => [check("support_email_t1_send_percent_range", sql`${table.t1SendPercent} between 0 and 100`)]);
 
 export type Customer = typeof customers.$inferSelect;
 export type User = typeof users.$inferSelect;

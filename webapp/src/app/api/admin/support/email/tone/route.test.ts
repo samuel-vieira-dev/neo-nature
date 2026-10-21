@@ -31,3 +31,19 @@ it("rejects oversized instructions before saving", async () => {
   expect((await PUT(request("x".repeat(4001)))).status).toBe(400);
   expect(save).not.toHaveBeenCalled();
 });
+
+it.each([-1, 101, 1.5, "10"])("rejects invalid rollout percentages (%s) before saving", async t1SendPercent => {
+  session.mockResolvedValue("staff"); staff.mockResolvedValue({ id: "staff", role: "cs", active: true });
+  const req = new Request("https://example.com/api/admin/support/email/tone", { method: "PUT", body: JSON.stringify({ instructions: "", version: 0, partialRolloutEnabled: true, t1SendPercent }) });
+  expect((await PUT(req)).status).toBe(400);
+  expect(save).not.toHaveBeenCalled();
+});
+it("requires write permission to activate rollout and forwards validated settings", async () => {
+  session.mockResolvedValue("staff"); staff.mockResolvedValue({ id: "staff", role: "tauk", active: true });
+  const req = () => new Request("https://example.com/api/admin/support/email/tone", { method: "PUT", body: JSON.stringify({ instructions: "", version: 0, partialRolloutEnabled: true, t1SendPercent: 10 }) });
+  expect((await PUT(req())).status).toBe(403);
+  expect(save).not.toHaveBeenCalled();
+  staff.mockResolvedValue({ id: "staff", role: "admin", active: true }); save.mockResolvedValue({ version: 1 });
+  expect((await PUT(req())).status).toBe(200);
+  expect(save).toHaveBeenCalledWith({ instructions: "", version: 0, partialRolloutEnabled: true, t1SendPercent: 10 }, expect.objectContaining({ role: "admin" }));
+});

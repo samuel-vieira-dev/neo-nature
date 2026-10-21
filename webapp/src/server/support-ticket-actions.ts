@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { adminActionLogs, adminUsers, supportEmailConversations as conversations, supportEmailMessages as messages, supportEmailJobs as jobs, tickets } from "@/db/schema";
 import { canDeliverEmail } from "./support-email-contract";
+import { readSupportEmailTone } from "./support-email-tone";
 import { withConversationLock } from "./support-email";
 import { TICKET_STATUSES, TICKET_STATUS_LABELS } from "@/lib/support-tickets";
 import type { AdminContext } from "./admin";
@@ -21,7 +22,7 @@ export async function ticketAction(id: string, data: z.infer<typeof ticketAction
         if (existing.conversationId !== id || existing.actorAdminId !== admin.id || existing.draft?.reply !== data.text || existing.replyStatus !== data.status) throw Response.json({ error: "request_id_conflict" }, { status: 409 });
         return { ok: true, jobId: existing.id, deduped: true };
       }
-      if (!canDeliverEmail(c.email)) throw Response.json({ error: "pilot_recipient_not_allowed" }, { status: 403 });
+      if (!canDeliverEmail(c.email, await readSupportEmailTone())) throw Response.json({ error: "pilot_recipient_not_allowed" }, { status: 403 });
       if (c.threadId.startsWith("local:")) throw Response.json({ error: "email_thread_required" }, { status: 409 });
       if (c.latestMessageId !== data.expectedMessageId || c.updatedAt.toISOString() !== new Date(data.expectedUpdatedAt).toISOString()) throw Response.json({ error: "ticket_changed_reload_before_replying" }, { status: 409 });
       const pending = await tx.query.supportEmailJobs.findFirst({ where: and(eq(jobs.conversationId, id), inArray(jobs.status, ["unknown", "processing"] )) });
