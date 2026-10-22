@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  customType,
   pgTable,
   check,
   text,
@@ -540,6 +541,14 @@ export const supportKnowledgeRevisions = pgTable("support_knowledge_revisions", 
   action: text("action").notNull(), adminId: text("admin_id"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, t => [uniqueIndex("support_knowledge_revision").on(t.articleId, t.version)]);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+/** Knowledge editor images/GIFs, stored in Postgres and served by /api/knowledge-images/[id]. */
+export const supportKnowledgeImages = pgTable("support_knowledge_images", {
+  id: text("id").primaryKey(), filename: text("filename").notNull(), contentType: text("content_type").notNull(),
+  size: integer("size").notNull(), data: bytea("data").notNull(), createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [check("support_knowledge_images_size", sql`${t.size} > 0 and ${t.size} <= 5242880`)]);
 
 export const supportTicketAttachments = pgTable("support_ticket_attachments", {
   id: text("id").primaryKey(), messageId: text("message_id").notNull().references(() => supportEmailMessages.id),

@@ -339,7 +339,7 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
   });
   it("publishes one shared knowledge source with draft isolation and conflict protection",async()=>{
     const {saveKnowledge,publishedKnowledge}=await import("./support-knowledge");const staff=await createStaff();
-    const first=await saveKnowledge({title:"Shipping policy",content:"Approved shipping policy",category:"Shipping",channels:["email","webapp"],version:0,action:"publish"},staff);
+    const first=await saveKnowledge({title:"Shipping policy",content:"Approved shipping policy",category:"Shipping & Delivery",channels:["email","webapp"],version:0,action:"publish"},staff);
     const next=await saveKnowledge({id:first.id,title:first.title,content:"Unpublished draft",category:first.category,channels:["email"],version:first.version,action:"save"},staff);
     expect((await publishedKnowledge("email"))[0].content).toBe("Approved shipping policy");expect((await publishedKnowledge("webapp"))[0].content).toBe("Approved shipping policy");
     await expect(saveKnowledge({id:first.id,title:first.title,content:"Conflict",category:first.category,channels:["email"],version:first.version,action:"publish"},staff)).rejects.toHaveProperty("status",409);
@@ -776,4 +776,55 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     expect((await reprocessT1T2Handoffs(database.db, true)).selected).toBe(0);
   });
 
+  it("outage backfill: dry-run changes nothing, --execute re-queues only untouched T1 tickets through the shared counter", async () => {
+    await enablePartial(50); const send = mockDelivery();
+    const { backfillOutageT1 } = await import("./support-email-backfill");
+    const receipts = [];
+    for (const id of ["outage-a", "outage-b", "outage-replied", "outage-staff"]) receipts.push(await service.receiveSupportEmail(realInput(id)));
+    // Simulate the outage: generation never completed for any of them.
+    await database.db.update(jobs).set({ status: "failed", error: "generation_failed", attempts: 3 });
+    await database.db.update(conversations).set({ status: "generation_failed" });
+    const [, , replied, staff] = receipts;
+    await database.db.insert(messages).values({ id: "manual-reply", conversationId: replied.conversationId!, dedupeKey: "manual-reply", providerMessageId: "p", direction: "outgoing", authorAdminId: null, subject: "Re", text: "Answered from Gmail", receivedAt: new Date() });
+    await database.db.update(conversations).set({ assignedAdminId: "admin-1" }).where(eq(conversations.id, staff.conversationId!));
+    const window = { since: new Date(Date.now() - 3_600_000), until: new Date(Date.now() + 60_000), limit: 100 };
+    const rollout = { partialRolloutEnabled: true, t1SendPercent: 50 };
+    const dry = await backfillOutageT1(database.db, { ...window, execute: false }, rollout);
+    expect(dry).toMatchObject({ scanned: 4, eligible: 2, skippedByReason: { replied: 1, staff_touched: 1 }, queued: [] });
+    expect(dry.candidates.map(c => c.projected)).toEqual(["not_answered", "send_if_still_T1"]);
+    expect((await database.db.select().from(jobs)).every(j => j.status === "failed")).toBe(true);
+    await expect(backfillOutageT1(database.db, { ...window, execute: true }, { partialRolloutEnabled: false, t1SendPercent: 50 })).rejects.toThrow(/Partial rollout is disabled/);
+    const run = await backfillOutageT1(database.db, { ...window, execute: true }, rollout);
+    expect(run.queued).toHaveLength(2);
+    await database.db.update(jobs).set({ runAt: new Date(0) }).where(eq(jobs.status, "queued"));
+    await service.runSupportEmailJobs(10);
+    await database.db.update(jobs).set({ runAt: new Date(0), sendAfter: new Date(0) }).where(eq(jobs.status, "queued"));
+    await service.runSupportEmailJobs(10);
+    expect(send).toHaveBeenCalledTimes(1);
+    const states = await Promise.all(receipts.slice(0, 2).map(r => service.supportEmailDetails(r.conversationId!)));
+    expect(states.map(d => d.jobs[0].draft?.partialRolloutT1Index).sort()).toEqual([0, 1]);
+    expect(states.map(d => emailNotAnswered(d.conversation)).sort()).toEqual([false, true]);
+    // A second execute finds nothing left to do (decisions are recorded).
+    const again = await backfillOutageT1(database.db, { ...window, execute: true }, rollout);
+    expect(again.queued).toHaveLength(0);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+  it("knowledge images: DDL is idempotent and uploads are type-checked and stored in Postgres", async () => {
+    for (let i = 0; i < 2; i++) execFileSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/add-knowledge-images.ts"], { cwd: process.cwd(), env: { ...process.env }, stdio: "pipe" });
+    const knowledge = await import("./support-knowledge");
+    const admin = { id: "admin-1" } as Parameters<typeof knowledge.saveKnowledgeImage>[1];
+    const gif = new File([new TextEncoder().encode("GIF89a\x01\x00\x01\x00")], "anim.gif", { type: "image/gif" });
+    const saved = await knowledge.saveKnowledgeImage(gif, admin);
+    expect(saved).toMatchObject({ contentType: "image/gif", url: `/api/knowledge-images/${saved.id}` });
+    expect((await knowledge.readKnowledgeImage(saved.id))?.data.subarray(0, 6).toString()).toBe("GIF89a");
+    await expect(knowledge.saveKnowledgeImage(new File(["<svg/>"], "x.png", { type: "image/png" }), admin)).rejects.toHaveProperty("status", 415);
+    const article = await knowledge.saveKnowledge({ title: "Refund policy", content: `<p><b>60 days</b><script>x</script><img src="${saved.url}" alt="How"></p>`, category: "Returns & Refunds", channels: ["webapp", "email"], version: 0, action: "publish" }, admin);
+    expect(article.content).toBe(`<p><strong>60 days</strong><img src="${saved.url}" alt="How" loading="lazy"></p>`);
+    const [published] = await knowledge.publishedKnowledge("webapp");
+    expect(published).toMatchObject({ content: "60 days[image: How]", html: article.content });
+    await expect(knowledge.saveKnowledge({ title: "Other", content: "x", category: "General", channels: ["email"], version: 0, action: "save" }, admin)).rejects.toHaveProperty("status", 400);
+    // Legacy categories stay editable without forcing a recategorization.
+    await database.db.insert(supportKnowledgeArticles).values({ id: "legacy-article", title: "Legacy", content: "Old plain text", category: "General", version: 1 });
+    expect(await knowledge.saveKnowledge({ id: "legacy-article", title: "Legacy", content: "Old plain text", category: "General", channels: ["email"], version: 1, action: "save" }, admin)).toMatchObject({ category: "General", content: "Old plain text", version: 2 });
+  });
 });

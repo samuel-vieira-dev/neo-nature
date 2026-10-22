@@ -6,6 +6,7 @@ import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search,
 import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
 import { useQuery } from "@tanstack/react-query";
+import { RICH_TEXT } from "@/lib/knowledge";
 
 const suggestions = ["When will I feel results?", "What's this charge on my card?", "What's your refund policy?"];
 
@@ -115,8 +116,9 @@ const ticketStatus = {
 export default function SupportPage() {
   const { data } = useTickets();
   const tickets = data?.tickets ?? [];
-  const knowledge = useQuery({ queryKey: ["published-faq"], queryFn: async () => { const res=await fetch("/api/faq"); if(!res.ok) throw new Error("faq_unavailable"); return res.json() as Promise<{articles:{id:string;title:string;content:string}[]}>; } });
-  const faqs=(knowledge.data?.articles ?? []).map(a=>({q:a.title,a:a.content}));
+  const knowledge = useQuery({ queryKey: ["published-faq"], queryFn: async () => { const res=await fetch("/api/faq"); if(!res.ok) throw new Error("faq_unavailable"); return res.json() as Promise<{articles:{id:string;title:string;content:string;html:string}[]}>; } });
+  // `html` is sanitized server-side (allowlisted tags, own image route only).
+  const faqs=(knowledge.data?.articles ?? []).map(a=>({q:a.title,html:a.html}));
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
@@ -194,7 +196,7 @@ export default function SupportPage() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <p className="px-4 pb-4 text-sm leading-relaxed text-muted">{f.a}</p>
+                      <div className={`px-4 pb-4 text-sm leading-relaxed text-muted ${RICH_TEXT}`} dangerouslySetInnerHTML={{ __html: f.html }} />
                     </motion.div>
                   )}
                 </AnimatePresence>
