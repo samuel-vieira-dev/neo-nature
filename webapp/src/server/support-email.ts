@@ -132,6 +132,12 @@ async function prepareJob(job: Job, c: Conversation, incoming: Message) {
       return;
     }
     const human = draft.needsHuman;
+    if (!human && draft.tier === "T1" && draft.intent === "no_reply") {
+      // Spam, marketing, vendor pitches: close without replying and without using a T1 rollout slot.
+      await tx.update(conversations).set({ tier: "T1", language: draft.language, requiresHuman: false, owner: "agent", ticketStatus: "closed", status: "no_reply", escalationReason: `No reply sent: ${draft.reason}`.slice(0, 1000), updatedAt: new Date() }).where(eq(conversations.id, c.id));
+      await tx.update(jobs).set({ draft: { ...draft }, status: "cancelled", error: "no_reply_not_customer" }).where(eq(jobs.id, job.id));
+      return;
+    }
     const storedDraft: NonNullable<Job["draft"]> = { ...draft };
     if (job.draft?.partialRolloutT1Index !== undefined) storedDraft.partialRolloutT1Index = job.draft.partialRolloutT1Index;
     if (partial && !human && draft.tier === "T1") storedDraft.partialRolloutT1Index = await partialT1Index(tx, job);

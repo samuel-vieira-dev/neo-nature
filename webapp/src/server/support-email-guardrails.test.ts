@@ -153,3 +153,17 @@ it("lists several orders without a selected one only when each tracking follows 
   const shared = { ...second, trackingCode: order.trackingCode, trackingUrl: order.trackingUrl };
   expect(validateEmailDecision({ ...decision, intent: "tracking", reply: `Orders ${order.number} and ${shared.number} ship together: ${order.trackingCode}` }, { ...context, orders: [order, shared], selectedOrderNumber: null }).reply).toContain(order.trackingCode);
 });
+it("accepts no_reply for non-customer mail, but never for senders with orders or staff requests", () => {
+  const noReply = (overrides: Partial<SupportEmailContext>, incoming = "Some cleaning products I've picked out for you") => validateEmailDecision({ ...decision, intent: "no_reply", reply: "Thanks!" }, { ...context, incoming, ...overrides });
+  expect(noReply({ orders: [] })).toMatchObject({ intent: "no_reply", reply: "", tier: "T1", needsHuman: false });
+  expect(() => noReply({})).toThrow(EmailReplyRejected);
+});
+it.each([
+  "For partnership inquiries, please contact our business development team.",
+  "Please reach out through our main contact form or sales team.",
+  "Log into your account on the Orders tab and cancel one of the orders directly.",
+  "You can cancel it in the app before payment processes.",
+])("rejects invented teams, channels or features: %s", reply => {
+  expect(() => validate(reply)).toThrow(EmailReplyRejected);
+  expect(validate(reply, { knowledge: [...context.knowledge!, { id: "x", title: "Paths", content: reply }] }).reply).toBe(reply);
+});
