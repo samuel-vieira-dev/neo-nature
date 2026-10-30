@@ -143,3 +143,13 @@ it("rejects offers to arrange replacements and 'immediately' commitments but kee
   expect(() => validate("A replacement can be shipped immediately.", noOrders)).toThrow(EmailReplyRejected);
   expect(validate("You can request a refund here: " + context.refundUrl, noOrders).reply).toContain("You can request a refund");
 });
+it("lists several orders without a selected one only when each tracking follows its own order number", () => {
+  const second = { ...order, number: "ORDER2222222222", trackingCode: "9400111111111111111111", trackingUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111111111111111111" };
+  const ctx = { orders: [order, second], selectedOrderNumber: null };
+  const tracking = (reply: string) => validateEmailDecision({ ...decision, intent: "tracking", reply }, { ...context, ...ctx });
+  expect(tracking(`Order ${order.number}: shipped, tracking ${order.trackingCode} ${order.trackingUrl}\nOrder ${second.number}: shipped, tracking ${second.trackingCode} ${second.trackingUrl}`).reply).toContain(second.trackingCode);
+  expect(() => tracking(`Order ${order.number} and order ${second.number}: tracking ${order.trackingCode}`)).toThrow(EmailReplyRejected);
+  expect(() => tracking(`Your tracking code is ${order.trackingCode}`)).toThrow(EmailReplyRejected);
+  const shared = { ...second, trackingCode: order.trackingCode, trackingUrl: order.trackingUrl };
+  expect(validateEmailDecision({ ...decision, intent: "tracking", reply: `Orders ${order.number} and ${shared.number} ship together: ${order.trackingCode}` }, { ...context, orders: [order, shared], selectedOrderNumber: null }).reply).toContain(order.trackingCode);
+});
