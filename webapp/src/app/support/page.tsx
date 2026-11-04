@@ -130,51 +130,8 @@ export default function SupportPage() {
         <AskAI />
       </FadeUp>
 
-      <FadeUp delay={0.04} className="mt-4 px-5">
-        <CTA href="/support/new">
-          <MessageCirclePlus className="h-5 w-5" /> Open a ticket
-        </CTA>
-        <a
-          href="tel:+18772864137"
-          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:bg-amber-700"
-        >
-          <Phone className="h-5 w-5 text-white" /> Call us · +1 877 286 4137
-        </a>
-        <p className="mt-2 text-center text-sm text-muted">
-          Problems, refunds, wrong items — we make it right, no hoops.
-        </p>
-      </FadeUp>
-
-      {/* tickets */}
-      <FadeUp delay={0.06} className="mt-6 px-5">
-        <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Your tickets</h3>
-        {tickets.length === 0 ? (
-          <div className="card rounded-2xl p-6 text-center text-base text-muted">No tickets yet — all smooth 🙌</div>
-        ) : (
-          <div className="space-y-3">
-            {tickets.map((t) => {
-              const s = ticketStatus[t.status as keyof typeof ticketStatus] ?? { tone: "blue" as const, label: t.status.replaceAll("_", " "), icon: Clock };
-              return (
-                <div key={t.id} className="card rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-semibold leading-snug text-[var(--text)]">{t.subject}</p>
-                      <p className="mt-0.5 text-sm text-muted">
-                        {t.id} · Order {t.orderNumber} · {t.date}
-                      </p>
-                    </div>
-                    <Chip tone={s.tone}>{s.label}</Chip>
-                  </div>
-                  {(data?.messages ?? []).filter(m=>m.legacyTicketId===t.id).length ? <details className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm"><summary className="cursor-pointer font-semibold">View conversation</summary><div className="mt-3 space-y-3">{data!.messages.filter(m=>m.legacyTicketId===t.id).map(m=><article key={m.id}><p className="text-xs text-muted">{m.direction==="incoming" ? "You" : "Neo Nature team"} · {new Date(m.receivedAt).toLocaleString()}</p><p className="whitespace-pre-wrap">{m.text}</p></article>)}</div></details> : <p className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-muted"><span className="font-semibold text-[var(--accent)]">Neo Nature team:</span> {t.lastMessage}</p>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </FadeUp>
-
-      {/* FAQ */}
-      <FadeUp delay={0.1} className="mt-6 px-5">
+      {/* FAQ — sits right under the search so customers try self-service before opening a ticket */}
+      {faqs.length > 0 && <FadeUp delay={0.04} className="mt-6 px-5">
         <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Quick answers</h3>
         <div className="space-y-2.5">
           {faqs.map((f, i) => {
@@ -204,6 +161,49 @@ export default function SupportPage() {
             );
           })}
         </div>
+      </FadeUp>}
+
+      <FadeUp delay={0.06} className="mt-6 px-5">
+        <CTA href="/support/new">
+          <MessageCirclePlus className="h-5 w-5" /> Open a ticket
+        </CTA>
+        <a
+          href="tel:+18772864137"
+          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:bg-amber-700"
+        >
+          <Phone className="h-5 w-5 text-white" /> Call us · +1 877 286 4137
+        </a>
+        <p className="mt-2 text-center text-sm text-muted">
+          Problems, refunds, wrong items — we make it right, no hoops.
+        </p>
+      </FadeUp>
+
+      {/* tickets */}
+      <FadeUp delay={0.1} className="mt-6 px-5">
+        <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Your tickets</h3>
+        {tickets.length === 0 ? (
+          <div className="card rounded-2xl p-6 text-center text-base text-muted">No tickets yet — all smooth 🙌</div>
+        ) : (
+          <div className="space-y-3">
+            {tickets.map((t) => {
+              const s = ticketStatus[t.status as keyof typeof ticketStatus] ?? { tone: "blue" as const, label: t.status.replaceAll("_", " "), icon: Clock };
+              return (
+                <div key={t.id} className="card rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold leading-snug text-[var(--text)]">{t.subject}</p>
+                      <p className="mt-0.5 text-sm text-muted">
+                        {t.id} · Order {t.orderNumber} · {t.date}
+                      </p>
+                    </div>
+                    <Chip tone={s.tone}>{s.label}</Chip>
+                  </div>
+                  {(data?.messages ?? []).filter(m=>m.legacyTicketId===t.id).length ? <details className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm"><summary className="cursor-pointer font-semibold">View conversation</summary><div className="mt-3 space-y-3">{data!.messages.filter(m=>m.legacyTicketId===t.id).map(m=><article key={m.id}><p className="text-xs text-muted">{m.direction==="incoming" ? "You" : "Neo Nature team"} · {new Date(m.receivedAt).toLocaleString()}</p><p className="whitespace-pre-wrap">{m.text}</p></article>)}</div></details> : <p className="mt-3 rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-muted"><span className="font-semibold text-[var(--accent)]">Neo Nature team:</span> {t.lastMessage}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </FadeUp>
     </div>
   );
