@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isKnowledgeCategory, knowledgeCategoryLabel, knowledgeToHtml, knowledgeToText, normalizeKnowledgeContent, sanitizeKnowledgeHtml, sniffKnowledgeImage } from "./knowledge";
+import { groupByKnowledgeCategory, isKnowledgeCategory, knowledgeCategoryLabel, knowledgeToHtml, knowledgeToText, moveInOrder, normalizeKnowledgeContent, quickAnswers, sanitizeKnowledgeHtml, sniffKnowledgeImage } from "./knowledge";
 
 const img = "/api/knowledge-images/0b5c3f4e-1a2b-4c3d-8e9f-0123456789ab";
 
@@ -61,5 +61,26 @@ describe("sniffKnowledgeImage", () => {
     expect(sniffKnowledgeImage(new TextEncoder().encode("GIF89a...."))).toBe("image/gif");
     expect(sniffKnowledgeImage(new TextEncoder().encode("RIFF\0\0\0\0WEBPVP8 "))).toBe("image/webp");
     expect(sniffKnowledgeImage(new TextEncoder().encode("<svg onload=alert(1)>"))).toBeNull();
+  });
+});
+
+describe("knowledge arrangement", () => {
+  const a = (id: string, featured = false, category = "Product Info") => ({ id, featured, category });
+
+  it("shows featured articles as Quick answers, else the first five in order", () => {
+    expect(quickAnswers([a("1"), a("2", true), a("3", true)]).map(x => x.id)).toEqual(["2", "3"]);
+    expect(quickAnswers(["1", "2", "3", "4", "5", "6"].map(id => a(id))).map(x => x.id)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(quickAnswers([])).toEqual([]);
+  });
+
+  it("groups by the fixed categories in order, legacy ones last", () => {
+    const groups = groupByKnowledgeCategory([a("1", false, "Returns & Refunds"), a("2", false, "General"), a("3", false, "Product Info"), a("4", false, "Returns & Refunds")]);
+    expect(groups.map(g => [g.category, g.items.map(i => i.id)])).toEqual([["Product Info", ["3"]], ["Returns & Refunds", ["1", "4"]], ["More answers", ["2"]]]);
+  });
+
+  it("moves an article into the target's slot", () => {
+    expect(moveInOrder(["a", "b", "c", "d"], "a", "c")).toEqual(["b", "c", "a", "d"]);
+    expect(moveInOrder(["a", "b", "c", "d"], "d", "b")).toEqual(["a", "d", "b", "c"]);
+    expect(moveInOrder(["a", "b"], "a", "missing")).toEqual(["a", "b"]);
   });
 });

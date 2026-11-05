@@ -6,6 +6,28 @@ export const KNOWLEDGE_CONTENT_MAX = 40_000;
 /** Tailwind descendant styles for rendered article HTML. */
 export const RICH_TEXT = "[&_a]:font-semibold [&_a]:text-[var(--accent)] [&_a]:underline [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_strong]:text-[var(--text)] [&_ul]:list-disc [&_ul]:pl-5";
 
+/** Webapp Quick answers: the featured articles, or the first few in order until staff pick some. */
+export const QUICK_ANSWERS_FALLBACK = 5;
+export function quickAnswers<T extends { featured: boolean }>(published: T[]) {
+  const featured = published.filter(a => a.featured);
+  return featured.length ? featured : published.slice(0, QUICK_ANSWERS_FALLBACK);
+}
+
+/** Groups articles by the fixed categories (in their order); anything else goes last as "More answers". */
+export function groupByKnowledgeCategory<T extends { category: string }>(items: T[]) {
+  const groups = [...KNOWLEDGE_CATEGORIES, UNCATEGORIZED].map(c => ({ category: c === UNCATEGORIZED ? "More answers" : c, items: items.filter(i => (isKnowledgeCategory(i.category) ? i.category : UNCATEGORIZED) === c) }));
+  return groups.filter(g => g.items.length > 0);
+}
+
+/** Moves `id` into `target`'s slot of the full order (admin drag & drop and arrow buttons). */
+export function moveInOrder(order: string[], id: string, target: string) {
+  const from = order.indexOf(id), to = order.indexOf(target);
+  if (from < 0 || to < 0 || from === to) return order;
+  const next = order.filter(x => x !== id);
+  next.splice(to, 0, id);
+  return next;
+}
+
 export function isKnowledgeCategory(value: string): value is KnowledgeCategory {
   return (KNOWLEDGE_CATEGORIES as readonly string[]).includes(value);
 }

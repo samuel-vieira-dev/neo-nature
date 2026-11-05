@@ -1,21 +1,59 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { adminActionLogs, supportKnowledgeArticles as articles, supportKnowledgeImages as images, supportKnowledgeRevisions as revisions } from "@/db/schema";
 import { KNOWLEDGE_CONTENT_MAX, KNOWLEDGE_IMAGE_MAX_BYTES, isKnowledgeCategory, knowledgeImagePath, knowledgeToHtml, knowledgeToText, normalizeKnowledgeContent, sniffKnowledgeImage } from "@/lib/knowledge";
 import type { AdminContext } from "./admin";
+import { adminNames } from "./admin-names";
 
 export const articleInput = z.object({ id: z.string().min(1).max(100).optional(), title: z.string().trim().min(3).max(200), content: z.string().trim().min(1).max(KNOWLEDGE_CONTENT_MAX), category: z.string().trim().min(1).max(80), channels: z.array(z.enum(["email", "webapp"])).min(1).max(2), version: z.number().int().min(0), action: z.enum(["save", "publish", "unpublish"]) }).strict();
+// Drag & drop position first; articles never arranged follow, oldest id first as before.
+const arranged = [sql`${articles.sortOrder} asc nulls last`, asc(articles.id)];
+async function publishedRows(channel: "email" | "webapp") {
+  const rows = await db.select({ id: articles.id, published: articles.published, version: articles.version, featured: articles.featured }).from(articles).orderBy(...arranged);
+  return rows.filter(r => r.published?.channels.includes(channel));
+}
 export async function publishedKnowledge(channel: "email" | "webapp") {
-  const rows = await db.select({ id: articles.id, published: articles.published, version: articles.version }).from(articles).orderBy(asc(articles.id));
   // `content` is plain text (AI prompts, guardrails); `html` is sanitized for the webapp.
-  return rows.filter(r => r.published?.channels.includes(channel)).map(r => ({ id: r.id, version: r.version, title: r.published!.title, content: knowledgeToText(r.published!.content), html: knowledgeToHtml(r.published!.content), category: r.published!.category }));
+  return (await publishedRows(channel)).map(r => ({ id: r.id, version: r.version, title: r.published!.title, content: knowledgeToText(r.published!.content), html: knowledgeToHtml(r.published!.content), category: r.published!.category }));
+}
+/** Webapp FAQ: the published articles plus the display-only featured flag. */
+export async function webappKnowledge() {
+  return (await publishedRows("webapp")).map(r => ({ id: r.id, title: r.published!.title, html: knowledgeToHtml(r.published!.content), category: r.published!.category, featured: r.featured }));
 }
 export async function listKnowledge() {
-  return db.select().from(articles).orderBy(desc(articles.updatedAt), asc(articles.id));
+  const rows = await db.select().from(articles).orderBy(...arranged);
+  const names = await adminNames(rows.map(r => r.updatedBy));
+  return rows.map(r => ({ ...r, updatedByAdmin: r.updatedBy ? names.get(r.updatedBy) ?? null : null }));
 }
 export async function knowledgeHistory(id: string) {
-  return db.select().from(revisions).where(eq(revisions.articleId, id)).orderBy(desc(revisions.version)).limit(50);
+  const rows = await db.select().from(revisions).where(eq(revisions.articleId, id)).orderBy(desc(revisions.version)).limit(50);
+  const names = await adminNames(rows.map(r => r.adminId));
+  return rows.map(r => ({ ...r, admin: r.adminId ? names.get(r.adminId) ?? null : null }));
+}
+
+export const arrangeInput = z.union([
+  z.object({ order: z.array(z.string().min(1).max(100)).min(1).max(1000) }).strict(),
+  z.object({ id: z.string().min(1).max(100), featured: z.boolean() }).strict(),
+]);
+/** Display-only changes (no new version): the full drag & drop order, or one featured flag. */
+export async function arrangeKnowledge(input: z.infer<typeof arrangeInput>, admin: AdminContext) {
+  const data = arrangeInput.parse(input);
+  return db.transaction(async tx => {
+    if ("order" in data) {
+      if (new Set(data.order).size !== data.order.length) throw Response.json({ error: "duplicate_article" }, { status: 400 });
+      const known = await tx.select({ id: articles.id }).from(articles).where(inArray(articles.id, data.order));
+      if (known.length !== data.order.length) throw Response.json({ error: "article_not_found" }, { status: 404 });
+      // One statement; ids not in the list keep their position (e.g. created meanwhile).
+      await tx.execute(sql`update support_knowledge_articles a set sort_order = o.pos from unnest(array[${sql.join(data.order.map(id => sql`${id}`), sql`, `)}]::text[]) with ordinality as o(id, pos) where a.id = o.id`);
+      await tx.insert(adminActionLogs).values({ adminUserId: admin.id, action: "support-knowledge.reorder", metadata: { count: data.order.length } });
+    } else {
+      const [row] = await tx.update(articles).set({ featured: data.featured }).where(eq(articles.id, data.id)).returning({ id: articles.id });
+      if (!row) throw Response.json({ error: "article_not_found" }, { status: 404 });
+      await tx.insert(adminActionLogs).values({ adminUserId: admin.id, action: data.featured ? "support-knowledge.feature" : "support-knowledge.unfeature", metadata: { articleId: data.id } });
+    }
+    return { ok: true };
+  });
 }
 export async function saveKnowledge(input: z.infer<typeof articleInput>, admin: AdminContext) {
   const data = articleInput.parse(input);
@@ -34,7 +72,7 @@ export async function saveKnowledge(input: z.infer<typeof articleInput>, admin: 
     if (!row) throw Response.json({ error: "article_changed_reload_before_saving" }, { status: 409 });
     await tx.insert(revisions).values({ articleId: id, version: row.version, snapshot, action: data.action, adminId: admin.id });
     await tx.insert(adminActionLogs).values({ adminUserId: admin.id, action: `support-knowledge.${data.action}`, metadata: { articleId: id, version: row.version } });
-    return row;
+    return { ...row, updatedByAdmin: { name: admin.name, email: admin.email } };
   });
 }
 

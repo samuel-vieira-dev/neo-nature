@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send, Phone } from "lucide-react";
+import { BookOpen, ChevronRight, MessageCirclePlus, Clock, CheckCircle2, CircleDot, Search, Sparkles, Send, Phone } from "lucide-react";
 import { useTickets } from "@/lib/hooks";
 import { FadeUp, PageHeader, Chip, CTA } from "@/components/ui";
-import { useQuery } from "@tanstack/react-query";
-import { RICH_TEXT } from "@/lib/knowledge";
+import Link from "next/link";
+import { FaqList, usePublishedFaq } from "@/components/FaqList";
+import { quickAnswers } from "@/lib/knowledge";
 
 const suggestions = ["When will I feel results?", "What's this charge on my card?", "What's your refund policy?"];
 
@@ -48,7 +49,7 @@ function AskAI() {
         </div>
         <button
           onClick={() => ask(question)}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-solid)]"
           aria-label="Ask"
         >
           <Send className="h-4 w-4 text-white" />
@@ -90,7 +91,7 @@ function AskAI() {
             {result.related.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {result.related.map((r) => (
-                  <button key={r} onClick={() => ask(r)} className="rounded-full bg-white px-2.5 py-1 text-xs text-muted">
+                  <button key={r} onClick={() => ask(r)} className="rounded-full bg-[var(--card)] px-2.5 py-1 text-xs text-muted">
                     {r}
                   </button>
                 ))}
@@ -116,10 +117,8 @@ const ticketStatus = {
 export default function SupportPage() {
   const { data } = useTickets();
   const tickets = data?.tickets ?? [];
-  const knowledge = useQuery({ queryKey: ["published-faq"], queryFn: async () => { const res=await fetch("/api/faq"); if(!res.ok) throw new Error("faq_unavailable"); return res.json() as Promise<{articles:{id:string;title:string;content:string;html:string}[]}>; } });
-  // `html` is sanitized server-side (allowlisted tags, own image route only).
-  const faqs=(knowledge.data?.articles ?? []).map(a=>({q:a.title,html:a.html}));
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const articles = usePublishedFaq().data?.articles ?? [];
+  const quick = quickAnswers(articles);
 
   return (
     <div>
@@ -131,36 +130,15 @@ export default function SupportPage() {
       </FadeUp>
 
       {/* FAQ — sits right under the search so customers try self-service before opening a ticket */}
-      {faqs.length > 0 && <FadeUp delay={0.04} className="mt-6 px-5">
+      {quick.length > 0 && <FadeUp delay={0.04} className="mt-6 px-5">
         <h3 className="mb-3 font-display text-lg font-bold text-[var(--text)]">Quick answers</h3>
-        <div className="space-y-2.5">
-          {faqs.map((f, i) => {
-            const open = openFaq === i;
-            return (
-              <div key={i} className="card overflow-hidden rounded-2xl">
-                <button
-                  onClick={() => setOpenFaq(open ? null : i)}
-                  className="flex min-h-[52px] w-full items-center justify-between px-4 py-3.5 text-left text-base font-semibold text-[var(--text)]"
-                >
-                  {f.q}
-                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
-                </button>
-                <AnimatePresence initial={false}>
-                  {open && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className={`px-4 pb-4 text-sm leading-relaxed text-muted ${RICH_TEXT}`} dangerouslySetInnerHTML={{ __html: f.html }} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </div>
+        <FaqList articles={quick} />
+        <Link href="/support/knowledge" className="card mt-3 flex min-h-[56px] items-center gap-3 rounded-2xl px-4 text-base font-semibold text-[var(--accent)]">
+          <BookOpen className="h-5 w-5 shrink-0" />
+          <span className="flex-1">Knowledge base</span>
+          <span className="text-sm font-normal text-muted">{articles.length} {articles.length === 1 ? "answer" : "answers"}</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
+        </Link>
       </FadeUp>}
 
       <FadeUp delay={0.06} className="mt-6 px-5">
@@ -169,7 +147,7 @@ export default function SupportPage() {
         </CTA>
         <a
           href="tel:+18772864137"
-          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:bg-amber-700"
+          className="mt-3 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-amber-600 text-base font-bold text-white active:brightness-95"
         >
           <Phone className="h-5 w-5 text-white" /> Call us · +1 877 286 4137
         </a>

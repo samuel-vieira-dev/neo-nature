@@ -1,10 +1,11 @@
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { adminActionLogs, adminUsers, contentEbookProgress as progress, contentEbookRevisions as revisions, contentEbooks as ebooks, supportKnowledgeImages as images } from "@/db/schema";
+import { adminActionLogs, contentEbookProgress as progress, contentEbookRevisions as revisions, contentEbooks as ebooks, supportKnowledgeImages as images } from "@/db/schema";
 import { EBOOK_ACTIONS, EBOOK_CHAPTER_TITLE_MAX, EBOOK_CONTENT_MAX, EBOOK_MAX_CHAPTERS, EBOOK_SUMMARY_MAX, isContentCategory, type EbookAction, type EbookSnapshot, type EbookStatus, type ReaderEbook } from "@/lib/content";
 import { knowledgeImagePath, knowledgeToHtml, knowledgeToText, normalizeKnowledgeContent } from "@/lib/knowledge";
 import type { AdminContext } from "./admin";
+import { adminNames } from "./admin-names";
 
 const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 export const ebookInput = z.object({
@@ -46,13 +47,6 @@ export function nextEbookStatus(action: EbookAction): EbookStatus {
 /** Publishing (and taking an e-book down) is limited to its author or an admin. */
 export function canPublishEbook(admin: Pick<AdminContext, "id" | "role">, createdBy: string | null | undefined) {
   return admin.role === "admin" || (!!createdBy && createdBy === admin.id);
-}
-
-async function adminNames(ids: (string | null)[]) {
-  const wanted = [...new Set(ids.filter((id): id is string => !!id))];
-  if (!wanted.length) return new Map<string, { name: string; email: string }>();
-  const rows = await db.select({ id: adminUsers.id, name: adminUsers.name, email: adminUsers.email }).from(adminUsers).where(inArray(adminUsers.id, wanted));
-  return new Map(rows.map(r => [r.id, { name: r.name, email: r.email }]));
 }
 
 export async function listEbooks() {
