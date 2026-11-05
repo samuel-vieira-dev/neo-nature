@@ -85,7 +85,7 @@ export default function OrdersPanel({ initial }: { initial: OrdersInitial }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={q}
@@ -94,12 +94,12 @@ export default function OrdersPanel({ initial }: { initial: OrdersInitial }) {
             className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
           />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>{s ? s[0].toUpperCase() + s.slice(1) : "Any status"}</option>
           ))}
         </select>
-        <select value={problem} onChange={(e) => setProblem(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={problem} onChange={(e) => setProblem(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           {ORDER_PROBLEMS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
@@ -117,7 +117,7 @@ export default function OrdersPanel({ initial }: { initial: OrdersInitial }) {
               ? `Showing ${data.offset + 1}–${data.offset + rows.length} of ${data.total} order${data.total === 1 ? "" : "s"}`
               : "0 orders"}
           </p>
-          <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+          <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
                 <tr>
@@ -195,7 +195,7 @@ export default function OrdersPanel({ initial }: { initial: OrdersInitial }) {
               <button
                 onClick={() => setOffset(Math.max(0, offset - LIMIT))}
                 disabled={offset === 0}
-                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+                className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
               >
                 ← Previous
               </button>
@@ -205,7 +205,7 @@ export default function OrdersPanel({ initial }: { initial: OrdersInitial }) {
               <button
                 onClick={() => setOffset(offset + LIMIT)}
                 disabled={offset + LIMIT >= data.total}
-                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+                className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
               >
                 Next →
               </button>

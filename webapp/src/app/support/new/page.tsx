@@ -275,7 +275,7 @@ export default function NewTicketPage() {
               transition={{ duration: 0.2 }}
               className="pt-6 text-center"
             >
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--accent)]">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--accent-solid)]">
                 <PartyPopper className="h-9 w-9 text-white" />
               </div>
               <h2 className="mt-5 font-display text-2xl font-bold text-[var(--text)]">

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui";
 import EbookReader from "@/components/EbookReader";
+import { ThemeToggleButton } from "@/components/ThemeControls";
 import type { ReaderEbook } from "@/lib/content";
 
 export default function EbookPage() {
@@ -30,7 +31,7 @@ export default function EbookPage() {
 
   return (
     <div>
-      <PageHeader title="Learn" backHref="/learn" />
+      <PageHeader title="Learn" backHref="/learn" action={<ThemeToggleButton />} />
       {query.isLoading ? (
         <p className="px-5 text-base text-muted">Loading…</p>
       ) : !ebook ? (

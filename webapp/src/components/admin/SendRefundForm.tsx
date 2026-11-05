@@ -48,7 +48,7 @@ export default function SendRefundForm({ orderId, email }: { orderId: string; em
   if (!canSend) return null;
   return <div className="mt-4 border-t border-[var(--border)] pt-4">
     <p className="mb-2 text-sm text-muted">Send the personalized refund form link to <strong className="break-all">{email || "customer without an email"}</strong>.</p>
-    <button type="button" disabled={busy || !email.trim()} onClick={send} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+    <button type="button" disabled={busy || !email.trim()} onClick={send} className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent-solid)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
       {busy ? "Sending…" : "Send refund form"}
     </button>

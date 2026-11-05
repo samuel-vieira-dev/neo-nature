@@ -18,7 +18,7 @@ export default function BottomNav() {
   if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
-    <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-md -translate-x-1/2 border-t border-[var(--border)] bg-white px-2 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-1px_8px_rgba(0,0,0,0.04)]">
+    <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-md -translate-x-1/2 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-1px_8px_rgba(0,0,0,0.04)]">
       <div className="flex items-center justify-around">
         {tabs.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);

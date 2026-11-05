@@ -66,13 +66,13 @@ export default function OrderTrackingCard({ order }: { order: OrderDto }) {
             <li key={i} className="flex flex-1 items-center gap-1.5">
               <span
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                  s.done ? "bg-[var(--accent)]" : "border-2 border-[var(--border)] bg-white"
+                  s.done ? "bg-[var(--accent-solid)]" : "border-2 border-[var(--border)] bg-[var(--card)]"
                 } ${s.current ? "ring-4 ring-[var(--accent-soft)]" : ""}`}
               >
                 {s.done && <Check className="h-3 w-3 text-white" strokeWidth={3.5} />}
               </span>
               {i < order.tracking.length - 1 && (
-                <span className={`h-0.5 flex-1 ${s.done ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`} />
+                <span className={`h-0.5 flex-1 ${s.done ? "bg-[var(--accent-solid)]" : "bg-[var(--border)]"}`} />
               )}
             </li>
           ))}
@@ -85,7 +85,7 @@ export default function OrderTrackingCard({ order }: { order: OrderDto }) {
             href={order.trackingUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] text-sm font-semibold text-white"
+            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent-solid)] text-sm font-semibold text-white"
           >
             <Truck className="h-4 w-4" /> Track package <ExternalLink className="h-3.5 w-3.5" />
           </a>

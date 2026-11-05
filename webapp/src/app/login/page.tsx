@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import Image from "next/image";
+import Logo from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Phone, KeyRound, ArrowRight, ChevronDown } from "lucide-react";
@@ -112,7 +112,7 @@ export default function LoginPage() {
     <div className="flex min-h-dvh flex-col justify-center px-6 pb-16">
       {/* brand */}
       <FadeUp className="text-center">
-        <Image src="/logo.svg" alt="Neo Nature" width={240} height={39} priority className="mx-auto h-10 w-auto" />
+        <Logo width={240} height={39} priority className="mx-auto h-10 w-auto" />
         <p className="mt-3 text-base text-muted">Your daily wellness companion</p>
       </FadeUp>
 

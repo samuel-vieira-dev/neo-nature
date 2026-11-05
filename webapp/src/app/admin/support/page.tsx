@@ -83,7 +83,7 @@ function StatCard({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`cursor-pointer rounded-2xl border bg-white p-4 text-left transition hover:border-[var(--accent)] ${
+      className={`cursor-pointer rounded-2xl border bg-[var(--card)] p-4 text-left transition hover:border-[var(--accent)] ${
         active ? "border-[var(--accent)] ring-1 ring-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"
       }`}
     >
@@ -113,7 +113,7 @@ function CustomersPanel() {
 
   return (
     <div>
-      <div className="flex min-w-[200px] items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3">
+      <div className="flex min-w-[200px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3">
         <Search className="h-4 w-4 text-muted" />
         <input
           value={q}
@@ -128,7 +128,7 @@ function CustomersPanel() {
       ) : isLoading ? (
         <p className="mt-4 text-sm text-muted">Loading…</p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
               <tr>

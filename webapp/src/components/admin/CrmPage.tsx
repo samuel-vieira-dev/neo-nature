@@ -83,7 +83,7 @@ const statusTones: Record<CustomerOrder["status"], string> = {
 
 function StatCard({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex items-center gap-2 text-muted">
         <Icon className={`h-4 w-4 ${tone}`} />
         <span className="text-xs font-semibold">{label}</span>
@@ -182,7 +182,7 @@ export default function CrmPage() {
 
       {/* revenue by platform / merchant account */}
       {stats && stats.revenueByPlatform.length > 0 && (
-        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
             <Store className="h-3.5 w-3.5" /> Revenue by platform &amp; merchant account
           </p>
@@ -199,7 +199,7 @@ export default function CrmPage() {
 
       {/* revenue by attribution (who sent the traffic) */}
       {stats && stats.revenueByOrigin.length > 0 && (
-        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
           <p className="text-xs font-semibold text-muted">Revenue by traffic attribution</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {stats.revenueByOrigin.slice(0, 8).map((r) => (
@@ -214,7 +214,7 @@ export default function CrmPage() {
 
       {/* filters */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3">
+        <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3">
           <Search className="h-4 w-4 text-muted" />
           <input
             value={q}
@@ -223,24 +223,24 @@ export default function CrmPage() {
             className="w-full bg-transparent py-2.5 text-sm focus:outline-none"
           />
         </div>
-        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           <option value="">All platforms</option>
           {data?.facets.platforms.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
-        <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           <option value="">All attributions</option>
           {data?.facets.origins.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-        <select value={product} onChange={(e) => setProduct(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={product} onChange={(e) => setProduct(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           <option value="">All products</option>
           {data?.facets.products.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           <option value="">Any status</option>
           <option value="active">Active</option>
           <option value="churned">Churned</option>
         </select>
-        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm font-semibold">
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold">
           <input type="checkbox" checked={reachable} onChange={(e) => setReachable(e.target.checked)} /> Push-reachable
         </label>
       </div>
@@ -254,7 +254,7 @@ export default function CrmPage() {
       </p>
 
       {/* table */}
-      <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+      <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -347,7 +347,7 @@ export default function CrmPage() {
                         ) : (
                           <div className="space-y-2">
                             {r.orders.map((o) => (
-                              <div key={o.id} className="rounded-xl border border-[var(--border)] bg-white p-3">
+                              <div key={o.id} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div className="flex items-center gap-2">
                                     <span className="font-display text-sm font-bold text-[var(--text)]">#{o.number}</span>
@@ -432,7 +432,7 @@ export default function CrmPage() {
           <button
             onClick={() => setOffset(Math.max(0, offset - (data.limit || 100)))}
             disabled={offset === 0}
-            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+            className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
           >
             ← Previous
           </button>
@@ -442,7 +442,7 @@ export default function CrmPage() {
           <button
             onClick={() => setOffset(offset + data.limit)}
             disabled={offset + data.limit >= data.filteredCount}
-            className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
+            className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 font-semibold text-[var(--text)] disabled:opacity-40"
           >
             Next →
           </button>

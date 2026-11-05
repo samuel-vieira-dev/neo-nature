@@ -52,7 +52,7 @@ export default function AdminAccountPage() {
       <h1 className="font-display text-2xl font-bold text-[var(--text)]">Account</h1>
       <p className="mt-1 text-sm text-muted">Your profile and password.</p>
 
-      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <UserCog className="h-4 w-4 text-[var(--accent)]" /> Profile
         </p>
@@ -69,7 +69,7 @@ export default function AdminAccountPage() {
         </div>
       </div>
 
-      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
           <KeyRound className="h-4 w-4 text-[var(--accent)]" /> Change password
         </p>
@@ -104,7 +104,7 @@ export default function AdminAccountPage() {
           onClick={submit}
           disabled={!canSubmit}
           className={`flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl py-2.5 font-display font-bold text-white ${
-            canSubmit ? "bg-[var(--accent)]" : "bg-[var(--border)] text-muted"
+            canSubmit ? "bg-[var(--accent-solid)]" : "bg-[var(--border)] text-muted"
           }`}
         >
           {changePassword.isPending ? "Saving…" : "Update password"}

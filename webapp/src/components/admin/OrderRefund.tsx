@@ -31,7 +31,7 @@ const errors: Record<string, string> = {
 };
 const errorText = (code: string) => errors[code] ?? "Unable to complete the request. Refresh the history and retry the same request if needed.";
 const button = "rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold disabled:opacity-50";
-const field = "mt-1 w-full rounded-lg border border-[var(--border)] bg-white p-2 text-sm";
+const field = "mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 text-sm";
 
 export default function OrderRefund({ orderId, orderNumber, platformKey }: { orderId: string; orderNumber: string; platformKey: string }) {
   const canRefund = useCan("orders:refund");

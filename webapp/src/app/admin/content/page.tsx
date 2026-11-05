@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ImagePlus, Monitor, Plus, Smartphone, Trash2, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Monitor, Moon, Plus, Smartphone, Sun, Trash2, X } from "lucide-react";
 import { adminApi } from "@/lib/adminApi";
 import { useAdmin, useCan } from "@/components/AdminProvider";
 import NoAccess from "@/components/NoAccess";
@@ -14,8 +14,8 @@ type Person = { name: string; email: string } | null;
 type Ebook = EbookSnapshot & { id: string; status: EbookStatus; published: EbookSnapshot | null; publishedAt: string | null; version: number; createdBy: string | null; createdAt: string; updatedAt: string; createdByAdmin: Person; updatedByAdmin: Person };
 type Revision = { version: number; snapshot: EbookSnapshot; status: EbookStatus; action: EbookAction; createdAt: string; admin: Person };
 
-const control = "rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm disabled:opacity-50";
-const primary = "rounded-xl border border-[var(--accent)] bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50";
+const control = "rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm disabled:opacity-50";
+const primary = "rounded-xl border border-[var(--accent)] bg-[var(--accent-solid)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50";
 const STATUS_TONE: Record<EbookStatus, string> = { draft: "bg-slate-100 text-slate-700", in_review: "bg-amber-50 text-amber-800", published: "bg-emerald-50 text-emerald-800" };
 const ACTION_LABELS: Record<EbookAction, string> = { save: "Saved draft", submit: "Sent to review", publish: "Published", unpublish: "Unpublished" };
 const who = (p: Person) => (p ? (p.name ? `${p.name} (${p.email})` : p.email) : "Unknown");
@@ -51,7 +51,7 @@ export default function ContentPage() {
     <input type="search" aria-label="Search by title" placeholder="Search by title…" className={`${control} w-full max-w-sm`} value={search} onChange={(e) => setSearch(e.target.value)} />
     {query.error && <p role="alert" className="text-rose-700">Could not load e-books. <button className="underline" onClick={() => query.refetch()}>Retry</button></p>}
     {query.isLoading ? <p>Loading…</p> : visible.length === 0 ? <p className="text-sm text-muted">{all.length ? "No e-books match." : "No e-books yet. Create the first one."}</p> : (
-      <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted"><tr><th className="px-4 py-3">Title</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Stage</th><th className="px-4 py-3">Live</th><th className="px-4 py-3">Last updated</th></tr></thead>
           <tbody>{visible.map((e) => <tr key={e.id} className="cursor-pointer border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface)]" onClick={() => setSelected(e.id)}>
@@ -77,6 +77,7 @@ function EbookEditor({ ebook, back, saved }: { ebook?: Ebook; back: () => void; 
   const [active, setActive] = useState(0);
   const [editorKey, setEditorKey] = useState(0);
   const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
+  const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
   const [previewChapter, setPreviewChapter] = useState<number | null>(null);
   const [showHistory, setHistory] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
@@ -143,7 +144,7 @@ function EbookEditor({ ebook, back, saved }: { ebook?: Ebook; back: () => void; 
     {mutation.error && <p role="alert" className="text-sm text-rose-700">{mutation.error.message.replaceAll("_", " ")}. Copy your changes before reloading.</p>}
 
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-      <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <label className="block text-sm">Title<input className={`${control} mt-1 w-full`} maxLength={200} value={title} disabled={busy} onChange={(e) => setTitle(e.target.value)} /></label>
         <label className="block text-sm">Category<select className={`${control} mt-1 w-full`} value={category} disabled={busy} onChange={(e) => setCategory(e.target.value)}>{!category && <option value="" disabled>Choose a category…</option>}{CONTENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
         <label className="block text-sm">Short description <span className="text-xs text-muted">(shown in the Learn list)</span><textarea className={`${control} mt-1 w-full`} rows={2} maxLength={EBOOK_SUMMARY_MAX} value={summary} disabled={busy} onChange={(e) => setSummary(e.target.value)} /></label>
@@ -161,7 +162,7 @@ function EbookEditor({ ebook, back, saved }: { ebook?: Ebook; back: () => void; 
         </div>
 
         <div className="border-t border-[var(--border)] pt-4">
-          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Chapters</h2><span className="text-xs text-muted">{length.toLocaleString()}/{EBOOK_CONTENT_MAX.toLocaleString()} characters in total</span></div>
+          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Chapters</h2><span className="text-xs text-muted">{length.toLocaleString("en-US")}/{EBOOK_CONTENT_MAX.toLocaleString("en-US")} characters in total</span></div>
           <div role="tablist" aria-label="Chapters" className="mt-2 flex flex-wrap gap-1.5">
             {chapters.map((c, i) => <button key={c.id} role="tab" aria-selected={i === active} className={`rounded-xl border px-3 py-1.5 text-sm ${i === active ? "border-[var(--accent)] bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "border-[var(--border)]"}`} onClick={() => { setActive(i); setPreviewChapter(i); }}>{i + 1}. {c.title.trim() || "Untitled"}</button>)}
             <button className={`${control} flex items-center gap-1`} disabled={busy || chapters.length >= EBOOK_MAX_CHAPTERS} onClick={addChapter}><Plus className="h-4 w-4" /> Add chapter</button>
@@ -186,24 +187,28 @@ function EbookEditor({ ebook, back, saved }: { ebook?: Ebook; back: () => void; 
 
       <aside className="space-y-3 self-start lg:sticky lg:top-20">
         <div className="flex items-center justify-between"><h2 className="font-semibold">Live preview</h2>
-          <div role="group" aria-label="Device" className="flex gap-1">
+          <div className="flex flex-wrap justify-end gap-1"><div role="group" aria-label="Device" className="flex gap-1">
             <button aria-pressed={device === "mobile"} className={`${control} flex items-center gap-1 ${device === "mobile" ? "border-[var(--accent)] text-[var(--accent)]" : ""}`} onClick={() => setDevice("mobile")}><Smartphone className="h-4 w-4" /> Mobile</button>
             <button aria-pressed={device === "desktop"} className={`${control} flex items-center gap-1 ${device === "desktop" ? "border-[var(--accent)] text-[var(--accent)]" : ""}`} onClick={() => setDevice("desktop")}><Monitor className="h-4 w-4" /> Desktop</button>
           </div>
+          <div role="group" aria-label="Theme" className="flex gap-1">
+            <button aria-pressed={previewTheme === "light"} aria-label="Light preview" title="Light" className={`${control} ${previewTheme === "light" ? "border-[var(--accent)] text-[var(--accent)]" : ""}`} onClick={() => setPreviewTheme("light")}><Sun className="h-4 w-4" /></button>
+            <button aria-pressed={previewTheme === "dark"} aria-label="Dark preview" title="Dark" className={`${control} ${previewTheme === "dark" ? "border-[var(--accent)] text-[var(--accent)]" : ""}`} onClick={() => setPreviewTheme("dark")}><Moon className="h-4 w-4" /></button>
+          </div></div>
         </div>
         {device === "mobile" ? (
-          <div className="mx-auto h-[700px] w-[375px] max-w-full overflow-y-auto rounded-[2rem] border-[6px] border-slate-800 bg-[var(--bg)] pt-4">
+          <div data-theme={previewTheme} className="mx-auto h-[700px] w-[375px] max-w-full overflow-y-auto rounded-[2rem] border-[6px] border-[#1f2a24] bg-[var(--bg)] pt-4">
             <EbookReader ebook={preview} chapter={previewAt} onChapter={setPreviewChapter} />
           </div>
         ) : (
           // A 1280×800 screen at 30%: the webapp keeps its phone-width column centred on desktop.
-          <div className="h-[240px] w-[384px] max-w-full overflow-hidden rounded-xl border-4 border-slate-800 bg-[var(--surface)]">
+          <div data-theme={previewTheme} className="h-[240px] w-[384px] max-w-full overflow-hidden rounded-xl border-4 border-[#1f2a24] bg-[var(--surface)]">
             <div className="h-[800px] w-[1280px] origin-top-left scale-[0.3] overflow-y-auto">
               <div className="mx-auto min-h-full w-full max-w-md bg-[var(--bg)] pt-6"><EbookReader ebook={preview} chapter={previewAt} onChapter={setPreviewChapter} /></div>
             </div>
           </div>
         )}
-        <p className="text-xs text-muted">Shows unsaved edits exactly as customers will read them. Dark mode preview arrives with the app-wide dark theme.</p>
+        <p className="text-xs text-muted">Shows unsaved edits exactly as customers will read them. Customers see light or dark depending on their phone or their choice in Profile.</p>
       </aside>
     </div>
   </div>;

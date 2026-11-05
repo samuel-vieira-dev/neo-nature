@@ -9,8 +9,8 @@ import { RefundForm, RefundResponse } from "@/lib/refund/form";
 type RequestRow = { id: string; userId: string; ticketId: string | null; email: string; name: string; orderNumber: string; createdAt: string; updatedAt: string; submittedAt: string | null; status: string; notes: string; response: RefundResponse; syncStatus: string; freshdeskId: number | null };
 const statuses: Record<string,string> = {new:"New",in_review:"In review",awaiting_customer:"Awaiting customer",closed:"Closed"};
 const outcomes: Record<string,string> = {draft:"In progress / abandoned",blocked:"Stopped by form rules",refund:"Refund submitted",retained:"Customer retained"};
-const input = "w-full rounded-xl border border-[var(--border)] bg-white p-3 text-sm";
-const button = "rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50";
+const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-sm";
+const button = "rounded-xl bg-[var(--accent-solid)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50";
 export default function RefundsPage() {
   const canRead = useCan("refund-requests:read");
   const canEdit = useCan("refund-form:write");
@@ -47,8 +47,8 @@ function RequestDetail({row,close}:{row:RequestRow;close:()=>void}) {
   const mutation = useMutation({ mutationFn:() => adminApi("/api/admin/refund-requests",{method:"PATCH",body:JSON.stringify({id:row.id,status,notes})}), onSuccess:() => {qc.invalidateQueries({queryKey:["admin-refunds"]});close();} });
   const answered = row.response.form.pages.flatMap(p => p.blocks).filter(b => b.type !== "copy" && row.response.answers[b.id]);
   const currentPage = row.response.form.pages.findIndex(p => p.id === row.response.endPage) + 1;
-  return <dialog ref={dialog} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-3xl overflow-y-auto rounded-3xl bg-white p-0 text-[var(--text)] backdrop:bg-black/40" aria-label={`Request ${row.id}`} onCancel={e => { e.preventDefault(); if (!mutation.isPending) close(); }}>
-    <div className="mx-auto max-w-3xl rounded-3xl bg-white p-5 sm:p-8"><div className="flex justify-between gap-4"><h2 className="text-xl font-bold">{row.ticketId ?? `Draft ${row.id.slice(0,8)}`} · Order {row.orderNumber}</h2><button autoFocus onClick={close} disabled={mutation.isPending} className="font-semibold">Close</button></div>
+  return <dialog ref={dialog} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-3xl overflow-y-auto rounded-3xl bg-[var(--card)] p-0 text-[var(--text)] backdrop:bg-black/40" aria-label={`Request ${row.id}`} onCancel={e => { e.preventDefault(); if (!mutation.isPending) close(); }}>
+    <div className="mx-auto max-w-3xl rounded-3xl bg-[var(--card)] p-5 sm:p-8"><div className="flex justify-between gap-4"><h2 className="text-xl font-bold">{row.ticketId ?? `Draft ${row.id.slice(0,8)}`} · Order {row.orderNumber}</h2><button autoFocus onClick={close} disabled={mutation.isPending} className="font-semibold">Close</button></div>
       <p className="mt-2 text-sm text-muted">{outcomes[row.response.outcome] ?? row.response.outcome} · Page {currentPage || "—"} of {row.response.form.pages.length} · Form version {row.response.version}</p>
       <p className="mt-1 text-sm text-muted">Opened {new Date(row.createdAt).toLocaleString()} · Last activity {new Date(row.updatedAt).toLocaleString()} · Ticket sync: {row.syncStatus}{row.freshdeskId ? ` (#${row.freshdeskId})` : ""}</p>
       <div className="my-6 space-y-5">{answered.map(b => <div key={b.id}><h3 className="whitespace-pre-line text-sm font-bold">{b.label}</h3>{b.type === "file" ? <a className="mt-1 inline-block font-semibold text-[var(--accent)] underline" href={`/api/admin/refund-requests/${encodeURIComponent(row.id)}/attachments/${encodeURIComponent(row.response.answers[b.id])}`}>Download {b.accept === "video" ? "video" : "photo"}</a> : <p className="mt-1 whitespace-pre-wrap break-words rounded-xl bg-[var(--surface)] p-3 text-sm">{b.options?.find(o => o.id === row.response.answers[b.id])?.label ?? row.response.answers[b.id]}</p>}</div>)}{!answered.length && <p className="rounded-xl bg-[var(--surface)] p-4 text-sm text-muted">The customer opened the form but has not answered any fields yet.</p>}</div>

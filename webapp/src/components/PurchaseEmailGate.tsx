@@ -32,6 +32,6 @@ export default function PurchaseEmailGate({ children }: { children: React.ReactN
     <p className="text-base text-muted">To request support or a refund, enter the email you used when placing your order.</p>
     <label className="block text-base font-semibold">Purchase email<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="card mt-2 min-h-14 w-full rounded-2xl p-4 text-base" /></label>
     {error && <p role="alert" className="text-rose-700">{error}</p>}
-    <button disabled={busy} className="min-h-14 w-full rounded-2xl bg-[var(--accent)] p-4 text-lg font-bold text-white disabled:opacity-60">{busy ? "Checking…" : "Continue"}</button>
+    <button disabled={busy} className="min-h-14 w-full rounded-2xl bg-[var(--accent-solid)] p-4 text-lg font-bold text-white disabled:opacity-60">{busy ? "Checking…" : "Continue"}</button>
   </form>;
 }

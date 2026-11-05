@@ -53,7 +53,7 @@ export default function AdminBannersPage() {
       <p className="mt-1 text-sm text-muted">The active banner shows at the top of every customer&apos;s home screen.</p>
 
       {/* create */}
-      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><Plus className="h-4 w-4 text-[var(--accent)]" /> New banner</p>
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Title — e.g. Free shipping this week 🚚" className="w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]" />
         <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={300} rows={2} placeholder="Message" className="w-full resize-none rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]" />
@@ -64,7 +64,7 @@ export default function AdminBannersPage() {
         <label className="flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={activateNew} onChange={(e) => setActivateNew(e.target.checked)} /> Make active immediately
         </label>
-        <button onClick={() => create.mutate()} disabled={!canCreate} className={`flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl py-2.5 font-display font-bold text-white ${canCreate ? "bg-[var(--accent)]" : "bg-[var(--border)] text-muted"}`}>
+        <button onClick={() => create.mutate()} disabled={!canCreate} className={`flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl py-2.5 font-display font-bold text-white ${canCreate ? "bg-[var(--accent-solid)]" : "bg-[var(--border)] text-muted"}`}>
           {create.isPending ? "Creating…" : "Create banner"}
         </button>
       </div>
@@ -72,7 +72,7 @@ export default function AdminBannersPage() {
       {/* list */}
       <div className="mt-4 space-y-3">
         {banners.map((b) => (
-          <div key={b.id} className={`rounded-2xl border bg-white p-4 ${b.active ? "border-[var(--accent)]" : "border-[var(--border)]"}`}>
+          <div key={b.id} className={`rounded-2xl border bg-[var(--card)] p-4 ${b.active ? "border-[var(--accent)]" : "border-[var(--border)]"}`}>
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
                 <Megaphone className="h-4 w-4 text-[var(--accent)]" />
