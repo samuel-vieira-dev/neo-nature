@@ -38,7 +38,8 @@ export async function saveKnowledge(input: z.infer<typeof articleInput>, admin: 
   });
 }
 
-export async function saveKnowledgeImage(file: File, admin: AdminContext) {
+/** Shared by the knowledge base and the content hub (e-book covers and chapter images). */
+export async function saveKnowledgeImage(file: File, admin: AdminContext, logAction = "support-knowledge.image_upload") {
   if (file.size <= 0 || file.size > KNOWLEDGE_IMAGE_MAX_BYTES) throw Response.json({ error: "image_too_large" }, { status: 413 });
   const data = Buffer.from(await file.arrayBuffer());
   if (data.length > KNOWLEDGE_IMAGE_MAX_BYTES) throw Response.json({ error: "image_too_large" }, { status: 413 });
@@ -48,7 +49,7 @@ export async function saveKnowledgeImage(file: File, admin: AdminContext) {
   const filename = (file.name || "image").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   await db.transaction(async tx => {
     await tx.insert(images).values({ id, filename, contentType, size: data.length, data, createdBy: admin.id });
-    await tx.insert(adminActionLogs).values({ adminUserId: admin.id, action: "support-knowledge.image_upload", metadata: { imageId: id, contentType, size: data.length } });
+    await tx.insert(adminActionLogs).values({ adminUserId: admin.id, action: logAction, metadata: { imageId: id, contentType, size: data.length } });
   });
   return { id, url: knowledgeImagePath(id), contentType, size: data.length };
 }

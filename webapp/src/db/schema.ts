@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   index,
   pgSequence,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -555,3 +556,35 @@ export const supportTicketAttachments = pgTable("support_ticket_attachments", {
   filename: text("filename").notNull(), contentType: text("content_type").notNull(),
   size: integer("size").notNull(), data: text("data").notNull(), sourceKey: text("source_key").notNull().unique(),
 });
+
+// E-books for the customer content hub. The row is the working copy; `published` is the
+// snapshot customers read, so editing a live e-book never changes it until it is republished.
+export const contentEbooks = pgTable("content_ebooks", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull().default(""),
+  category: text("category").notNull(),
+  coverImageId: text("cover_image_id"), // support_knowledge_images.id, served by /api/knowledge-images/[id]
+  chapters: jsonb("chapters").$type<import("@/lib/content").EbookChapter[]>().notNull().default([]),
+  status: text("status").notNull().default("draft"), // draft | in_review | published — see lib/content.ts
+  published: jsonb("published").$type<import("@/lib/content").EbookSnapshot>(),
+  publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+  version: integer("version").notNull().default(1),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+export const contentEbookRevisions = pgTable("content_ebook_revisions", {
+  id: serial("id").primaryKey(), ebookId: text("ebook_id").notNull().references(() => contentEbooks.id),
+  version: integer("version").notNull(), snapshot: jsonb("snapshot").$type<import("@/lib/content").EbookSnapshot>().notNull(),
+  status: text("status").notNull(), action: text("action").notNull(), adminId: text("admin_id"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [uniqueIndex("content_ebook_revision").on(t.ebookId, t.version)]);
+/** Last chapter each customer opened, so the reader resumes there. */
+export const contentEbookProgress = pgTable("content_ebook_progress", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  ebookId: text("ebook_id").notNull().references(() => contentEbooks.id, { onDelete: "cascade" }),
+  chapterId: text("chapter_id").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [primaryKey({ name: "content_ebook_progress_pkey", columns: [t.userId, t.ebookId] })]);
