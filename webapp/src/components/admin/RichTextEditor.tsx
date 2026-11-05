@@ -7,7 +7,7 @@ const tool = "flex h-9 min-w-9 items-center justify-center rounded-lg border bor
 const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Uncontrolled contentEditable editor. Remount (key) to load new content; the server re-sanitizes on save. */
-export default function RichTextEditor({ initial, disabled, onChange, className }: { initial: string; disabled: boolean; onChange: (html: string) => void; className?: string }) {
+export default function RichTextEditor({ initial, disabled, onChange, className, label = "Approved content", uploadUrl = "/api/admin/support/knowledge/images" }: { initial: string; disabled: boolean; onChange: (html: string) => void; className?: string; label?: string; uploadUrl?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const range = useRef<Range | null>(null);
@@ -47,7 +47,7 @@ export default function RichTextEditor({ initial, disabled, onChange, className 
     try {
       const body = new FormData();
       body.append("file", picked);
-      const res = await fetch("/api/admin/support/knowledge/images", { method: "POST", body });
+      const res = await fetch(uploadUrl, { method: "POST", body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String(data.error ?? `HTTP ${res.status}`).replaceAll("_", " "));
       const alt = picked.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 120);
@@ -66,7 +66,7 @@ export default function RichTextEditor({ initial, disabled, onChange, className 
       <button type="button" className={tool} disabled={disabled || uploading} aria-label="Upload image or GIF" title="Upload image or GIF" onMouseDown={e => { e.preventDefault(); saveSelection(); }} onClick={() => file.current?.click()}><ImagePlus className="h-4 w-4" /><span className="ml-1">{uploading ? "Uploading…" : "Image / GIF"}</span></button>
       <input ref={file} type="file" hidden accept={KNOWLEDGE_IMAGE_TYPES.join(",")} onChange={e => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
     </div>
-    <div ref={ref} role="textbox" aria-multiline="true" aria-label="Approved content" contentEditable={!disabled} suppressContentEditableWarning
+    <div ref={ref} role="textbox" aria-multiline="true" aria-label={label} contentEditable={!disabled} suppressContentEditableWarning
       className={className}
       onInput={emit} onBlur={() => { saveSelection(); emit(); }} onKeyUp={saveSelection} onMouseUp={saveSelection}
       onPaste={e => { const html = e.clipboardData.getData("text/html"); if (!html) return; e.preventDefault(); insertHtml(html); }}

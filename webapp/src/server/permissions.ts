@@ -25,6 +25,7 @@ export const PERMISSIONS = [
   "push:send",
   "banners:write",
   "refund-form:write",
+  "content:write", // criar/editar e-books do Learn; publicar exige ser o autor ou admin
   "admins:manage", // criar/editar/desativar contas + ver auditoria
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];

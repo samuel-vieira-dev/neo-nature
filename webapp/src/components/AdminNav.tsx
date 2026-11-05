@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut, ClipboardList } from "lucide-react";
+import { BookOpen, LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut, ClipboardList } from "lucide-react";
 import { useAdmin } from "./AdminProvider";
 import { ROLE_LABELS, type Permission } from "@/server/permissions";
 
@@ -11,6 +11,7 @@ const links: { href: string; label: string; icon: React.ElementType; exact?: boo
   { href: "/admin/support", label: "Support", icon: LifeBuoy, exact: true, permission: "support:read" },
   { href: "/admin", label: "Customers", icon: Users, exact: true, permission: "analytics:read" },
   { href: "/admin/support/knowledge", label: "Knowledge", icon: ClipboardList, permission: "support:read" },
+  { href: "/admin/content", label: "Content", icon: BookOpen, permission: "content:write" },
   { href: "/admin/orders", label: "Orders", icon: ClipboardList, permission: "orders:read" },
   { href: "/admin/refunds", label: "Refunds", icon: ClipboardList, permission: "refund-requests:read" },
   { href: "/admin/push", label: "Push", icon: Send, permission: "push:send" },
@@ -38,7 +39,7 @@ export default function AdminNav() {
           <Image src="/logo.svg" alt="Neo Nature" width={130} height={21} className="h-5 w-auto" priority />
         </Link>
         <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--accent)]">Admin</span>
-        <nav className="ml-auto flex items-center gap-1">
+        <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">
           {visibleLinks.map((l) => {
             const active = l.exact ? pathname === l.href : pathname.startsWith(l.href);
             return (
