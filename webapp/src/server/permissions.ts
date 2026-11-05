@@ -16,6 +16,8 @@ export const PERMISSIONS = [
   "customers:export", // futuro (sem UI ainda)
   "tickets:write", // abrir ticket a partir do 360
   "support:read", // filas e indicadores do Support desk, sem acesso ao Customer 360
+  "reports:read", // Reports de suporte (SLA, resolução, perguntas do Ask AI)
+  "reports:export", // exportar os Reports em CSV (só Admin, pedido do William 04/11)
   "refund-requests:read", // formulários de refund e anexos, sem edição
   "orders:read", // consultar pedidos sem acesso ao CRM de clientes
   "orders:send-refund-form", // enviar link do formulário ao e-mail do pedido
@@ -32,7 +34,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 export const ROLES = {
   admin: [...PERMISSIONS],
-  cs: ["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "support:read", "refund-requests:read", "tickets:write", "orders:refund", "refund-form:write"],
+  cs: ["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "support:read", "reports:read", "refund-requests:read", "tickets:write", "orders:refund", "refund-form:write"],
   tauk: ["orders:read", "orders:send-refund-form", "support:read", "refund-requests:read"],
 } as const satisfies Record<string, readonly Permission[]>;
 export type Role = keyof typeof ROLES;

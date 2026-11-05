@@ -4,7 +4,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import { ThemeToggleButton } from "@/components/ThemeControls";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut, ClipboardList } from "lucide-react";
+import { BarChart3, BookOpen, LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut, ClipboardList } from "lucide-react";
 import { useAdmin } from "./AdminProvider";
 import { ROLE_LABELS, type Permission } from "@/server/permissions";
 
@@ -12,6 +12,7 @@ const links: { href: string; label: string; icon: React.ElementType; exact?: boo
   { href: "/admin/support", label: "Support", icon: LifeBuoy, exact: true, permission: "support:read" },
   { href: "/admin", label: "Customers", icon: Users, exact: true, permission: "analytics:read" },
   { href: "/admin/support/knowledge", label: "Knowledge", icon: ClipboardList, permission: "support:read" },
+  { href: "/admin/support/reports", label: "Reports", icon: BarChart3, permission: "reports:read" },
   { href: "/admin/content", label: "Content", icon: BookOpen, permission: "content:write" },
   { href: "/admin/orders", label: "Orders", icon: ClipboardList, permission: "orders:read" },
   { href: "/admin/refunds", label: "Refunds", icon: ClipboardList, permission: "refund-requests:read" },
