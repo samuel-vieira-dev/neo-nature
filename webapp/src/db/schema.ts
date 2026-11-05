@@ -535,6 +535,10 @@ export const supportKnowledgeArticles = pgTable("support_knowledge_articles", {
   published: jsonb("published").$type<KnowledgeSnapshot>(),
   version: integer("version").notNull().default(1), updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  // Display-only arrangement (not versioned): featured = shown in the webapp's Quick answers;
+  // sortOrder = drag & drop position, null = not arranged yet (listed after arranged ones).
+  featured: boolean("featured").notNull().default(false),
+  sortOrder: integer("sort_order"),
 });
 export const supportKnowledgeRevisions = pgTable("support_knowledge_revisions", {
   id: serial("id").primaryKey(), articleId: text("article_id").notNull().references(() => supportKnowledgeArticles.id),
