@@ -43,18 +43,18 @@ function ResponseTable({ title, rows, waiting, waitingBreached, slaHours }: { ti
         <h2 className="font-display text-lg font-bold text-[var(--text)]">{title}</h2>
         <p className="text-xs text-muted">Waiting now: {waiting} · past {slaHours} h: <span className={waitingBreached ? "font-semibold text-amber-700" : ""}>{waitingBreached}</span></p>
       </div>
-      <table className="mt-2 w-full min-w-[520px] text-left text-sm">
+      <table className="mt-2 w-full min-w-[440px] whitespace-nowrap text-left text-sm">
         <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
-          <tr><th className="px-4 py-2 font-semibold">Sent by</th><th className="px-4 py-2 text-right font-semibold">Replies</th><th className="px-4 py-2 text-right font-semibold">Median</th><th className="px-4 py-2 text-right font-semibold">Average</th><th className="px-4 py-2 text-right font-semibold">Within {slaHours} h</th></tr>
+          <tr><th className="px-3 py-2 font-semibold">Sent by</th><th className="px-3 py-2 text-right font-semibold">Replies</th><th className="px-3 py-2 text-right font-semibold">Median</th><th className="px-3 py-2 text-right font-semibold">Average</th><th className="px-3 py-2 text-right font-semibold">Within {slaHours} h</th></tr>
         </thead>
         <tbody className="divide-y divide-[var(--border)]">
           {rows.map(([label, s]) => (
             <tr key={label}>
-              <td className="px-4 py-2 font-semibold text-[var(--text)]">{label}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{s.count}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{hours(s.median)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{hours(s.average)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{s.count ? `${s.withinSla} (${pct(Math.round((s.withinSla / s.count) * 1000) / 10)})` : "—"}</td>
+              <td className="px-3 py-2 font-semibold text-[var(--text)]">{label}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{s.count}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{hours(s.median)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{hours(s.average)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{s.count ? `${s.withinSla} (${pct(Math.round((s.withinSla / s.count) * 1000) / 10)})` : "—"}</td>
             </tr>
           ))}
         </tbody>
