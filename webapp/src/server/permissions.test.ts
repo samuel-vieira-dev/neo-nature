@@ -8,7 +8,7 @@ describe("permissionsFor", () => {
 
   it("cs has the customer-support and full refund-management permissions", () => {
     expect(new Set(permissionsFor("cs"))).toEqual(
-      new Set(["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "support:read", "refund-requests:read", "tickets:write", "orders:refund", "refund-form:write"])
+      new Set(["orders:read", "orders:send-refund-form", "customers:read", "customers:impersonate", "support:read", "reports:read", "refund-requests:read", "tickets:write", "orders:refund", "refund-form:write"])
     );
   });
 
@@ -20,10 +20,20 @@ describe("permissionsFor", () => {
       "customers:write",
       "orders:write",
       "admins:manage",
+      "reports:export",
     ];
     for (const p of adminOnly) {
       expect(hasPermission("cs", p)).toBe(false);
     }
+  });
+});
+
+describe("support reports", () => {
+  it("admin and cs see the reports; only admin exports them", () => {
+    expect(hasPermission("cs", "reports:read")).toBe(true);
+    expect(hasPermission("tauk", "reports:read")).toBe(false);
+    expect(hasPermission("admin", "reports:export")).toBe(true);
+    expect(hasPermission("cs", "reports:export")).toBe(false);
   });
 });
 
