@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bold, ImagePlus, Italic, Link2, Unlink } from "lucide-react";
 import { KNOWLEDGE_IMAGE_MAX_BYTES, KNOWLEDGE_IMAGE_TYPES, knowledgeToHtml, sanitizeKnowledgeHtml } from "@/lib/knowledge";
 
-const tool = "flex h-9 min-w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-white px-2 text-sm disabled:opacity-50";
+const tool = "flex h-9 min-w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 text-sm disabled:opacity-50";
 const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Uncontrolled contentEditable editor. Remount (key) to load new content; the server re-sanitizes on save. */

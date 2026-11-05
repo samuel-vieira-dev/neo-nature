@@ -5,7 +5,7 @@ import { ShieldOff } from "lucide-react";
  *  doesn't render a broken form the request would just reject. */
 export default function NoAccess() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-6 py-16 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-6 py-16 text-center">
       <ShieldOff className="h-8 w-8 text-muted" />
       <p className="text-sm font-semibold text-[var(--text)]">You don&apos;t have access to this page.</p>
     </div>

@@ -103,10 +103,10 @@ function FormSession({ config: initialConfig, orderNumber, onBack, standalone }:
         </div>)}
       </fieldset>
       {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-rose-700">{error}</p>}
-      {!ticketId && next && <button type="submit" disabled={busy || !!uploading} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] p-4 font-bold text-white disabled:opacity-60">{busy ? <><Loader2 className="h-5 w-5 animate-spin" /> Submitting…</> : willSubmit ? "Submit" : "Next"}</button>}
+      {!ticketId && next && <button type="submit" disabled={busy || !!uploading} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-solid)] p-4 font-bold text-white disabled:opacity-60">{busy ? <><Loader2 className="h-5 w-5 animate-spin" /> Submitting…</> : willSubmit ? "Submit" : "Next"}</button>}
       {!ticketId && !next && <div className="card rounded-2xl p-4"><p className="text-sm text-muted">Your refund inquiry and the information provided have been recorded for our team. Contact support if you need help.</p><a href="tel:+18772864137" className="mt-2 block font-bold text-[var(--accent)]">Call support · +1 877 286 4137</a></div>}
       {!ticketId && (history.length > 1 || onBack) && <button type="button" disabled={busy || !!uploading} onClick={() => { setErrors({}); setError(""); if(history.length > 1) setHistory(h => h.slice(0,-1)); else onBack?.(); }} className="flex min-h-12 items-center gap-2 font-semibold text-muted"><ArrowLeft className="h-4 w-4" /> Back</button>}
-      {ticketId && (standalone ? <p className="rounded-2xl bg-[var(--accent-soft)] p-4 text-center font-bold text-[var(--accent)]">Your request has been received. Save reference {ticketId}.</p> : <Link href="/support" className="block rounded-2xl bg-[var(--accent)] p-4 text-center font-bold text-white">View my tickets</Link>)}
+      {ticketId && (standalone ? <p className="rounded-2xl bg-[var(--accent-soft)] p-4 text-center font-bold text-[var(--accent)]">Your request has been received. Save reference {ticketId}.</p> : <Link href="/support" className="block rounded-2xl bg-[var(--accent-solid)] p-4 text-center font-bold text-white">View my tickets</Link>)}
     </form>
   </div>;
 }

@@ -5,6 +5,7 @@ import { Bell, ChevronRight, Clock, CreditCard, LifeBuoy, LogOut, MapPin, Packag
 import { useApp } from "@/lib/store";
 import { useMe, useUpdatePrefs, useReminders, useReminderMutations, useLogout } from "@/lib/hooks";
 import { FadeUp, Toggle } from "@/components/ui";
+import { AppearancePicker } from "@/components/ThemeControls";
 
 export default function ProfilePage() {
   const { toast } = useApp();
@@ -22,7 +23,7 @@ export default function ProfilePage() {
     <div className="pt-8">
       {/* identity */}
       <FadeUp className="px-5 text-center">
-        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent)] font-display text-3xl font-bold text-white">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent-solid)] font-display text-3xl font-bold text-white">
           {initials}
         </div>
         <h1 className="mt-3 font-display text-2xl font-bold text-[var(--text)]">{displayName || "…"}</h1>
@@ -75,6 +76,15 @@ export default function ProfilePage() {
               )}
             </div>
           )}
+        </div>
+      </FadeUp>
+
+      {/* appearance */}
+      <FadeUp delay={0.08} className="mt-4 px-5">
+        <div className="card rounded-3xl p-5">
+          <p className="text-base font-semibold text-[var(--text)]">Appearance</p>
+          <p className="mb-3 text-sm text-muted">Automatic follows your phone&apos;s setting.</p>
+          <AppearancePicker />
         </div>
       </FadeUp>
 

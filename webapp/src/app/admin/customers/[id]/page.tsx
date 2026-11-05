@@ -128,7 +128,7 @@ const ORDER_FIELD_ORDER = ["customerName", "customerPhone", "email", "shippingTr
 
 function Kpi({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex items-center gap-2 text-muted">
         <Icon className={`h-4 w-4 ${tone}`} />
         <span className="text-xs font-semibold">{label}</span>
@@ -140,7 +140,7 @@ function Kpi({ icon: Icon, label, value, tone = "text-[var(--accent)]" }: { icon
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
-    <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-4">
+    <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
         <Icon className="h-3.5 w-3.5" /> {title}
       </p>
@@ -231,7 +231,7 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
   const canEdit = editableFields.length > 0;
 
   return (
-    <div className={`rounded-xl border border-[var(--border)] bg-white p-3 ${addOn ? "ml-6" : ""}`}>
+    <div className={`rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 ${addOn ? "ml-6" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-display text-sm font-bold text-[var(--text)]">#{o.number}</span>
@@ -357,7 +357,7 @@ function OrderCard({ o, customerId, addOn = false }: { o: CustomerOrder; custome
                 <button
                   onClick={() => save.mutate()}
                   disabled={save.isPending}
-                  className="flex-1 rounded-lg bg-[var(--accent)] py-1.5 text-xs font-display font-bold text-white disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-[var(--accent-solid)] py-1.5 text-xs font-display font-bold text-white disabled:opacity-50"
                 >
                   {save.isPending ? "Saving…" : "Save"}
                 </button>
@@ -540,7 +540,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
         {canOpenTicket && (
           <button
             onClick={focusTicketForm}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
           >
             <LifeBuoy className="h-4 w-4 text-[var(--accent)]" /> Open ticket
           </button>
@@ -549,7 +549,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
           <button
             onClick={impersonate}
             disabled={impersonating}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)] disabled:opacity-50"
           >
             <LogIn className="h-4 w-4" />
             {impersonating ? "Opening…" : "View as customer"}
@@ -558,7 +558,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
         {canEditCustomer && (
           <button
             onClick={() => (editingCustomer ? setEditingCustomer(false) : startCustomerEdit())}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
           >
             <Pencil className="h-4 w-4" />
             {editingCustomer ? "Cancel" : "Edit"}
@@ -567,7 +567,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {editingCustomer && (
-        <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
           <p className="text-sm font-bold text-[var(--text)]">Edit customer</p>
           <div>
             <label className="flex items-center gap-1.5 text-xs font-semibold text-muted">
@@ -625,7 +625,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             <button
               onClick={() => saveCustomer.mutate()}
               disabled={saveCustomer.isPending}
-              className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
+              className="flex-1 rounded-xl bg-[var(--accent-solid)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
             >
               {saveCustomer.isPending ? "Saving…" : "Save"}
             </button>
@@ -758,12 +758,12 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             {!showTicketForm ? (
               <button
                 onClick={() => setShowTicketForm(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+                className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
               >
                 <Plus className="h-4 w-4 text-[var(--accent)]" /> Open ticket
               </button>
             ) : (
-              <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-white p-4">
+              <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
                 <p className="text-sm font-bold text-[var(--text)]">Open ticket</p>
                 <select
                   value={ticketKind}
@@ -804,7 +804,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
                   <button
                     onClick={() => openTicket.mutate()}
                     disabled={openTicket.isPending || !ticketSubject.trim()}
-                    className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
+                    className="flex-1 rounded-xl bg-[var(--accent-solid)] py-2.5 text-sm font-display font-bold text-white disabled:opacity-50"
                   >
                     {openTicket.isPending ? "Opening…" : "Open ticket"}
                   </button>

@@ -68,7 +68,7 @@ export default function Home() {
         >
           <Bell className="h-5 w-5" />
           {hydrated && (me?.unread ?? 0) > 0 && (
-            <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-600 ring-2 ring-white" />
+            <span className="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-amber-600 ring-2 ring-[var(--card)]" />
           )}
         </Link>
       </FadeUp>
@@ -101,7 +101,7 @@ export default function Home() {
               <div
                 className={`flex min-h-[64px] items-center gap-3 rounded-2xl px-5 py-4 ${
                   packageOrder && !packageOrder.awaitingArrival
-                    ? "bg-[var(--accent)] text-white"
+                    ? "bg-[var(--accent-solid)] text-white"
                     : "card text-[var(--text)]"
                 }`}
               >

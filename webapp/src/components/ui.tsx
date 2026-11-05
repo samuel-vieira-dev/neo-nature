@@ -28,7 +28,7 @@ export function FadeUp({
 }
 
 /** Page header with back button */
-export function PageHeader({ title, subtitle, backHref }: { title: string; subtitle?: string; backHref?: string }) {
+export function PageHeader({ title, subtitle, backHref, action }: { title: string; subtitle?: string; backHref?: string; action?: React.ReactNode }) {
   const router = useRouter();
   return (
     <div className="flex items-center gap-3 px-5 pt-6 pb-4">
@@ -43,6 +43,7 @@ export function PageHeader({ title, subtitle, backHref }: { title: string; subti
         <h1 className="font-display text-xl font-bold text-[var(--text)]">{title}</h1>
         {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
       </div>
+      {action && <div className="ml-auto">{action}</div>}
     </div>
   );
 }
@@ -89,7 +90,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) =
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 rounded-full transition-colors duration-200 ${on ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
+      className={`relative h-7 w-12 rounded-full transition-colors duration-200 ${on ? "bg-[var(--accent-solid)]" : "bg-[var(--border)]"}`}
       role="switch"
       aria-checked={on}
     >
@@ -135,7 +136,7 @@ export function CTA({
 }) {
   const styles =
     variant === "primary"
-      ? "bg-[var(--accent)] text-white active:bg-[var(--accent-strong)]"
+      ? "bg-[var(--accent-solid)] text-white active:bg-[var(--accent-solid-strong)]"
       : "card text-[var(--text)]";
   const inner = (
     <span

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import Logo from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import { KeyRound, Mail, User as UserIcon, ArrowRight, ShieldCheck } from "lucide-react";
 
@@ -77,13 +77,13 @@ export default function AdminLoginPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 pb-16">
       <div className="text-center">
-        <Image src="/logo.svg" alt="Neo Nature" width={200} height={33} priority className="mx-auto h-8 w-auto" />
+        <Logo width={200} height={33} priority className="mx-auto h-8 w-auto" />
         <p className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-[var(--accent)]">
           <ShieldCheck className="h-4 w-4" /> Admin panel
         </p>
       </div>
 
-      <div className="mt-8 rounded-3xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5">
         {bootstrap === null ? (
           <p className="py-6 text-center text-sm text-muted">Loading…</p>
         ) : bootstrap ? (
@@ -163,7 +163,7 @@ export default function AdminLoginPage() {
           <button
             onClick={submit}
             disabled={busy}
-            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] font-display text-base font-bold text-white disabled:opacity-60"
+            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-solid)] font-display text-base font-bold text-white disabled:opacity-60"
           >
             {busy ? "Signing in…" : "Sign in"} <ArrowRight className="h-4 w-4" />
           </button>

@@ -63,7 +63,7 @@ export default function OrderDetailPage() {
               href={order.trackingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] text-sm font-semibold text-white"
+              className="mt-4 flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[var(--accent-solid)] text-sm font-semibold text-white"
             >
               <Truck className="h-4 w-4" /> Track package <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -81,11 +81,11 @@ export default function OrderDetailPage() {
               return (
                 <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
                   {!isLast && (
-                    <span className={`absolute left-[11px] top-6 h-full w-0.5 ${step.done ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`} />
+                    <span className={`absolute left-[11px] top-6 h-full w-0.5 ${step.done ? "bg-[var(--accent-solid)]" : "bg-[var(--border)]"}`} />
                   )}
                   <span
                     className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-                      ${step.done ? "bg-[var(--accent)]" : "border-2 border-[var(--border)] bg-white"}
+                      ${step.done ? "bg-[var(--accent-solid)]" : "border-2 border-[var(--border)] bg-[var(--card)]"}
                       ${step.current ? "ring-4 ring-[var(--accent-soft)]" : ""}`}
                   >
                     {step.done && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3.5} />}

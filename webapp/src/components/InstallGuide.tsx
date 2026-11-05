@@ -61,7 +61,7 @@ export default function InstallGuide() {
             key={p}
             onClick={() => setPlatform(p)}
             className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold transition-colors ${
-              platform === p ? "bg-[var(--accent)] text-white" : "bg-[var(--surface)] text-muted"
+              platform === p ? "bg-[var(--accent-solid)] text-white" : "bg-[var(--surface)] text-muted"
             }`}
           >
             {p === "desktop" ? <Monitor className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}

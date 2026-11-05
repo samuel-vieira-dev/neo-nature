@@ -14,7 +14,7 @@ export default function ComingSoon({ title = "Coming soon" }: { title?: string }
       </p>
       <Link
         href="/"
-        className="mt-6 flex min-h-[52px] items-center justify-center rounded-2xl bg-[var(--accent)] px-8 text-base font-bold text-white"
+        className="mt-6 flex min-h-[52px] items-center justify-center rounded-2xl bg-[var(--accent-solid)] px-8 text-base font-bold text-white"
       >
         Back to home
       </Link>

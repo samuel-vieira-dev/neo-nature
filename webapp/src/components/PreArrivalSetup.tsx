@@ -73,7 +73,7 @@ export default function PreArrivalSetup() {
       <AnimatePresence mode="wait">
         {step === "welcome" && (
           <motion.div key="welcome" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="flex flex-1 flex-col justify-center text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--accent)]">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--accent-solid)]">
               {inTransit ? <Truck className="h-10 w-10 text-white" /> : <Package className="h-10 w-10 text-white" />}
             </div>
             <h1 className="mt-6 font-display text-3xl font-extrabold leading-tight text-[var(--text)]">

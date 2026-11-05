@@ -154,7 +154,7 @@ function FullOnboarding() {
         {/* STEP 0 — welcome */}
         {step === 0 && (
           <motion.div key="s0" variants={stepVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="flex flex-1 flex-col justify-center text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--accent)]">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--accent-solid)]">
               <Leaf className="h-10 w-10 text-white" />
             </div>
             <h1 className="mt-6 font-display text-3xl font-extrabold leading-tight text-[var(--text)]">
@@ -292,7 +292,7 @@ function FullOnboarding() {
               <AnimatePresence mode="wait">
                 {firstDoseTaken ? (
                   <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent)]">
+                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent-solid)]">
                       <Check className="h-12 w-12 text-white" strokeWidth={3} />
                     </div>
                     <p className="mt-4 font-display text-xl font-bold text-[var(--text)]">First dose logged!</p>
@@ -369,7 +369,7 @@ function FullOnboarding() {
                             )
                           }
                           className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${
-                            r.habitAnchor === anchor ? "bg-[var(--accent)] text-white" : "bg-[var(--surface)] text-muted"
+                            r.habitAnchor === anchor ? "bg-[var(--accent-solid)] text-white" : "bg-[var(--surface)] text-muted"
                           }`}
                         >
                           {anchor}

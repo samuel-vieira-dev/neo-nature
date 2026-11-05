@@ -87,7 +87,7 @@ export default function ProductPage() {
           onClick={() => toast("Demo: 30-second posology video plays here in Phase 2 ▶️")}
           className="card flex w-full items-center gap-3 rounded-2xl p-4"
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-solid)]">
             <Play className="ml-0.5 h-4 w-4 text-white" fill="currentColor" />
           </span>
           <span className="text-left">

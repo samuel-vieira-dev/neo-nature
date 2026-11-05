@@ -56,7 +56,7 @@ export default function AdminPushPage() {
       <p className="mt-1 text-sm text-muted">Send a notification to a filtered audience. Only customers with the app and notifications enabled receive it.</p>
 
       {/* compose */}
-      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-4 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <div>
           <label className="text-xs font-semibold text-muted">Title</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="e.g. New: GlucoEase restocked 🌿" className="mt-1 w-full rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]" />
@@ -72,7 +72,7 @@ export default function AdminPushPage() {
       </div>
 
       {/* audience */}
-      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-white p-5">
+      <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
         <p className="text-sm font-bold text-[var(--text)]">Audience</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <select value={origin} onChange={(e) => setOrigin(e.target.value)} className="rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm font-semibold">
@@ -100,7 +100,7 @@ export default function AdminPushPage() {
       <button
         onClick={() => { setResult(null); send.mutate(); }}
         disabled={!canSend}
-        className={`mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl py-3 font-display text-base font-bold text-white ${canSend ? "bg-[var(--accent)]" : "bg-[var(--border)] text-muted"}`}
+        className={`mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl py-3 font-display text-base font-bold text-white ${canSend ? "bg-[var(--accent-solid)]" : "bg-[var(--border)] text-muted"}`}
       >
         <Send className="h-4 w-4" /> {send.isPending ? "Sending…" : `Send to ${reach}`}
       </button>

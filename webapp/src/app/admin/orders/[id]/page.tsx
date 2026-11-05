@@ -23,7 +23,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!order) notFound();
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
   const money = (value: string | null) => value == null ? "—" : `${order.currency} ${Number(value).toFixed(2)}`;
-  const card = "rounded-2xl border border-[var(--border)] bg-white p-5";
+  const card = "rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5";
   return <div className="mx-auto max-w-5xl space-y-5">
     <Link href="/admin/orders" className="text-sm font-semibold text-[var(--accent)]">← Orders</Link>
     <header><h1 className="font-display text-2xl font-bold">Order #{order.buygoodsOrderId ?? order.number}</h1><p className="mt-1 text-sm text-muted">{order.source} · {order.status} · {date(order.placedAt)}</p></header>

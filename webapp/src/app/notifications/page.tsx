@@ -64,7 +64,7 @@ export default function NotificationsPage() {
           </div>
           <button
             onClick={enablePush}
-            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-3 font-display text-base font-bold text-white"
+            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-solid)] py-3 font-display text-base font-bold text-white"
           >
             <Bell className="h-4 w-4" />
             {testNotification.isPending ? "Enabling…" : "Enable on this device"}

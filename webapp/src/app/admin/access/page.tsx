@@ -140,7 +140,7 @@ export default function AdminAccessPage() {
       </p>
 
       {/* accounts table */}
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -194,14 +194,14 @@ export default function AdminAccessPage() {
 
       <button
         onClick={() => setShowNew((v) => !v)}
-        className="mt-3 flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
+        className="mt-3 flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface)]"
       >
         <UserPlus className="h-4 w-4 text-[var(--accent)]" /> New account
       </button>
 
       {/* new account */}
       {showNew && (
-        <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-white p-5">
+        <div className="mt-3 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
           <p className="text-sm font-bold text-[var(--text)]">New account</p>
           <input
             value={newName}
@@ -243,7 +243,7 @@ export default function AdminAccessPage() {
               onClick={() => create.mutate()}
               disabled={!canCreate}
               className={`flex-1 rounded-xl py-2.5 text-sm font-display font-bold text-white ${
-                canCreate ? "bg-[var(--accent)]" : "bg-[var(--border)] text-muted"
+                canCreate ? "bg-[var(--accent-solid)]" : "bg-[var(--border)] text-muted"
               }`}
             >
               {create.isPending ? "Creating…" : "Create account"}
@@ -255,7 +255,7 @@ export default function AdminAccessPage() {
       {/* edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5">
+          <div className="w-full max-w-sm rounded-2xl bg-[var(--card)] p-5">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-bold text-[var(--text)]">Edit account</p>
               <button onClick={() => setEditing(null)} aria-label="Close" className="text-muted">
@@ -302,7 +302,7 @@ export default function AdminAccessPage() {
                 onClick={() => save.mutate()}
                 disabled={!canSave}
                 className={`flex-1 rounded-xl py-2.5 text-sm font-display font-bold text-white ${
-                  canSave ? "bg-[var(--accent)]" : "bg-[var(--border)] text-muted"
+                  canSave ? "bg-[var(--accent-solid)]" : "bg-[var(--border)] text-muted"
                 }`}
               >
                 {save.isPending ? "Saving…" : "Save"}
@@ -317,7 +317,7 @@ export default function AdminAccessPage() {
         <p className="flex items-center gap-2 font-display text-lg font-bold text-[var(--text)]">
           <History className="h-4 w-4 text-[var(--accent)]" /> Audit log
         </p>
-        <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-white">
+        <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--card)]">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-[var(--border)] text-xs uppercase tracking-wide text-muted">
               <tr>

@@ -70,7 +70,7 @@ export default function EbookReader({ ebook, chapter, onChapter }: { ebook: Read
           <button
             onClick={() => onChapter(at + 1)}
             disabled={at === total - 1}
-            className="flex min-h-[56px] items-center justify-center gap-1 rounded-2xl bg-[var(--accent)] text-base font-bold text-white disabled:opacity-40"
+            className="flex min-h-[56px] items-center justify-center gap-1 rounded-2xl bg-[var(--accent-solid)] text-base font-bold text-white disabled:opacity-40"
           >
             Next chapter <ChevronRight className="h-5 w-5" />
           </button>

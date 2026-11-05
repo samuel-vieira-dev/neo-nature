@@ -51,12 +51,12 @@ export default function InstallBanner() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden px-4 pt-4"
           >
-            <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white p-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3">
               <Image src="/icon-192.png" alt="Neo Nature" width={36} height={36} className="shrink-0 rounded-xl" />
               <p className="flex-1 text-sm font-semibold text-[var(--text)]">Install the app for one-tap access</p>
               <button
                 onClick={onInstallClick}
-                className="shrink-0 rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm font-bold text-white active:bg-[var(--accent-strong)]"
+                className="shrink-0 rounded-xl bg-[var(--accent-solid)] px-3 py-2.5 text-sm font-bold text-white active:bg-[var(--accent-solid-strong)]"
               >
                 Install
               </button>

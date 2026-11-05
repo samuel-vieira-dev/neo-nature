@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import Logo from "@/components/Logo";
+import { ThemeToggleButton } from "@/components/ThemeControls";
 import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, LifeBuoy, Users, Send, Megaphone, ShieldCheck, UserCog, LogOut, ClipboardList } from "lucide-react";
 import { useAdmin } from "./AdminProvider";
@@ -33,10 +34,10 @@ export default function AdminNav() {
   const visibleLinks = links.filter((l) => !l.permission || admin.permissions.includes(l.permission));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)]/90 backdrop-blur">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
         <Link href="/admin" aria-label="Go to home">
-          <Image src="/logo.svg" alt="Neo Nature" width={130} height={21} className="h-5 w-auto" priority />
+          <Logo width={130} height={21} className="h-5 w-auto" priority />
         </Link>
         <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--accent)]">Admin</span>
         <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">
@@ -59,6 +60,7 @@ export default function AdminNav() {
             <p className="text-xs font-semibold text-[var(--text)]">{admin.name || admin.email}</p>
             <p className="text-[10px] text-muted">{ROLE_LABELS[admin.role]}</p>
           </div>
+          <ThemeToggleButton className="ml-1 h-9 w-9 border-0 shadow-none" />
           <button
             onClick={adminLogout}
             className="ml-1 flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted hover:bg-[var(--surface)]"
