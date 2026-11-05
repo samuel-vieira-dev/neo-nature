@@ -355,6 +355,8 @@ export const supportEmailConversations = pgTable("support_email_conversations", 
   freshdeskId: integer("freshdesk_id"),
   escalationReason: text("escalation_reason"),
   firstRepliedAt: timestamp("first_replied_at", { withTimezone: true, mode: "date" }),
+  // When the ticket last became resolved/closed; cleared when it reopens (support reports).
+  resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, t => [
@@ -560,6 +562,18 @@ export const supportTicketAttachments = pgTable("support_ticket_attachments", {
   filename: text("filename").notNull(), contentType: text("content_type").notNull(),
   size: integer("size").notNull(), data: text("data").notNull(), sourceKey: text("source_key").notNull().unique(),
 });
+
+// Questions customers type into the webapp "Ask anything" box (support reports: word cloud,
+// gaps in the knowledge base). Not recorded while staff view the app as a customer.
+export const supportAiQuestions = pgTable("support_ai_questions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  question: text("question").notNull(),
+  source: text("source").notNull(), // ai | search (keyword fallback)
+  orderQuestion: boolean("order_question").notNull().default(false),
+  related: jsonb("related").$type<string[]>().notNull().default([]), // matched article titles
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [index("support_ai_questions_created").on(t.createdAt)]);
 
 // E-books for the customer content hub. The row is the working copy; `published` is the
 // snapshot customers read, so editing a live e-book never changes it until it is republished.

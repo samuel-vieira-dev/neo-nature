@@ -8,6 +8,8 @@ import { isAutomatedEmail, usesPartialEmailRollout, canAutoDeliverEmail, support
 import { readSupportEmailTone, voicePreferences } from "./support-email-tone";
 import { internalSupportEnabled, type TicketStatus } from "@/lib/support-tickets";
 import { publishedKnowledge } from "./support-knowledge";
+import { citedOrder } from "./support-ticket-product";
+import { isResolvedTicketStatus, resolvedAtFor } from "./support-ticket-resolution";
 import { pushEmailToFreshdesk } from "./support-email-freshdesk";
 import type { z } from "zod";
 
@@ -59,7 +61,7 @@ export async function receiveSupportEmail(input: EmailInbound): Promise<EmailRec
     const handoff = requiredHumanHandoff(`${input.subject}\n${input.text}`);
     const partial = usesPartialEmailRollout(c.email, tone);
     const human = tier === "T3" || partial && tier === "T2" || c.owner === "human" || !!uncertain;
-    await tx.update(conversations).set({ latestMessageId: m.id, subject: input.subject, tier, requiresHuman: human, ticketStatus: c.latestMessageId ? "open" : "new", owner: human ? "human" : "agent", status: uncertain ? "delivery_unknown" : human ? "awaiting_human" : "queued", escalationReason: uncertain ? "Reconcile the previous uncertain delivery before responding" : partial && tier !== "T1" ? `${tier}: Human required during partial rollout` : tier === "T3" ? handoff : c.owner === "human" ? c.escalationReason : null, updatedAt: now }).where(eq(conversations.id, c.id));
+    await tx.update(conversations).set({ latestMessageId: m.id, subject: input.subject, tier, requiresHuman: human, ticketStatus: c.latestMessageId ? "open" : "new", resolvedAt: null, owner: human ? "human" : "agent", status: uncertain ? "delivery_unknown" : human ? "awaiting_human" : "queued", escalationReason: uncertain ? "Reconcile the previous uncertain delivery before responding" : partial && tier !== "T1" ? `${tier}: Human required during partial rollout` : tier === "T3" ? handoff : c.owner === "human" ? c.escalationReason : null, updatedAt: now }).where(eq(conversations.id, c.id));
     await tx.insert(jobs).values({ id: crypto.randomUUID(), conversationId: c.id, messageId: m.id, stage: human && !partial ? (c.freshdeskId ? "human_note" : "escalate") : "prepare", runAt: now, sendAfter: human || c.firstRepliedAt ? now : responseDueAt(now, Math.random(), { minDelay: tone.minDelayMinutes, maxDelay: tone.maxDelayMinutes }) });
     return { accepted: true, deduped: false, conversationId: c.id, messageId: m.id, tier };
   });
@@ -71,7 +73,7 @@ export async function supportEmailContext(c: Conversation, incoming: Message): P
     db.query.supportEmailMessages.findMany({ where: and(eq(messages.conversationId, c.id), inArray(messages.direction, ["incoming", "outgoing"])), orderBy: [desc(messages.receivedAt), desc(messages.id)], limit: 20 }),
     db.query.orders.findMany({ where: sql`lower(${orders.email}) = ${c.email}`, orderBy: [desc(orders.placedAt)], limit: 21, columns: { id: true, number: true, buygoodsOrderId: true, konnektiveOrderId: true, productName: true, status: true, shippingTrackingId: true, shippingStatus: true, fulfilledAt: true, trackingSteps: true, source: true, total: true, currency: true, placedAt: true } }),
   ]);
-  const requestedOrder = purchaseRows.find(o => [o.id, o.number, o.buygoodsOrderId, o.konnektiveOrderId].some(id => id && id.length >= 4 && new RegExp(`(?<![a-z0-9])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`, "i").test(`${incoming.subject}\n${incoming.text}`)));
+  const requestedOrder = citedOrder(`${incoming.subject}\n${incoming.text}`, purchaseRows);
   // An explicitly different order must not silently fall back to the sender's only order.
   const claimedText = /(?:order(?:\s+(?:number|id))?|pedido|commande|orden)\s*[:#]?\s*([a-z0-9-]{4,})/i.exec(`${incoming.subject}\n${incoming.text}`)?.[1];
   const claimedOrder = claimedText && (/\d/.test(claimedText) || /^[A-Z0-9-]{5,}$/.test(claimedText)) ? claimedText : null;
@@ -134,7 +136,7 @@ async function prepareJob(job: Job, c: Conversation, incoming: Message) {
     const human = draft.needsHuman;
     if (!human && draft.tier === "T1" && draft.intent === "no_reply") {
       // Spam, marketing, vendor pitches: close without replying and without using a T1 rollout slot.
-      await tx.update(conversations).set({ tier: "T1", language: draft.language, requiresHuman: false, owner: "agent", ticketStatus: "closed", status: "no_reply", escalationReason: `No reply sent: ${draft.reason}`.slice(0, 1000), updatedAt: new Date() }).where(eq(conversations.id, c.id));
+      await tx.update(conversations).set({ tier: "T1", language: draft.language, requiresHuman: false, owner: "agent", ticketStatus: "closed", resolvedAt: resolvedAtFor("closed"), status: "no_reply", escalationReason: `No reply sent: ${draft.reason}`.slice(0, 1000), updatedAt: new Date() }).where(eq(conversations.id, c.id));
       await tx.update(jobs).set({ draft: { ...draft }, status: "cancelled", error: "no_reply_not_customer" }).where(eq(jobs.id, job.id));
       return;
     }
@@ -142,7 +144,7 @@ async function prepareJob(job: Job, c: Conversation, incoming: Message) {
     if (job.draft?.partialRolloutT1Index !== undefined) storedDraft.partialRolloutT1Index = job.draft.partialRolloutT1Index;
     if (partial && !human && draft.tier === "T1") storedDraft.partialRolloutT1Index = await partialT1Index(tx, job);
     const send = !human && canAutoDeliverEmail(current.email, storedDraft.partialRolloutT1Index, draft.tier, tone);
-    await tx.update(conversations).set({ tier: draft.tier, language: draft.language, requiresHuman: human, ticketStatus: human ? "open" : current.ticketStatus, owner: human ? "human" : "agent", status: human ? "awaiting_human" : partial && !send ? "ai_draft_not_sent" : "draft_ready", escalationReason: human ? partial ? `${draft.tier}: Human required during partial rollout` : draft.reason : null, updatedAt: new Date() }).where(eq(conversations.id, c.id));
+    await tx.update(conversations).set({ tier: draft.tier, language: draft.language, requiresHuman: human, ticketStatus: human ? "open" : current.ticketStatus, resolvedAt: human ? null : current.resolvedAt, owner: human ? "human" : "agent", status: human ? "awaiting_human" : partial && !send ? "ai_draft_not_sent" : "draft_ready", escalationReason: human ? partial ? `${draft.tier}: Human required during partial rollout` : draft.reason : null, updatedAt: new Date() }).where(eq(conversations.id, c.id));
     await tx.update(jobs).set({ draft: storedDraft, stage: human && !partial ? (current.freshdeskId ? "human_note" : "escalate") : "send", status: partial ? send ? "queued" : "review" : !human && !send ? "review" : "queued", runAt: human ? new Date() : job.sendAfter, attempts: 0, startedAt: null, error: null }).where(eq(jobs.id, job.id));
   });
 }
@@ -154,7 +156,7 @@ async function recordOutgoing(tx: Transaction, c: Conversation, job: Job, incomi
   if (job.stage !== "manual_send" && job.draft?.needsHuman && c.owner === "human" && c.latestMessageId === job.messageId) {
     await tx.insert(jobs).values({ id: crypto.randomUUID(), conversationId: c.id, messageId: incoming.id, stage: "escalate", sendAfter: new Date() }).onConflictDoNothing();
   }
-  await tx.update(conversations).set({ requiresHuman: job.stage === "manual_send" ? false : c.requiresHuman, ticketStatus: (job.stage === "manual_send" ? job.replyStatus || "pending" : "pending") as TicketStatus, status: c.latestMessageId === job.messageId ? "replied" : c.status === "delivery_unknown" ? "awaiting_human" : c.status, firstRepliedAt: c.firstRepliedAt ?? new Date(), updatedAt: new Date() }).where(eq(conversations.id, c.id));
+  await tx.update(conversations).set({ requiresHuman: job.stage === "manual_send" ? false : c.requiresHuman, ticketStatus: (job.stage === "manual_send" ? job.replyStatus || "pending" : "pending") as TicketStatus, resolvedAt: resolvedAtFor(job.stage === "manual_send" ? job.replyStatus || "pending" : "pending"), status: c.latestMessageId === job.messageId ? "replied" : c.status === "delivery_unknown" ? "awaiting_human" : c.status, firstRepliedAt: c.firstRepliedAt ?? new Date(), updatedAt: new Date() }).where(eq(conversations.id, c.id));
 }
 
 async function deliverJob(job: Job, incoming: Message) {
@@ -223,7 +225,7 @@ async function escalateJob(job: Job, incoming: Message) {
       return;
     }
     if (usesPartialEmailRollout(c.email, await readSupportEmailTone()) || internalSupportEnabled() || process.env.SUPPORT_EMAIL_LEGACY_FRESHDESK_HANDOFF !== "true") {
-      await tx.update(conversations).set({ owner: "human", requiresHuman: true, ticketStatus: ["resolved", "closed"].includes(c.ticketStatus) ? c.ticketStatus : "open", status: "awaiting_human", updatedAt: new Date() }).where(eq(conversations.id, c.id));
+      await tx.update(conversations).set({ owner: "human", requiresHuman: true, ticketStatus: ["resolved", "closed"].includes(c.ticketStatus) ? c.ticketStatus : "open", resolvedAt: isResolvedTicketStatus(c.ticketStatus) ? c.resolvedAt : null, status: "awaiting_human", updatedAt: new Date() }).where(eq(conversations.id, c.id));
       await tx.update(jobs).set({ status: "succeeded", error: null }).where(eq(jobs.id, job.id));
       return;
     }
@@ -321,7 +323,7 @@ export async function receiveFreshdeskEmailEvent(input: z.infer<typeof freshdesk
     const lastEvent = await tx.query.supportEmailMessages.findFirst({ where: and(eq(messages.conversationId, current.id), eq(messages.direction, "human")), orderBy: [desc(messages.receivedAt)] });
     await tx.insert(messages).values({ id: crypto.randomUUID(), conversationId: current.id, dedupeKey, providerMessageId: input.messageId || input.eventId, direction: "human", subject: current.subject, text: input.text || input.event, receivedAt: new Date(input.occurredAt) });
     if (lastEvent && lastEvent.receivedAt > new Date(input.occurredAt)) return { accepted: true, ignored: true, reason: "older_human_event_saved" };
-    await tx.update(conversations).set({ owner: "human", requiresHuman: input.event !== "human.replied" && input.event !== "ticket.resolved", ticketStatus: input.event === "ticket.resolved" ? "resolved" : input.event === "human.replied" ? "pending" : "open", freshdeskId: input.freshdeskId, status: input.event === "ticket.resolved" ? "resolved" : "human", firstRepliedAt: input.event === "human.replied" ? current.firstRepliedAt ?? new Date(input.occurredAt) : current.firstRepliedAt, updatedAt: new Date() }).where(eq(conversations.id, current.id));
+    await tx.update(conversations).set({ owner: "human", requiresHuman: input.event !== "human.replied" && input.event !== "ticket.resolved", ticketStatus: input.event === "ticket.resolved" ? "resolved" : input.event === "human.replied" ? "pending" : "open", resolvedAt: resolvedAtFor(input.event === "ticket.resolved" ? "resolved" : "open"), freshdeskId: input.freshdeskId, status: input.event === "ticket.resolved" ? "resolved" : "human", firstRepliedAt: input.event === "human.replied" ? current.firstRepliedAt ?? new Date(input.occurredAt) : current.firstRepliedAt, updatedAt: new Date() }).where(eq(conversations.id, current.id));
     if (!current.freshdeskId) await tx.update(jobs).set({ status: "succeeded", error: null }).where(and(eq(jobs.conversationId, current.id), eq(jobs.stage, "escalate"), eq(jobs.status, "unknown")));
     await tx.update(jobs).set({ status: "cancelled", error: "human_took_over" }).where(and(eq(jobs.conversationId, current.id), inArray(jobs.stage, ["prepare", "send"]), inArray(jobs.status, ["queued", "review", "blocked", "failed"])));
     return { accepted: true, deduped: false };
@@ -375,7 +377,7 @@ export async function supportEmailAction(id: string, action: "takeover" | "resum
     const tone = await readSupportEmailTone();
     const partial = usesPartialEmailRollout(c.email, tone);
     if (action === "takeover") {
-      await tx.update(conversations).set({ owner: "human", requiresHuman: true, ticketStatus: "open", status: "awaiting_human", escalationReason: "Staff took over", updatedAt: now }).where(eq(conversations.id, id));
+      await tx.update(conversations).set({ owner: "human", requiresHuman: true, ticketStatus: "open", resolvedAt: null, status: "awaiting_human", escalationReason: "Staff took over", updatedAt: now }).where(eq(conversations.id, id));
       await tx.update(jobs).set({ status: "cancelled", error: "human_took_over" }).where(and(eq(jobs.conversationId, id), inArray(jobs.stage, ["prepare", "send"]), inArray(jobs.status, ["queued", "review", "blocked", "failed"])));
       if (c.latestMessageId) await tx.insert(jobs).values({ id: crypto.randomUUID(), conversationId: id, messageId: c.latestMessageId, stage: "escalate", sendAfter: now }).onConflictDoNothing();
     } else if (action === "resume") {

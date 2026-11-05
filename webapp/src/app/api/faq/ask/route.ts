@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withUser } from "@/server/session";
 import { publishedKnowledge } from "@/server/support-knowledge";
 import { readSupportEmailTone, voicePreferences } from "@/server/support-email-tone";
+import { recordAiQuestion } from "@/server/support-ai-questions";
 
 const schema = z.object({ question: z.string().min(3).max(300) });
 
@@ -50,6 +51,7 @@ export const POST = withUser(async (user, request: Request) => {
         .join(" ")
         .trim();
 
+      await recordAiQuestion(user.id, { question, source: "ai", orderQuestion, related: related.map((f) => f.q) });
       return Response.json({ answer: supplement(answer), source: "ai", related: related.map((f) => f.q) });
     } catch (e) {
       console.error("[faq-ai]", e);
@@ -58,6 +60,7 @@ export const POST = withUser(async (user, request: Request) => {
   }
 
   const best = related[0];
+  await recordAiQuestion(user.id, { question, source: "search", orderQuestion, related: related.map((f) => f.q) });
   return Response.json({
     answer: orderQuestion ? supplement(selected ? `Order ${selected.number}: ${selected.shippingStatus || selected.status}.${selected.trackingId ? "" : " Tracking is not available yet."}` : "Please confirm the order number so we can identify the correct purchase.") : best
       ? best.a
