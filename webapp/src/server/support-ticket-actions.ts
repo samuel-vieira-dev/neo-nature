@@ -4,6 +4,7 @@ import { adminActionLogs, adminUsers, supportEmailConversations as conversations
 import { canDeliverEmail } from "./support-email-contract";
 import { readSupportEmailTone } from "./support-email-tone";
 import { withConversationLock } from "./support-email";
+import { resolvedAtFor } from "./support-ticket-resolution";
 import { TICKET_STATUSES, TICKET_STATUS_LABELS } from "@/lib/support-tickets";
 import type { AdminContext } from "./admin";
 
@@ -46,7 +47,7 @@ export async function ticketAction(id: string, data: z.infer<typeof ticketAction
         if (uncertain) throw Response.json({ error: "reconcile_pending_delivery_first" }, { status: 409 });
         await tx.update(jobs).set({ status: "cancelled", error: "ticket_closed_by_staff" }).where(and(eq(jobs.conversationId, id), inArray(jobs.status, ["queued", "review", "blocked", "failed"])));
       }
-      await tx.update(conversations).set({ ticketStatus: data.status, requiresHuman: ["resolved", "closed", "pending"].includes(data.status) ? false : c.owner === "human" || c.tier === "T3", updatedAt: now }).where(eq(conversations.id, id));
+      await tx.update(conversations).set({ ticketStatus: data.status, resolvedAt: resolvedAtFor(data.status), requiresHuman: ["resolved", "closed", "pending"].includes(data.status) ? false : c.owner === "human" || c.tier === "T3", updatedAt: now }).where(eq(conversations.id, id));
       if (c.legacyTicketId) await tx.update(tickets).set({ status: data.status }).where(eq(tickets.id, c.legacyTicketId));
     } else {
       if (data.adminId) {

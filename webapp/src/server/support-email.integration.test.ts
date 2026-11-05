@@ -299,6 +299,19 @@ describe.skipIf(process.env.RUN_SUPPORT_EMAIL_DB_TESTS !== "1")("support email d
     const [row]=await database.db.insert(adminUsers).values({id:crypto.randomUUID(),email:`${crypto.randomUUID()}@example.com`,name:"CS tester",role:"cs",passwordHash:"unused"}).returning();
     return {...row,role:"cs" as const,permissions:[]};
   }
+  it("records when a ticket is resolved and clears it when the customer writes again", async()=>{
+    vi.stubEnv("SUPPORT_TICKETING_BACKEND","internal");vi.stubEnv("SUPPORT_EMAIL_MODE","pilot");
+    const {ticketAction}=await import("./support-ticket-actions");const staff=await createStaff();
+    await service.receiveSupportEmail(input("resolve-1","This is a scam"));await service.runSupportEmailJobs();
+    const read=async()=>(await database.db.select().from(conversations))[0];
+    expect((await read()).resolvedAt).toBeNull();
+    await ticketAction((await read()).id,{action:"status",status:"resolved",expectedUpdatedAt:(await read()).updatedAt.toISOString()},staff);
+    const resolved=await read();expect(resolved.resolvedAt).toBeInstanceOf(Date);
+    await ticketAction(resolved.id,{action:"status",status:"closed",expectedUpdatedAt:resolved.updatedAt.toISOString()},staff);
+    expect((await read()).resolvedAt?.toISOString()).toBe(resolved.resolvedAt!.toISOString());
+    await service.receiveSupportEmail(input("resolve-2","Still not solved"));
+    expect(await read()).toMatchObject({ticketStatus:"open",resolvedAt:null});
+  });
   it("sends human replies once, preserves notes internally and reopens on new mail", async()=>{
     vi.stubEnv("SUPPORT_TICKETING_BACKEND","internal");vi.stubEnv("SUPPORT_EMAIL_MODE","pilot");
     const {ticketAction}=await import("./support-ticket-actions");const staff=await createStaff();
